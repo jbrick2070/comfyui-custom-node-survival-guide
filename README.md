@@ -6,7 +6,7 @@
 
 ### Want to feed your AI assistant even more context?
 
-Check out the **[Detailed Guide (52 sections)](DETAILED_GUIDE.md)** — a deep-dive companion to this README covering every lesson learned across the full development cycle. Fair warning: it's AI-assisted, opinionated, and the ComfyUI landscape moves fast, so take it with a grain of salt. But if it saves you even one three-hour debugging session, it paid for itself.
+Check out the **[Detailed Guide (52 sections)](DETAILED_GUIDE.md)** — a deep-dive companion to this README covering every lesson learned across the full development cycle. Fair warning: it's AI-assisted, opinionated, and the ComfyUI landscape moves fast, so take it with a grain of salt. But if it saves you even one three-hour debugging session, it paid (it's free anyway!)  for itself.
 
 ---
 
