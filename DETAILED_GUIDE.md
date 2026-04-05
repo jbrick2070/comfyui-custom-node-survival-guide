@@ -8,6 +8,8 @@ April 2026
 
 Every rule in this document was learned the hard way.
 
+**How this guide was made:** I am not a coder. I am a healthcare IT project manager who builds AI creative tools as a side pursuit. Every single line of code in my ComfyUI node packs --- ComfyUI-Goofer and ComfyUI-OldTimeRadio (SIGNAL LOST) --- was written by Claude, Anthropic's AI assistant, across dozens of sessions. The v1.0 sections (1--52) were discovered over several weeks of building with Claude Code (Anthropic's command-line coding agent). The v1.1 sections (53--60) were discovered in a single intensive Claude Cowork session (Anthropic's desktop AI tool) while building the SIGNAL LOST audio-video pipeline. I never manually edited a workflow wire, typed a widget value, or wrote a line of Python. Every bug, every fix, every architectural pattern in this guide came from directing Claude to build, test, break, diagnose, and repair ComfyUI custom nodes on my behalf. If that changes how you read this document --- good. It should. This is what AI-assisted development actually looks like in practice: you bring the creative vision and domain knowledge, the AI brings the code, and the lessons learned are real regardless of who typed them.
+
 ## Table of Contents
 
 ## Part I: Core Architecture & Environment
@@ -1534,57 +1536,63 @@ When upgrading the transformers library across major versions (e.g., 4.x to 5.x)
 
 After any file transfer to a Git-tracked directory, verify encoding integrity by: (1) checking for BOM bytes with head -c 3 file | xxd, (2) scanning for mojibake patterns with grep -P '[\x80-\xff]{4,}', and (3) confirming that transformers and other version-pinned dependencies in requirements.txt match the actual library API being called in the source code. A fresh clone from the remote is the only reliable final verification.
 
-## Part VII: Lessons from SIGNAL LOST (v1.1)
+## Part VII: Building ComfyUI Node Packs with Claude Cowork (v1.1)
 
-The following sections were added after building ComfyUI-OldTimeRadio (SIGNAL LOST), a 12-node audio-video pipeline that orchestrates Gemma 4 script generation, Bark TTS, procedural SFX, spatial audio mastering, and ffmpeg-based CRT video rendering inside ComfyUI. Every issue described below cost real debugging hours.
+The following sections were added after building the entire ComfyUI-OldTimeRadio (SIGNAL LOST) node pack --- 12 nodes, two workflows, a live render monitor, and a procedural video engine --- using Claude Cowork as the primary development environment. Claude Cowork is Anthropic's desktop AI tool: it has a sandboxed Linux shell for running code, file tools (Read/Write/Edit) mounted to a workspace folder on the user's Windows machine, and a Windows MCP (Model Context Protocol) bridge for executing PowerShell commands on the host.
 
-### Section 53: ffmpeg Subprocess Pipe Deadlock
+Every section below describes a specific problem encountered during this Cowork-driven build, how it was diagnosed using the tools available in Cowork, and what the fix was. The goal is to help other developers who are using Claude Cowork (or similar AI-assisted development tools) to build ComfyUI custom nodes avoid the same pitfalls.
 
-When shelling out to ffmpeg from a ComfyUI node (e.g., to encode video frames into an MP4), the most common fatal mistake is setting both stdout and stderr to subprocess.PIPE.
+### Section 53: ffmpeg Subprocess Pipe Deadlock (Diagnosed via Windows MCP Process Inspection)
 
-**The bug:** Python's subprocess.Popen writes frame data to ffmpeg's stdin. ffmpeg writes status messages to stderr. If both stdout and stderr are set to PIPE, the OS pipe buffer (typically 64 KB on Linux, 4 KB on Windows) fills up because nobody is reading from those pipes while you are busy writing to stdin. Once the buffer is full, ffmpeg blocks on its next write to stderr. Your Python process blocks on its next write to stdin because ffmpeg stopped reading. Both processes are now waiting on each other. Classic deadlock.
+**Context:** Claude Cowork wrote a video rendering node (SignalLostVideo) that pipes PIL-generated frames to ffmpeg's stdin for MP4 encoding. The first render queued via the ComfyUI API appeared to run --- the node started executing, ffmpeg launched --- but the pipeline never completed.
 
-The process appears frozen. CPU usage drops to near zero. ffmpeg's cumulative CPU time in Task Manager stops increasing. The node never completes, never errors, just hangs forever.
+**How Cowork diagnosed it:** The Windows MCP's PowerShell tool ran `Get-Process python*` on the host machine. The ComfyUI Python process showed 0.046 seconds of cumulative CPU time after several minutes of wall-clock time. That is a dead giveaway: the process is alive but not computing. It is blocked on I/O.
 
-**The fix:**
+The root cause was a classic subprocess pipe deadlock. The original code set both `stdout=subprocess.PIPE` and `stderr=subprocess.PIPE` on the ffmpeg Popen call. Python writes frame data to ffmpeg's stdin. ffmpeg writes encoding progress to stderr. The OS pipe buffer (64 KB on Linux, 4 KB on Windows) fills up because nobody is reading from those pipes while stdin writes are happening. Once full, ffmpeg blocks on its next stderr write. Python blocks on its next stdin write because ffmpeg stopped reading. Both processes wait on each other forever.
+
+**The fix Cowork applied:**
 
 ```python
 import subprocess
 import tempfile as _tf
 
-# CORRECT: stdout to DEVNULL (we don't need it), stderr to a temp file
+# stdout → DEVNULL (we never read it), stderr → temp file (read after encoding)
 stderr_file = _tf.NamedTemporaryFile(mode="w+b", prefix="otr_ffmpeg_", suffix=".log", delete=False)
 
 proc = subprocess.Popen(
     cmd,
     stdin=subprocess.PIPE,
     stdout=subprocess.DEVNULL,   # never PIPE
-    stderr=stderr_file,           # file, not PIPE
+    stderr=stderr_file,           # file descriptor, not PIPE
 )
 
-# Write all frames to stdin
 for frame in frame_generator():
     proc.stdin.write(frame)
 proc.stdin.close()
 proc.wait()
 
-# NOW read stderr from the temp file (ffmpeg already exited)
+# Read ffmpeg's log output AFTER it exits
 stderr_file.seek(0)
 log_output = stderr_file.read().decode("utf-8", errors="replace")
 stderr_file.close()
 ```
 
-**Why not proc.communicate()?** communicate() buffers the entire stdin payload in memory before sending. For video encoding, that means loading every frame into RAM simultaneously, which defeats the purpose of streaming frames one at a time. The temp-file approach lets ffmpeg write its logs without blocking while you stream frames incrementally.
+**Why not proc.communicate()?** communicate() buffers the entire stdin payload in memory before sending. For video encoding (thousands of 1080p frames), that means gigabytes of RAM. The temp-file approach lets ffmpeg write its logs without blocking while you stream frames incrementally.
 
-**Why not threads?** You could spawn a thread to drain stderr while the main thread writes to stdin. This works but adds complexity (thread safety, exception propagation) for no benefit over a temp file that ffmpeg writes to directly.
+**Cowork-specific lesson:** When Claude Cowork writes code that shells out to external processes, it cannot see the subprocess hang in real time the way a human watching a terminal would. The Windows MCP's process inspection (`Get-Process`, checking CPU time) is the primary diagnostic tool. If cumulative CPU time stops increasing while the process is still alive, suspect a pipe deadlock.
 
 **Rule:** When calling any external process that reads from stdin AND writes to stdout/stderr simultaneously, never set both output pipes to PIPE. Use DEVNULL for the one you don't need and a temp file for the one you do.
 
-### Section 54: Git LFS Filter Hangs on Windows
+### Section 54: Git LFS Filter + Windows Defender — A Compound Hang (Diagnosed via Elimination in Cowork)
 
-If every git command hangs indefinitely on a Windows machine --- including trivial operations like `git --version` or `git status` --- the most likely cause is a broken or misconfigured Git LFS filter in the global .gitconfig.
+**Context:** After Cowork finished writing all the node code and the README, the next step was committing and pushing to GitHub via the Windows MCP's PowerShell tool. Every single git command hung indefinitely --- including `git --version`, which takes no arguments and touches no repo.
 
-**The bug:** Git for Windows installs a global LFS filter by default:
+**How Cowork diagnosed it:** This required systematic elimination, because there was no error message --- just silence. Cowork ran increasingly minimal commands through the Windows MCP:
+
+1. `echo "test"` → instant. Shell works.
+2. `where.exe git` → instant. Git is installed at `C:\Program Files\Git\cmd\git.exe`.
+3. `git --version` → hangs. The problem is in git.exe itself, not a specific repo.
+4. Read `~/.gitconfig` directly via `Get-Content` → found the culprit:
 
 ```ini
 [filter "lfs"]
@@ -1594,228 +1602,176 @@ If every git command hangs indefinitely on a Windows machine --- including trivi
     required = true
 ```
 
-The `process = git-lfs filter-process` directive tells git to launch `git-lfs.exe` as a long-running filter process for EVERY git operation, even on repositories that contain zero LFS-tracked files. If `git-lfs.exe` itself hangs (due to a corrupted installation, a network call that never returns, or an antivirus program scanning the executable on every launch), then every single git command inherits that hang.
+Git for Windows installs this global LFS filter by default. The `process = git-lfs filter-process` directive launches `git-lfs.exe` as a long-running filter for EVERY git operation, even on repos with zero LFS-tracked files. If `git-lfs.exe` hangs (as it did here), every git command inherits the hang.
 
-**Diagnosis:** Run these in sequence to isolate:
-1. `echo "test"` → works instantly? Shell is fine.
-2. `where.exe git` → returns a path? Git is installed.
-3. `git --version` → hangs? The problem is git itself, not your repo.
-4. `git-lfs version` → hangs? LFS is the root cause.
-
-**The fix:** Remove the LFS filter from global config:
+**First fix — Cowork removed the LFS filter:**
 
 ```powershell
-# PowerShell — remove the entire [filter "lfs"] section
 $cfg = Get-Content "$env:USERPROFILE\.gitconfig" -Raw
 $cleaned = $cfg -replace '(?s)\[filter "lfs"\].*?(?=\[|$)', ''
 $cleaned.Trim() | Set-Content "$env:USERPROFILE\.gitconfig" -Encoding utf8
 ```
 
-Or manually edit `~/.gitconfig` and delete the `[filter "lfs"]` block entirely. You can reinstall LFS later with `git lfs install` once the underlying hang is resolved.
+But git STILL hung after removing LFS. Cowork then checked `Get-MpComputerStatus` and found Windows Defender Real-Time Protection was enabled. Defender scans every executable on launch. For git.exe --- which spawns child processes like `git-remote-https.exe`, `git-lfs.exe`, and `ssh.exe` --- Defender was holding file locks long enough to cause timeouts in the MCP's PowerShell session.
 
-**Prevention:** If your node pack does not use Git LFS (and most should not --- models belong on HuggingFace, not in git), consider running `git lfs uninstall --system` on developer machines to remove the system-level hook entirely.
-
-### Section 55: Windows Defender & Git Executable Blocking
-
-Windows Defender's Real-Time Protection scans every executable on launch. For `git.exe`, which spawns multiple child processes per command (`git-remote-https.exe`, `git-lfs.exe`, `ssh.exe`), this can add 30+ seconds of latency per git operation or cause outright hangs when the scanner holds an exclusive file lock.
-
-**Symptoms:** Git commands hang or take 30-60 seconds for trivial operations. Non-git executables (echo, dir, Python) work instantly. The git process appears in Task Manager with minimal CPU usage.
-
-**The fix:** Add Git to Defender's exclusion list (requires Administrator):
+**Second fix — required the user to run from an Administrator terminal:**
 
 ```powershell
 Add-MpPreference -ExclusionPath "C:\Program Files\Git"
 ```
 
-This is safe because git's executables are signed binaries from a trusted publisher. The exclusion only skips real-time scanning of the git binaries themselves, not the files git operates on.
+After both fixes (LFS removal + Defender exclusion), git commands completed instantly.
 
-**Broader lesson:** Any ComfyUI workflow that shells out to external tools (ffmpeg, git, ImageMagick) on Windows should document Defender exclusions in the installation guide. Real-time scanning of frequently-invoked executables is the single most common cause of "it works on Linux but hangs on Windows" reports.
+**Cowork-specific lesson:** The Windows MCP's PowerShell tool has a 60-second timeout. When a command times out, Cowork sees `MCP server timed out` with no stderr, no partial output, nothing. This makes it impossible to distinguish "the command is slow" from "the command hung forever." The only diagnostic path is binary elimination: run simpler and simpler commands until you find the boundary between "works" and "hangs." Cowork ran ~20 progressively simpler git invocations before isolating the root cause.
 
-### Section 56: CPU-Only Video Rendering in ComfyUI (Zero VRAM)
+**Important:** The MCP PowerShell session and an admin PowerShell window are separate processes. Defender exclusions added in one don't retroactively fix hung commands in the other. The user had to run the git commit/push from their own admin terminal after both fixes were applied.
 
-ComfyUI custom nodes can produce video output without touching the GPU at all. This is critical in pipelines where VRAM is already committed to LLM inference and TTS generation.
+**Rule for Cowork developers:** If git hangs through the Windows MCP, check `.gitconfig` for LFS filters first (read the file directly, don't run git), then check Defender status. Both must be resolved. Document Defender exclusions for git and ffmpeg in your node pack's installation guide.
 
-**Architecture:** Use PIL (Pillow) for frame composition and numpy for audio analysis. Generate each frame as a PIL Image, convert to raw bytes, and pipe directly to ffmpeg's stdin (see Section 53 for the correct pipe pattern). The entire video render runs on CPU with zero VRAM allocation.
+### Section 55: Finding ComfyUI's Actual Install Location (Windows MCP Process Discovery)
 
-**Audio-reactive pattern:**
+**Context:** Cowork needed to find ComfyUI's workspace directory to read logs, check output files, and queue renders via the API. The user's ComfyUI was installed via the Desktop App, which doesn't use the standard `C:\Users\<name>\ComfyUI` path.
 
-```python
-import numpy as np
-from PIL import Image, ImageDraw
+**How Cowork found it:** Standard path guesses failed. Cowork used the Windows MCP to inspect running processes:
 
-def analyze_audio(waveform_np, sample_rate, fps):
-    """Pre-compute per-frame audio features for the entire clip."""
-    samples_per_frame = sample_rate // fps
-    total_frames = len(waveform_np) // samples_per_frame
-
-    volume = np.zeros(total_frames)
-    freqs = np.zeros((total_frames, 64))   # 64-bin FFT
-    waves = np.zeros((total_frames, 200))  # 200-sample waveform slice
-
-    for fi in range(total_frames):
-        start = fi * samples_per_frame
-        end = start + samples_per_frame
-        chunk = waveform_np[start:end]
-
-        # RMS volume (0.0 – 1.0 normalized)
-        volume[fi] = min(1.0, np.sqrt(np.mean(chunk ** 2)) * 5.0)
-
-        # FFT frequency bins (magnitude spectrum)
-        fft = np.abs(np.fft.rfft(chunk))[:64]
-        peak = fft.max()
-        freqs[fi] = fft / peak if peak > 1e-8 else fft
-
-        # Raw waveform slice for oscilloscope display
-        step = max(1, len(chunk) // 200)
-        waves[fi] = chunk[::step][:200]
-
-    return volume, freqs, waves
+```powershell
+Get-Process python* | Select-Object Id, Path
 ```
 
-**Key design decisions:**
-- Pre-compute ALL audio analysis before rendering any frames. This avoids redundant FFT calculations and makes the frame generator a pure function of (frame_index, precomputed_data).
-- Use PIL ImageDraw for geometric primitives (lines, arcs, polygons). It is fast enough for 24 fps 1080p on any modern CPU.
-- Yield frames as raw RGB bytes to ffmpeg rather than saving intermediate PNGs. This avoids disk I/O entirely.
-- Target 24 fps for cinematic feel. Higher frame rates waste CPU time on procedural art that doesn't benefit from smoothness.
+This returned PID 31968 running from `C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe`. From that path, the workspace root was `C:\Users\jeffr\Documents\ComfyUI\`, the custom nodes were in `custom_nodes/`, and the server was confirmed on port 8000 (not the default 8188) by checking the log file at `user/comfyui_8000.log`.
 
-**Performance:** A 4-minute episode at 1080p24 renders in ~4 minutes on an Intel Core i7 class CPU. The GPU remains 100% available for the preceding LLM and TTS stages.
+**Cowork-specific lesson:** Never assume ComfyUI's install path. The Desktop App installs the launcher at `AppData\Local\Programs\ComfyUI\` but the workspace (models, custom_nodes, output) lives at `Documents\ComfyUI\`. These are different directories. The running Python process is the only reliable way to find the workspace.
 
-### Section 57: Output Path Resolution Pitfalls
+**Rule:** When building automation (monitors, API scripts, OBS integrations) that needs to find ComfyUI's directories, use process inspection first. Hardcoded paths break across install methods.
 
-Never use chained `os.path.dirname()` calls to navigate from a node's source file to ComfyUI's output directory. The number of parent traversals depends on install location, and this breaks silently when the directory structure changes.
+### Section 56: CPU-Only Video Rendering in ComfyUI (Zero VRAM, Designed in Cowork)
 
-**The bug:**
+**Context:** The SIGNAL LOST pipeline runs Gemma 4 (~8 GB VRAM) and Bark TTS (~4 GB VRAM) sequentially. Adding GPU-based video rendering would require either waiting for both models to unload or having a second GPU. Cowork designed the video engine to use zero VRAM by rendering entirely on CPU.
+
+**Architecture Cowork built:** PIL (Pillow) for frame composition, numpy for per-frame FFT/RMS audio analysis, raw RGB bytes piped to ffmpeg (see Section 53). The visual elements --- circular frequency ring, orbiting particles, warping geometric grid, mirrored waveform, frequency-spectrum color bars, CRT scan lines, vignette overlay, and audio-reactive noise --- are all drawn with PIL's ImageDraw primitives (lines, arcs, polygons, rectangles).
+
+**Audio analysis is pre-computed for the entire clip before rendering begins:**
 
 ```python
-# WRONG — fragile, breaks if nesting changes
+samples_per_frame = sample_rate // fps
+for fi in range(total_frames):
+    chunk = waveform_np[fi * samples_per_frame : (fi + 1) * samples_per_frame]
+    volume[fi] = min(1.0, np.sqrt(np.mean(chunk ** 2)) * 5.0)    # RMS
+    freqs[fi]  = np.abs(np.fft.rfft(chunk))[:64]                   # 64-bin FFT
+    waves[fi]  = chunk[::step][:200]                                 # waveform slice
+```
+
+This makes the frame generator a pure function of `(frame_index, precomputed_arrays)` with no redundant computation.
+
+**Performance (measured during actual SIGNAL LOST renders):** A 4-minute episode at 1080p 24fps renders in approximately 4.5 minutes on the user's Intel Core Ultra 9 275HX CPU. The NVIDIA RTX 5080 GPU sits idle during video rendering and is 100% available for the preceding LLM and TTS pipeline stages.
+
+**Cowork-specific lesson:** When Cowork is building a multi-model pipeline, it needs to reason about VRAM as a shared resource across the entire workflow. The sequential unload pattern (Gemma → unload → Bark → unload → video) means video rendering must not touch the GPU at all, because Bark's VRAM cleanup may be incomplete (PyTorch memory fragmentation). CPU-only rendering eliminates this entire class of VRAM contention bugs.
+
+**First version failed:** Cowork's initial video engine attempted to sync dialogue text and character cards to the audio timeline using word-count-based duration estimation (`words / 2.5 wps`). This didn't match Bark's actual output durations, so the text was visibly out of sync. The fix was to remove all script-synced text entirely and replace it with pure procedural audio-reactive art that doesn't need timing data --- only the raw audio waveform.
+
+### Section 57: Output Path Resolution Pitfalls (Sandbox vs Windows Mount)
+
+**Context:** Cowork operates in a sandboxed Linux environment with the user's Windows filesystem mounted at `/sessions/<id>/mnt/`. When Cowork writes code that constructs output paths, those paths must resolve correctly on the Windows host where ComfyUI actually runs --- not in the sandbox.
+
+**The bug Cowork introduced:**
+
+```python
+# WRONG — Cowork wrote this, counting parent dirs from nodes/video_engine.py
 output_dir = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-    "output", "my_node_pack"
+    "output", "old_time_radio"
 )
-# Resolves to: custom_nodes/output/my_node_pack/  (WRONG)
-# Expected:   ComfyUI/output/my_node_pack/         (RIGHT)
+# On Windows at runtime: custom_nodes/ComfyUI-OldTimeRadio/output/old_time_radio/  (WRONG)
+# Expected:              Documents/ComfyUI/output/old_time_radio/                    (RIGHT)
 ```
 
-The number of dirname() calls required depends on whether the file is in `nodes/`, `nodes/subdir/`, or the package root. If you reorganize your file structure later, this silently starts writing to the wrong directory.
+The `os.path.dirname()` x3 chain walks up from `nodes/video_engine.py` → `nodes/` → `ComfyUI-OldTimeRadio/` → `custom_nodes/`. That's only three levels, not four, so the output directory ended up inside the node pack instead of in ComfyUI's output folder.
 
-**The fix — Option A (ComfyUI API):**
+**How Cowork caught it:** After the first successful render, the user asked "where's the file?" Cowork checked the expected output directory via Windows MCP and found nothing. Then checked the node pack directory itself and found the MP4 had been written there.
 
-```python
-import folder_paths
-output_dir = os.path.join(folder_paths.get_output_directory(), "my_node_pack")
-```
-
-**The fix — Option B (Home directory, for Desktop App users):**
+**The fix:**
 
 ```python
+# CORRECT — matches the EpisodeAssembler pattern and Desktop App default
 output_dir = os.path.join(
-    os.path.expanduser("~"), "Documents", "ComfyUI", "output", "my_node_pack"
+    os.path.expanduser("~"), "Documents", "ComfyUI", "output", "old_time_radio"
 )
 ```
 
-Option B is explicit and works regardless of how the node file is nested. It matches the ComfyUI Desktop App's default workspace location on Windows. Use this when folder_paths is not available (e.g., in standalone scripts like otr_monitor.py).
-
-**Rule:** If your output path depends on counting parent directories from __file__, it will break. Use folder_paths or an absolute reference.
+**Cowork-specific lesson:** Cowork's file tools show paths like `/sessions/lucid-serene-darwin/mnt/ComfyUI/...` which is the Linux mount path. But the code runs on Windows where the path is `C:\Users\jeffr\Documents\ComfyUI\...`. When writing path-construction logic, Cowork must think in terms of the runtime environment (Windows), not its own view of the filesystem (Linux mount). Use `os.path.expanduser("~")` or `folder_paths.get_output_directory()` --- never chain `os.path.dirname(__file__)`.
 
 ### Section 58: Audio-Reactive Pipeline Timing & Beat Duration Tuning
 
-In a multi-stage audio pipeline (ScriptWriter → Director → TTS → Sequencer), beat/pause timing is controlled at three different layers. All three must agree, or you get dead air.
+**Context:** After the first full pipeline render completed successfully (~33 minutes), the user listened to the output and said the beat pauses between dialogue lines felt too long --- "maybe 200ms?" The default was 800ms.
 
-**Layer 1 — Parser defaults:** The script parser converts raw LLM output like `(beat)` into structured pause events. It assigns a default duration (e.g., `duration_ms: 800`). This is the source of truth if the LLM doesn't specify a duration.
+**The problem:** Beat/pause timing is controlled at three separate layers in the SIGNAL LOST pipeline, and all three had independent defaults:
 
-**Layer 2 — Director pacing prompt:** The Director node's system prompt tells the LLM what beat duration to use: `"beat_pause_ms": 800`. If this doesn't match the parser default, scripts generated by the Director will disagree with the parser's fallback.
+1. **Parser default** (gemma4_orchestrator.py line 1026): When the script parser encounters `(beat)` in the raw LLM output, it creates a pause event with `duration_ms: 800`.
+2. **Director pacing prompt** (gemma4_orchestrator.py line 1130): The Director node's system prompt tells Gemma 4 to use `"beat_pause_ms": 800` when planning production.
+3. **Sequencer render** (scene_sequencer.py): The Scene Sequencer renders pauses using whatever duration the script specifies, with no cap.
 
-**Layer 3 — Sequencer render cap:** The Scene Sequencer can enforce a maximum pause duration regardless of what the script says: `dur_ms = min(dur_ms, 200)`. This is the safety net.
+800ms pauses sound fine in isolation, but a script with 20+ beats adds 16 seconds of dead air. After Bark TTS compression (Bark often produces slightly shorter audio than the word count would predict), the relative silence is even more noticeable.
 
-**The bug:** Default beat pauses of 800ms sound fine in isolation but stack up. A script with 20 beat pauses adds 16 seconds of dead air. After TTS compression (Bark produces slightly shorter audio than expected), the pauses feel even longer relative to the dialogue.
-
-**The fix:** Tune all three layers to the same value. For spoken-word radio drama, 200ms beats feel natural and maintain momentum. Update:
-1. Parser default: `duration_ms: 200`
+**What Cowork changed:** All three layers were updated to 200ms:
+1. Parser: `duration_ms: 200`
 2. Director prompt: `"beat_pause_ms": 200`
-3. Sequencer cap: `dur_ms = min(dur_ms, 200)`
+3. Sequencer: Added a hard cap: `dur_ms = min(dur_ms, 200)`
 
-**Rule:** Any timing parameter that appears in more than one layer must be synchronized. Document the authoritative value in one place and have the other layers reference or defer to it.
+The cap in layer 3 acts as a safety net --- even if the LLM hallucinates a 2000ms pause, the sequencer clamps it to 200ms.
+
+**Cowork-specific lesson:** When Cowork builds a multi-stage pipeline where the same parameter appears at different layers (LLM prompt → parser → renderer), it must update ALL layers simultaneously. Cowork used the Grep tool to search for `800` and `beat_pause` across the entire codebase to find every instance before making changes. A partial update (changing the parser but not the Director prompt) would cause inconsistency between freshly-generated scripts and the rendering defaults.
+
+**Rule:** Any timing parameter that appears in more than one layer must be synchronized. Grep for the value across the whole codebase before changing it.
 
 ### Section 59: WAV vs MP4 Output Strategy — Memory-Only Passthrough
 
-When a pipeline produces both audio and video, the intermediate audio file (WAV) is often an unnecessary disk write. If the video node consumes the audio tensor directly from memory, the WAV write is pure overhead.
+**Context:** The user watched the pipeline produce both an `episode_001_*.wav` file and a `signal_lost_*.mp4` file every render. They only wanted the MP4 and asked to remove the WAV output.
 
-**The pattern:** The Episode Assembler node produces a final audio tensor and passes it downstream to the Video node via ComfyUI's in-memory AUDIO type. The Video node extracts the waveform numpy array, writes it to a temporary WAV for ffmpeg to mux, and deletes the temp file after encoding.
-
-**Before (wasteful):**
-```
-EpisodeAssembler → writes episode.wav to disk → returns AUDIO tensor
-SignalLostVideo  → reads AUDIO tensor → writes temp.wav → encodes MP4 → deletes temp.wav
-Result: Two WAV files written. User only wants the MP4.
-```
-
-**After (clean):**
-```
-EpisodeAssembler → returns AUDIO tensor (no disk write)
-SignalLostVideo  → reads AUDIO tensor → writes temp.wav → encodes MP4 → deletes temp.wav
-Result: One temp WAV (deleted). User gets only the MP4.
-```
-
-**Implementation:** Remove the soundfile.write() call from the assembler. Keep the AUDIO return type and all metadata. The node still functions as a pipeline stage; it just stops producing a side-effect file.
+**What Cowork changed:** The EpisodeAssembler node previously called `soundfile.write()` to save the assembled audio as a WAV file, then returned the AUDIO tensor for downstream nodes. Cowork removed the `sf.write()` call and the accompanying `_log.txt` file write. The node still returns the AUDIO tensor via ComfyUI's in-memory type system, so the SignalLostVideo node downstream receives the exact same data.
 
 ```python
-# v1.0: WAV saving disabled — final output is MP4 only via SignalLostVideo.
-# Audio still passes through to downstream nodes in memory.
+# Before: sf.write(output_path, audio_np, sample_rate)  ← disk write removed
+# After:
 audio_out = {"waveform": episode_waveform, "sample_rate": sample_rate}
 output_path = "(video-only — no WAV saved)"
 ```
 
-**Rule:** Only the terminal output node should write to disk. Intermediate nodes should pass data through memory via ComfyUI's type system. This reduces I/O, avoids filename collision bugs, and makes cleanup trivial.
+The SignalLostVideo node writes a temporary WAV (for ffmpeg to mux with the video) and deletes it after encoding. The user only sees the final `.mp4`.
+
+**Cowork-specific lesson:** When Cowork modifies a node's behavior (removing file output), it must verify that no downstream node depends on the file path string. Cowork checked the workflow JSON to confirm that only the AUDIO tensor output (slot 0) was wired to downstream nodes, not the output_path string (slot 1). The string output still exists for API compatibility but contains a placeholder message.
+
+**Rule:** Only terminal output nodes (the last node in the pipeline) should write permanent files to disk. Intermediate nodes should pass data through ComfyUI's in-memory type system. This reduces I/O, eliminates filename collision bugs, and gives users a single clean deliverable.
 
 ### Section 60: OUTPUT_NODE UI Results & Preview Thumbnails
 
-ComfyUI nodes with `OUTPUT_NODE = True` can return rich UI data alongside their functional outputs. This is how PreviewImage and SaveImage display thumbnails in the graph editor. Custom nodes can use the same mechanism.
+**Context:** After the video engine was working, Cowork added a preview thumbnail feature so users can see a representative frame from the rendered MP4 directly in the ComfyUI graph editor, without opening the file externally.
 
-**The pattern:** Instead of returning a plain tuple, return a dict with `"ui"` and `"result"` keys:
+**The pattern:** ComfyUI nodes with `OUTPUT_NODE = True` can return a dict with `"ui"` and `"result"` keys instead of a plain tuple. The `"ui"` dict is sent to the frontend; the `"result"` tuple is the normal return value for downstream nodes. This is the same mechanism PreviewImage and SaveImage use.
 
 ```python
-class MyOutputNode:
-    OUTPUT_NODE = True
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("file_path",)
+# Extract a frame at ~30% into the video as a representative thumbnail
+thumb_path = out_path.replace(".mp4", "_thumb.png")
+seek_sec = max(0.5, duration * 0.3)
+subprocess.run([
+    "ffmpeg", "-y", "-ss", f"{seek_sec:.2f}",
+    "-i", out_path, "-frames:v", "1",
+    "-q:v", "2", thumb_path,
+], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
 
-    def execute(self, ...):
-        # ... do work, produce output_path ...
-
-        # Generate a preview thumbnail
-        preview_results = []
-        try:
-            thumb_path = output_path.replace(".mp4", "_thumb.png")
-            subprocess.run([
-                "ffmpeg", "-y", "-ss", "5.0",
-                "-i", output_path, "-frames:v", "1",
-                "-q:v", "2", thumb_path,
-            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
-
-            if os.path.exists(thumb_path):
-                preview_results.append({
-                    "filename": os.path.basename(thumb_path),
-                    "subfolder": "",
-                    "type": "output",
-                })
-        except Exception:
-            pass  # thumbnail is advisory, not critical
-
-        return {
-            "ui": {"images": preview_results},
-            "result": (output_path,),
-        }
+return {
+    "ui": {"images": [{"filename": fname, "subfolder": "", "type": "output"}]},
+    "result": (out_path,),
+}
 ```
 
 **Key details:**
-- The `"ui"` dict is sent to the frontend. The `"images"` key triggers ComfyUI's built-in image preview widget.
-- The `"result"` tuple is the normal return value used by downstream nodes. It must match RETURN_TYPES.
-- The thumbnail file must be in ComfyUI's output directory (or temp directory) for the frontend to find it.
-- The `"type"` field in the preview dict must be `"output"` or `"temp"` to match the directory the file is in.
-- If thumbnail generation fails, return an empty list. The node still works; it just won't show a preview.
+- Extract at ~30% into the video (not frame 0, which is often a black intro or title card).
+- The thumbnail file must be in ComfyUI's output directory for the frontend to find it. The `"type": "output"` field tells the frontend which directory to look in.
+- If thumbnail extraction fails (ffmpeg not found, timeout, etc.), return an empty images list. The node still works; it just won't show a preview. Thumbnail generation is advisory, not critical path.
+- This adds ~0.5 seconds to the render --- negligible compared to the 4+ minute video encoding.
 
-**For video nodes:** Extract a frame at ~30% into the video (not the first frame, which is often black or a title card) using ffmpeg's `-ss` flag. This gives a representative preview of the actual content.
+**Cowork-specific lesson:** When Cowork writes OUTPUT_NODE code, it should always consider whether a UI preview is appropriate. For image nodes this is obvious. For video and audio nodes, extracting a representative thumbnail or waveform image dramatically improves the user's experience in the graph editor. The `{"ui": ..., "result": ...}` return pattern is the standard way to do this and is well-documented in ComfyUI's SaveImage source code.
 
-**Rule:** Any OUTPUT_NODE that produces files the user cares about should return a UI preview. It costs one extra ffmpeg call (~0.5 seconds) and dramatically improves the user experience.
+**Note:** This specific thumbnail implementation was written by Cowork but has not yet been verified in a live ComfyUI render at time of writing. The pattern matches ComfyUI's documented OUTPUT_NODE behavior, but edge cases (subfolder resolution, temp vs output directory) may need adjustment.
 
-*End of Document — v1.1*
+*End of Document — v1.1 (SIGNAL LOST Edition)*
