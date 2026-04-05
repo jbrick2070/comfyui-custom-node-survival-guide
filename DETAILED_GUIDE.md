@@ -1,28 +1,12 @@
 # ComfyUI Custom Node & Workflow JSON Development — Best Practices & Lessons Learned
 
-**Version 1.0 — Community Edition + Major Restructure**
+**Version 1.1 — SIGNAL LOST Edition**
 
 Jeffrey A. Brick
 
-March 2026
+April 2026
 
 Every rule in this document was learned the hard way.
-
-## Release Notes — Version 1.0
-
-Version 1.0 introduces a major structural reorganization from 48 sections (arranged chronologically by discovery) into 6 thematic Parts. All existing content is preserved; only the organization has changed.
-
-What changed in this restructure:
-
--   Major restructure into 6 Parts for thematic organization
-
--   Global Table of Contents with all 52 sections mapped to their Parts
-
--   Section 49: trust_remote_code and Custom Model Code Compatibility (transformers 5.0 issues)
-
--   Section 50: Execution Order Dependencies via Dummy Links (cache ordering gotchas)
-
--   Section 51: Widget Value Desync After INPUT_TYPES Changes (workflow JSON position mapping)
 
 ## Table of Contents
 
@@ -43,6 +27,12 @@ What changed in this restructure:
 -   Section 45: Dependency Conflict Resolution Across Node Packs
 
 -   Section 47: transformers 5.0 Compatibility & Breaking Changes
+
+-   Section 54: Git LFS Filter Hangs on Windows
+
+-   Section 55: Windows Defender & Git Executable Blocking
+
+-   Section 57: Output Path Resolution Pitfalls
 
 ## Part II: Node Design & Execution Mechanics
 
@@ -76,6 +66,8 @@ What changed in this restructure:
 
 -   Section 50: Execution Order Dependencies via Dummy Links
 
+-   Section 60: OUTPUT_NODE UI Results & Preview Thumbnails
+
 ## Part III: Models, Tensors, & VRAM
 
 -   Section 3: Using Local LLMs in Custom Nodes
@@ -96,6 +88,10 @@ What changed in this restructure:
 
 -   Section 49: trust_remote_code and Custom Model Code Compatibility
 
+-   Section 53: ffmpeg Subprocess Pipe Deadlock
+
+-   Section 56: CPU-Only Video Rendering in ComfyUI (Zero VRAM)
+
 ## Part IV: State, Caching, & I/O
 
 -   Section 12: Cache Invalidation with IS_CHANGED
@@ -113,6 +109,10 @@ What changed in this restructure:
 -   Section 42: Audio Provenance & ID3v2 Metadata Embedding
 
 -   Section 43: Server Telemetry via send_sync
+
+-   Section 58: Audio-Reactive Pipeline Timing & Beat Duration Tuning
+
+-   Section 59: WAV vs MP4 Output Strategy — Memory-Only Passthrough
 
 ## Part V: Workflow JSON Mastery
 
@@ -1534,4 +1534,288 @@ When upgrading the transformers library across major versions (e.g., 4.x to 5.x)
 
 After any file transfer to a Git-tracked directory, verify encoding integrity by: (1) checking for BOM bytes with head -c 3 file | xxd, (2) scanning for mojibake patterns with grep -P '[\x80-\xff]{4,}', and (3) confirming that transformers and other version-pinned dependencies in requirements.txt match the actual library API being called in the source code. A fresh clone from the remote is the only reliable final verification.
 
-*End of Document — v1.0*
+## Part VII: Lessons from SIGNAL LOST (v1.1)
+
+The following sections were added after building ComfyUI-OldTimeRadio (SIGNAL LOST), a 12-node audio-video pipeline that orchestrates Gemma 4 script generation, Bark TTS, procedural SFX, spatial audio mastering, and ffmpeg-based CRT video rendering inside ComfyUI. Every issue described below cost real debugging hours.
+
+### Section 53: ffmpeg Subprocess Pipe Deadlock
+
+When shelling out to ffmpeg from a ComfyUI node (e.g., to encode video frames into an MP4), the most common fatal mistake is setting both stdout and stderr to subprocess.PIPE.
+
+**The bug:** Python's subprocess.Popen writes frame data to ffmpeg's stdin. ffmpeg writes status messages to stderr. If both stdout and stderr are set to PIPE, the OS pipe buffer (typically 64 KB on Linux, 4 KB on Windows) fills up because nobody is reading from those pipes while you are busy writing to stdin. Once the buffer is full, ffmpeg blocks on its next write to stderr. Your Python process blocks on its next write to stdin because ffmpeg stopped reading. Both processes are now waiting on each other. Classic deadlock.
+
+The process appears frozen. CPU usage drops to near zero. ffmpeg's cumulative CPU time in Task Manager stops increasing. The node never completes, never errors, just hangs forever.
+
+**The fix:**
+
+```python
+import subprocess
+import tempfile as _tf
+
+# CORRECT: stdout to DEVNULL (we don't need it), stderr to a temp file
+stderr_file = _tf.NamedTemporaryFile(mode="w+b", prefix="otr_ffmpeg_", suffix=".log", delete=False)
+
+proc = subprocess.Popen(
+    cmd,
+    stdin=subprocess.PIPE,
+    stdout=subprocess.DEVNULL,   # never PIPE
+    stderr=stderr_file,           # file, not PIPE
+)
+
+# Write all frames to stdin
+for frame in frame_generator():
+    proc.stdin.write(frame)
+proc.stdin.close()
+proc.wait()
+
+# NOW read stderr from the temp file (ffmpeg already exited)
+stderr_file.seek(0)
+log_output = stderr_file.read().decode("utf-8", errors="replace")
+stderr_file.close()
+```
+
+**Why not proc.communicate()?** communicate() buffers the entire stdin payload in memory before sending. For video encoding, that means loading every frame into RAM simultaneously, which defeats the purpose of streaming frames one at a time. The temp-file approach lets ffmpeg write its logs without blocking while you stream frames incrementally.
+
+**Why not threads?** You could spawn a thread to drain stderr while the main thread writes to stdin. This works but adds complexity (thread safety, exception propagation) for no benefit over a temp file that ffmpeg writes to directly.
+
+**Rule:** When calling any external process that reads from stdin AND writes to stdout/stderr simultaneously, never set both output pipes to PIPE. Use DEVNULL for the one you don't need and a temp file for the one you do.
+
+### Section 54: Git LFS Filter Hangs on Windows
+
+If every git command hangs indefinitely on a Windows machine --- including trivial operations like `git --version` or `git status` --- the most likely cause is a broken or misconfigured Git LFS filter in the global .gitconfig.
+
+**The bug:** Git for Windows installs a global LFS filter by default:
+
+```ini
+[filter "lfs"]
+    clean = git-lfs clean -- %f
+    smudge = git-lfs smudge -- %f
+    process = git-lfs filter-process
+    required = true
+```
+
+The `process = git-lfs filter-process` directive tells git to launch `git-lfs.exe` as a long-running filter process for EVERY git operation, even on repositories that contain zero LFS-tracked files. If `git-lfs.exe` itself hangs (due to a corrupted installation, a network call that never returns, or an antivirus program scanning the executable on every launch), then every single git command inherits that hang.
+
+**Diagnosis:** Run these in sequence to isolate:
+1. `echo "test"` → works instantly? Shell is fine.
+2. `where.exe git` → returns a path? Git is installed.
+3. `git --version` → hangs? The problem is git itself, not your repo.
+4. `git-lfs version` → hangs? LFS is the root cause.
+
+**The fix:** Remove the LFS filter from global config:
+
+```powershell
+# PowerShell — remove the entire [filter "lfs"] section
+$cfg = Get-Content "$env:USERPROFILE\.gitconfig" -Raw
+$cleaned = $cfg -replace '(?s)\[filter "lfs"\].*?(?=\[|$)', ''
+$cleaned.Trim() | Set-Content "$env:USERPROFILE\.gitconfig" -Encoding utf8
+```
+
+Or manually edit `~/.gitconfig` and delete the `[filter "lfs"]` block entirely. You can reinstall LFS later with `git lfs install` once the underlying hang is resolved.
+
+**Prevention:** If your node pack does not use Git LFS (and most should not --- models belong on HuggingFace, not in git), consider running `git lfs uninstall --system` on developer machines to remove the system-level hook entirely.
+
+### Section 55: Windows Defender & Git Executable Blocking
+
+Windows Defender's Real-Time Protection scans every executable on launch. For `git.exe`, which spawns multiple child processes per command (`git-remote-https.exe`, `git-lfs.exe`, `ssh.exe`), this can add 30+ seconds of latency per git operation or cause outright hangs when the scanner holds an exclusive file lock.
+
+**Symptoms:** Git commands hang or take 30-60 seconds for trivial operations. Non-git executables (echo, dir, Python) work instantly. The git process appears in Task Manager with minimal CPU usage.
+
+**The fix:** Add Git to Defender's exclusion list (requires Administrator):
+
+```powershell
+Add-MpPreference -ExclusionPath "C:\Program Files\Git"
+```
+
+This is safe because git's executables are signed binaries from a trusted publisher. The exclusion only skips real-time scanning of the git binaries themselves, not the files git operates on.
+
+**Broader lesson:** Any ComfyUI workflow that shells out to external tools (ffmpeg, git, ImageMagick) on Windows should document Defender exclusions in the installation guide. Real-time scanning of frequently-invoked executables is the single most common cause of "it works on Linux but hangs on Windows" reports.
+
+### Section 56: CPU-Only Video Rendering in ComfyUI (Zero VRAM)
+
+ComfyUI custom nodes can produce video output without touching the GPU at all. This is critical in pipelines where VRAM is already committed to LLM inference and TTS generation.
+
+**Architecture:** Use PIL (Pillow) for frame composition and numpy for audio analysis. Generate each frame as a PIL Image, convert to raw bytes, and pipe directly to ffmpeg's stdin (see Section 53 for the correct pipe pattern). The entire video render runs on CPU with zero VRAM allocation.
+
+**Audio-reactive pattern:**
+
+```python
+import numpy as np
+from PIL import Image, ImageDraw
+
+def analyze_audio(waveform_np, sample_rate, fps):
+    """Pre-compute per-frame audio features for the entire clip."""
+    samples_per_frame = sample_rate // fps
+    total_frames = len(waveform_np) // samples_per_frame
+
+    volume = np.zeros(total_frames)
+    freqs = np.zeros((total_frames, 64))   # 64-bin FFT
+    waves = np.zeros((total_frames, 200))  # 200-sample waveform slice
+
+    for fi in range(total_frames):
+        start = fi * samples_per_frame
+        end = start + samples_per_frame
+        chunk = waveform_np[start:end]
+
+        # RMS volume (0.0 – 1.0 normalized)
+        volume[fi] = min(1.0, np.sqrt(np.mean(chunk ** 2)) * 5.0)
+
+        # FFT frequency bins (magnitude spectrum)
+        fft = np.abs(np.fft.rfft(chunk))[:64]
+        peak = fft.max()
+        freqs[fi] = fft / peak if peak > 1e-8 else fft
+
+        # Raw waveform slice for oscilloscope display
+        step = max(1, len(chunk) // 200)
+        waves[fi] = chunk[::step][:200]
+
+    return volume, freqs, waves
+```
+
+**Key design decisions:**
+- Pre-compute ALL audio analysis before rendering any frames. This avoids redundant FFT calculations and makes the frame generator a pure function of (frame_index, precomputed_data).
+- Use PIL ImageDraw for geometric primitives (lines, arcs, polygons). It is fast enough for 24 fps 1080p on any modern CPU.
+- Yield frames as raw RGB bytes to ffmpeg rather than saving intermediate PNGs. This avoids disk I/O entirely.
+- Target 24 fps for cinematic feel. Higher frame rates waste CPU time on procedural art that doesn't benefit from smoothness.
+
+**Performance:** A 4-minute episode at 1080p24 renders in ~4 minutes on an Intel Core i7 class CPU. The GPU remains 100% available for the preceding LLM and TTS stages.
+
+### Section 57: Output Path Resolution Pitfalls
+
+Never use chained `os.path.dirname()` calls to navigate from a node's source file to ComfyUI's output directory. The number of parent traversals depends on install location, and this breaks silently when the directory structure changes.
+
+**The bug:**
+
+```python
+# WRONG — fragile, breaks if nesting changes
+output_dir = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+    "output", "my_node_pack"
+)
+# Resolves to: custom_nodes/output/my_node_pack/  (WRONG)
+# Expected:   ComfyUI/output/my_node_pack/         (RIGHT)
+```
+
+The number of dirname() calls required depends on whether the file is in `nodes/`, `nodes/subdir/`, or the package root. If you reorganize your file structure later, this silently starts writing to the wrong directory.
+
+**The fix — Option A (ComfyUI API):**
+
+```python
+import folder_paths
+output_dir = os.path.join(folder_paths.get_output_directory(), "my_node_pack")
+```
+
+**The fix — Option B (Home directory, for Desktop App users):**
+
+```python
+output_dir = os.path.join(
+    os.path.expanduser("~"), "Documents", "ComfyUI", "output", "my_node_pack"
+)
+```
+
+Option B is explicit and works regardless of how the node file is nested. It matches the ComfyUI Desktop App's default workspace location on Windows. Use this when folder_paths is not available (e.g., in standalone scripts like otr_monitor.py).
+
+**Rule:** If your output path depends on counting parent directories from __file__, it will break. Use folder_paths or an absolute reference.
+
+### Section 58: Audio-Reactive Pipeline Timing & Beat Duration Tuning
+
+In a multi-stage audio pipeline (ScriptWriter → Director → TTS → Sequencer), beat/pause timing is controlled at three different layers. All three must agree, or you get dead air.
+
+**Layer 1 — Parser defaults:** The script parser converts raw LLM output like `(beat)` into structured pause events. It assigns a default duration (e.g., `duration_ms: 800`). This is the source of truth if the LLM doesn't specify a duration.
+
+**Layer 2 — Director pacing prompt:** The Director node's system prompt tells the LLM what beat duration to use: `"beat_pause_ms": 800`. If this doesn't match the parser default, scripts generated by the Director will disagree with the parser's fallback.
+
+**Layer 3 — Sequencer render cap:** The Scene Sequencer can enforce a maximum pause duration regardless of what the script says: `dur_ms = min(dur_ms, 200)`. This is the safety net.
+
+**The bug:** Default beat pauses of 800ms sound fine in isolation but stack up. A script with 20 beat pauses adds 16 seconds of dead air. After TTS compression (Bark produces slightly shorter audio than expected), the pauses feel even longer relative to the dialogue.
+
+**The fix:** Tune all three layers to the same value. For spoken-word radio drama, 200ms beats feel natural and maintain momentum. Update:
+1. Parser default: `duration_ms: 200`
+2. Director prompt: `"beat_pause_ms": 200`
+3. Sequencer cap: `dur_ms = min(dur_ms, 200)`
+
+**Rule:** Any timing parameter that appears in more than one layer must be synchronized. Document the authoritative value in one place and have the other layers reference or defer to it.
+
+### Section 59: WAV vs MP4 Output Strategy — Memory-Only Passthrough
+
+When a pipeline produces both audio and video, the intermediate audio file (WAV) is often an unnecessary disk write. If the video node consumes the audio tensor directly from memory, the WAV write is pure overhead.
+
+**The pattern:** The Episode Assembler node produces a final audio tensor and passes it downstream to the Video node via ComfyUI's in-memory AUDIO type. The Video node extracts the waveform numpy array, writes it to a temporary WAV for ffmpeg to mux, and deletes the temp file after encoding.
+
+**Before (wasteful):**
+```
+EpisodeAssembler → writes episode.wav to disk → returns AUDIO tensor
+SignalLostVideo  → reads AUDIO tensor → writes temp.wav → encodes MP4 → deletes temp.wav
+Result: Two WAV files written. User only wants the MP4.
+```
+
+**After (clean):**
+```
+EpisodeAssembler → returns AUDIO tensor (no disk write)
+SignalLostVideo  → reads AUDIO tensor → writes temp.wav → encodes MP4 → deletes temp.wav
+Result: One temp WAV (deleted). User gets only the MP4.
+```
+
+**Implementation:** Remove the soundfile.write() call from the assembler. Keep the AUDIO return type and all metadata. The node still functions as a pipeline stage; it just stops producing a side-effect file.
+
+```python
+# v1.0: WAV saving disabled — final output is MP4 only via SignalLostVideo.
+# Audio still passes through to downstream nodes in memory.
+audio_out = {"waveform": episode_waveform, "sample_rate": sample_rate}
+output_path = "(video-only — no WAV saved)"
+```
+
+**Rule:** Only the terminal output node should write to disk. Intermediate nodes should pass data through memory via ComfyUI's type system. This reduces I/O, avoids filename collision bugs, and makes cleanup trivial.
+
+### Section 60: OUTPUT_NODE UI Results & Preview Thumbnails
+
+ComfyUI nodes with `OUTPUT_NODE = True` can return rich UI data alongside their functional outputs. This is how PreviewImage and SaveImage display thumbnails in the graph editor. Custom nodes can use the same mechanism.
+
+**The pattern:** Instead of returning a plain tuple, return a dict with `"ui"` and `"result"` keys:
+
+```python
+class MyOutputNode:
+    OUTPUT_NODE = True
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("file_path",)
+
+    def execute(self, ...):
+        # ... do work, produce output_path ...
+
+        # Generate a preview thumbnail
+        preview_results = []
+        try:
+            thumb_path = output_path.replace(".mp4", "_thumb.png")
+            subprocess.run([
+                "ffmpeg", "-y", "-ss", "5.0",
+                "-i", output_path, "-frames:v", "1",
+                "-q:v", "2", thumb_path,
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
+
+            if os.path.exists(thumb_path):
+                preview_results.append({
+                    "filename": os.path.basename(thumb_path),
+                    "subfolder": "",
+                    "type": "output",
+                })
+        except Exception:
+            pass  # thumbnail is advisory, not critical
+
+        return {
+            "ui": {"images": preview_results},
+            "result": (output_path,),
+        }
+```
+
+**Key details:**
+- The `"ui"` dict is sent to the frontend. The `"images"` key triggers ComfyUI's built-in image preview widget.
+- The `"result"` tuple is the normal return value used by downstream nodes. It must match RETURN_TYPES.
+- The thumbnail file must be in ComfyUI's output directory (or temp directory) for the frontend to find it.
+- The `"type"` field in the preview dict must be `"output"` or `"temp"` to match the directory the file is in.
+- If thumbnail generation fails, return an empty list. The node still works; it just won't show a preview.
+
+**For video nodes:** Extract a frame at ~30% into the video (not the first frame, which is often black or a title card) using ffmpeg's `-ss` flag. This gives a representative preview of the actual content.
+
+**Rule:** Any OUTPUT_NODE that produces files the user cares about should return a UI preview. It costs one extra ffmpeg call (~0.5 seconds) and dramatically improves the user experience.
+
+*End of Document — v1.1*

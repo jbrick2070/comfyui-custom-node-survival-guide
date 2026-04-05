@@ -1,12 +1,12 @@
 # ComfyUI Custom Node & Workflow JSON Development Best Practices
 
-**By Jeffrey A. Brick** · Community Edition · March 2026
+**By Jeffrey A. Brick** · SIGNAL LOST Edition · April 2026
 
 > Battle-tested guidance for building ComfyUI custom nodes, maintaining workflow JSONs, and keeping GPU-heavy pipelines stable. Every section here exists because of a specific class of "ghost bug" that cost real hours to diagnose — usually rooted in ComfyUI's import lifecycle, execution caching, or workflow serialization rules.
 
 ### Want to feed your AI assistant even more context?
 
-Check out the **[Detailed Guide (52 sections)](DETAILED_GUIDE.md)** — a deep-dive companion to this README covering every lesson learned across the full development cycle. Fair warning: it's AI-assisted, opinionated, and the ComfyUI landscape moves fast, so take it with a grain of salt. But if it saves you even one three-hour debugging session, it paid (it's free anyway!)  for itself.
+Check out the **[Detailed Guide (60 sections)](DETAILED_GUIDE.md)** — a deep-dive companion to this README covering every lesson learned across the full development cycle. Fair warning: it's AI-assisted, opinionated, and the ComfyUI landscape moves fast, so take it with a grain of salt. But if it saves you even one three-hour debugging session, it paid (it's free anyway!)  for itself.
 
 ---
 
