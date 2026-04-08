@@ -1,0 +1,672 @@
+# ComfyUI Custom Node Bug Bible — v1.2 SIGNAL LOST Edition
+# Machine-readable. Each entry: id, area, symptom, cause, fix, verify, tags.
+# Source: lessons learned shipping Goofer + ComfyUI-OldTimeRadio (SIGNAL LOST).
+version: "1.2"
+schema: {id: str, area: str, symptom: str, cause: str, fix: str, verify: str, tags: [str]}
+
+bugs:
+
+- id: 1
+  area: architecture
+  symptom: Edits don't take effect; "fixed" bug persists after restart.
+  cause: Two copies of code (source repo + custom_nodes). Edited one, ComfyUI loaded the other. Or __pycache__ served stale .pyc.
+  fix: Sync ALL files from source repo to custom_nodes after every edit. Clear __pycache__ in BOTH locations. Fully restart ComfyUI (re-queue does NOT reload modules).
+  verify: MD5-hash every .py in both locations; all must match.
+  tags: [sync, cache, pycache, restart]
+
+- id: 9.1
+  area: windows
+  symptom: git command hangs forever in PowerShell.
+  cause: Windows Credential Manager opens GUI prompt AI cannot interact with. Or Git LFS filter (process=git-lfs filter-process) hangs every git op even on non-LFS repos. Or Windows Defender locks git.exe child processes.
+  fix: Wrap git in Start-Job with timeout. Remove [filter "lfs"] block from ~/.gitconfig. Add-MpPreference -ExclusionPath "C:\Program Files\Git" from admin terminal.
+  verify: git --version returns instantly.
+  tags: [git, powershell, lfs, defender, hang]
+
+- id: 9.4
+  area: windows
+  symptom: PowerShell shows scary "NativeCommandError" red block after git push.
+  cause: Git writes normal status (To https://..., branch arrows) to stderr. PowerShell wraps any stderr from native commands as an error.
+  fix: Ignore the error block. Look for the real git output line (e.g. "4053a16..f7c661c main -> main") embedded inside it. Push actually succeeded.
+  verify: git log --oneline -3 locally then git fetch origin && git log --oneline origin/<branch> -1 — both should show new commit.
+  tags: [git, powershell, stderr, false-alarm]
+
+- id: 9.5
+  area: windows
+  symptom: 'git push origin main' reports "Everything up-to-date" but commits never land.
+  cause: You were on a feature branch, not main. Pushing main from a non-main branch pushes nothing.
+  fix: Always push the explicit current branch name. Hand user PowerShell blocks that include `git status` first so they can see what branch they're on.
+  verify: Look for literal "branch -> branch" line in push output. If "Everything up-to-date" when you expected commits, you pushed wrong branch.
+  tags: [git, branch, silent-failure]
+
+- id: 9.6
+  area: windows
+  symptom: User runs handed PowerShell block, "nothing happens."
+  cause: User's terminal CWD wasn't where you assumed. They opened a new window in C:\Users\<them>.
+  fix: ALWAYS bake `cd <absolute path>` as the first line of every PowerShell block handed to a user.
+  verify: Block starts with `cd C:\...` even if "they're already there."
+  tags: [powershell, cd, ux]
+
+- id: 31
+  area: huggingface
+  symptom: C: drive fills up; model downloads take 2x expected; multi-GB duplicates in .cache\huggingface.
+  cause: HuggingFace symlinks require Developer Mode or admin on Windows. Without them, files are duplicated.
+  fix: Enable Developer Mode (Settings>Developer settings), OR set HF_HOME=D:\hf_cache to a short path on a large drive. Enable Win32 long paths.
+  verify: New downloads create symlinks not copies; check folder size.
+  tags: [hf, windows, symlink, max_path]
+
+- id: 32
+  area: python
+  symptom: pip install succeeds but ComfyUI throws ModuleNotFoundError.
+  cause: pip installed into system Python, not ComfyUI's python_embeded.
+  fix: Always use the explicit ComfyUI python path. `.\python_embeded\python.exe -m pip install <pkg>`.
+  verify: `.\python_embeded\python.exe -c "import <pkg>"` succeeds.
+  tags: [pip, venv, python_embeded]
+
+- id: 41
+  area: cuda
+  symptom: torch.cuda.is_available() returns False after pip install of a torch-related package.
+  cause: pip downloaded the CPU-only wheel, overwriting CUDA torch.
+  fix: Always specify --index-url https://download.pytorch.org/whl/cu130 when installing torch-related packages into python_embeded.
+  verify: After every install, run torch.cuda.is_available() check.
+  tags: [pip, torch, cuda, wheel]
+
+- id: 44
+  area: env
+  symptom: HF_HOME or other env vars set in __init__.py have no effect.
+  cause: By the time __init__.py runs, libraries already read defaults.
+  fix: Use prestartup_script.py at the custom_nodes/<pack> level. Runs BEFORE node imports. Keep it lightweight — no heavy imports.
+  verify: Print env var from inside a node and confirm it matches.
+  tags: [env, bootstrap, prestartup]
+
+- id: 45
+  area: deps
+  symptom: Installing one node pack breaks another. numpy downgrade. torch overwritten.
+  cause: No global dependency resolver in ComfyUI ecosystem.
+  fix: Pin requirements LOOSELY (transformers>=4.40,<6.0). Never pin torch in requirements.txt (ComfyUI manages it). Use try/except with fallback paths around version-sensitive imports.
+  verify: Pre-flight _check_deps() function in __init__.py reports issues.
+  tags: [requirements, conflicts]
+
+- id: 47.1
+  area: transformers
+  symptom: Deprecation warnings around torch_dtype.
+  cause: transformers 5.0 deprecated torch_dtype param.
+  fix: Use `dtype=torch.float16` instead of `torch_dtype=torch.float16`.
+  verify: No warning on model load.
+  tags: [transformers5, deprecation]
+
+- id: 47.2
+  area: transformers
+  symptom: Model load fails with "requires accelerate" even though accelerate IS installed.
+  cause: ComfyUI calls torch.set_default_device("cuda") before nodes load. transformers 5.0 device_map="auto" interaction with set_default_device fails the check.
+  fix: Skip device_map entirely. Use `model = from_pretrained(name, dtype=fp16).to("cuda").eval()`.
+  verify: Standalone test outside ComfyUI passes; the bug only appears INSIDE ComfyUI.
+  tags: [transformers5, device_map, accelerate]
+
+- id: 47.3
+  area: transformers
+  symptom: pipeline("summarization", ...) raises "Unknown task summarization."
+  cause: transformers 5.0 removed the summarization pipeline task.
+  fix: Use AutoModelForSeq2SeqLM directly with tokenizer + .generate().
+  verify: Standalone test calls .generate() and gets text output.
+  tags: [transformers5, pipeline]
+
+- id: 49
+  area: transformers
+  symptom: Phi-3 (or other) model fails with TypeError('type') on load.
+  cause: trust_remote_code=True loaded custom modeling_*.py written for transformers 4.x against 5.x API.
+  fix: REMOVE trust_remote_code=True. Models natively supported by your transformers version do not need it.
+  verify: Check official transformers docs for native model support. Use log.exception() not log.warning() to see the real traceback.
+  tags: [transformers5, trust_remote_code]
+
+- id: 2
+  area: widgets
+  symptom: Widget shows wrong value after loading saved workflow. No error.
+  cause: widgets_values is positional, not named. Adding/removing/reordering INPUT_TYPES optional widgets shifts every position after the change.
+  fix: Every time you add, remove, or reorder an optional widget, MANUALLY update widgets_values in EVERY saved workflow JSON. Prefer append-only changes. Commit code + workflow JSONs in the same atomic commit.
+  verify: For every node, count INPUT_TYPES optional widgets and compare to len(widgets_values). They must match.
+  tags: [widgets, json, silent]
+
+- id: 8
+  area: loading
+  symptom: One broken node crashes the entire pack on import.
+  cause: Default __init__.py imports all nodes at module scope.
+  fix: Use isolated per-node loading via importlib.import_module wrapped in try/except. Each node failure logs a warning but doesn't crash siblings.
+  verify: Intentionally break one node; siblings still register.
+  tags: [init, isolation]
+
+- id: 8.1
+  area: loading
+  symptom: ComfyUI startup is slow (30+ seconds).
+  cause: Heavy libraries (torch, transformers, torchaudio) imported at module scope.
+  fix: Move heavy imports inside execute(). Node registers instantly; pays cost only when run.
+  verify: Time __init__.py import.
+  tags: [init, lazy-import, startup]
+
+- id: 13
+  area: coordination
+  symptom: Multiple node instances need to coordinate (e.g. cooperative camera selection) without a wire between them.
+  cause: ComfyUI nodes execute independently with no shared channel.
+  fix: Pass the same seed to all instances. Each computes the same shuffled order deterministically. Use sha256(unique_input)[:4] as offset to differentiate. For sequential modes, module-level dict + threading lock.
+  verify: Same seed produces same allocation across runs.
+  tags: [coordination, determinism, shared-seed]
+
+- id: 21
+  area: migration
+  symptom: After renaming a node class, every saved workflow shows red "node type not found."
+  cause: Workflows store the old NODE_CLASS_MAPPINGS key.
+  fix: Keep the old key as an alias in NODE_CLASS_MAPPINGS pointing to the new class. One line of code, permanent backward compat. For input renames, accept both names in execute() with fallback.
+  verify: Load an old workflow JSON; node resolves.
+  tags: [migration, alias, compat]
+
+- id: 22
+  area: naming
+  symptom: Two node packs declare the same NODE_CLASS_MAPPINGS key. One silently disappears from UI.
+  cause: ComfyUI lets one win silently on collision.
+  fix: Always namespace node IDs with your pack name (Goofer_Sanitizer, not Sanitizer). Treat keys as permanent public API — never rename.
+  verify: Grep ComfyUI registry for collisions before publishing.
+  tags: [naming, namespace, collision]
+
+- id: 23
+  area: hidden-inputs
+  symptom: Multiple instances of same node share cached state and cross-contaminate.
+  cause: Module-level cache uses a fixed key, not per-instance.
+  fix: Declare `"hidden": {"unique_id": "UNIQUE_ID"}` in INPUT_TYPES and use unique_id as cache key.
+  verify: Two instances in one workflow produce different outputs.
+  tags: [hidden, cache, unique_id]
+
+- id: 24
+  area: validation
+  symptom: VALIDATE_INPUTS rejects a connected (slot) input as None even though runtime would receive a real value.
+  cause: Connected inputs arrive as None during validation.
+  fix: Always check `if input is None: return True` first. Only validate values that are actually present.
+  verify: Connect a Primitive to the input; workflow runs.
+  tags: [validate_inputs, none]
+
+- id: 27
+  area: list-execution
+  symptom: Returning a list from a node sends the whole list as one payload (downstream runs once).
+  cause: Without OUTPUT_IS_LIST=(True,), ComfyUI wraps the return as a single value.
+  fix: Set OUTPUT_IS_LIST=(True,) on the node class. For receivers that need ALL items at once, set INPUT_IS_LIST=True on the consumer.
+  verify: Downstream runs N times for N-item list.
+  tags: [batching, list]
+
+- id: 28
+  area: lazy
+  symptom: Disabled toggle still triggers expensive upstream model loads.
+  cause: Default execution evaluates ALL upstream nodes before calling execute.
+  fix: Mark expensive inputs `{"lazy": True}` in INPUT_TYPES. Implement check_lazy_status() to return [] when disabled. For blocking downstream too, return ExecutionBlocker(None).
+  verify: Disable toggle; upstream LLM loader does not run.
+  tags: [lazy, performance, executionblocker]
+
+- id: 29
+  area: interrupt
+  symptom: Cancel button doesn't stop a running node; ComfyUI looks frozen during long ops.
+  cause: Tight Python loops don't check the interrupt flag and don't report progress.
+  fix: Call comfy.model_management.throw_exception_if_processing_interrupted() inside every loop iteration. Use comfy.utils.ProgressBar to emit step updates.
+  verify: Cancel mid-run; node stops within one iteration.
+  tags: [interrupt, progress, ux]
+
+- id: 33
+  area: combo
+  symptom: Node crashes at registration when COMBO source directory is empty. Or "Value not in list" on workflow load after model rename.
+  cause: COMBO with empty list crashes; saved values validated against current list.
+  fix: Always include a fallback option ["(no models found)"]. In VALIDATE_INPUTS, fall back to first available option if saved value missing instead of crashing.
+  verify: Fresh install with empty model dir registers cleanly.
+  tags: [combo, registration]
+
+- id: 36
+  area: asyncio
+  symptom: ConnectionResetError from ProactorEventLoop crashes node output stage when browser tab disconnects.
+  cause: Windows event loop raises on browser disconnect during execution.
+  fix: In __init__.py, set a custom asyncio exception handler that suppresses ConnectionResetError only.
+  verify: Close browser mid-run; node still completes.
+  tags: [asyncio, windows, event-loop]
+
+- id: 46
+  area: headless
+  symptom: Node works in browser but fails or returns wrong format via /prompt API.
+  cause: Return format mixes UI data with functional output assuming browser is connected.
+  fix: Return `{"ui": {...}, "result": (...)}` separating frontend data from functional output.
+  verify: Test via curl/requests against /prompt.
+  tags: [headless, output_node, api]
+
+- id: 50
+  area: execution-order
+  symptom: Two nodes that both read a module cache execute in wrong order; downstream gets stale/empty data.
+  cause: No data dependency between them. ComfyUI executor picks any order.
+  fix: Add a fake forced INT input on the dependent node wired from an output of the producer (forceInput=True). Better: pass real data through the graph instead of module cache.
+  verify: Producer always runs before consumer.
+  tags: [execution-order, dummy-link]
+
+- id: 3
+  area: vram
+  symptom: CUDA OOM when running Phi-3 + LTX-Video sequentially even though each fits.
+  cause: Models loaded at import time stay resident. Or no explicit unload between models.
+  fix: Lazy-load pattern (model=None until first call). Explicit _unload_model() that del's globals + torch.cuda.empty_cache(). Sequence pipeline so each heavy model unloads before the next loads.
+  verify: nvidia-smi shows VRAM freed between stages.
+  tags: [vram, lazy-load, unload]
+
+- id: 3.4
+  area: vram
+  symptom: Device mismatch error on second run after switching CUDA device.
+  cause: Cached model is on the old device.
+  fix: Track device alongside model in cache; reload on device change. Always call .eval() after loading.
+  verify: Switch devices; cached model reloads.
+  tags: [cache, device-change]
+
+- id: 4
+  area: model-class
+  symptom: Model loads without error but ignores conditioning input and produces garbage.
+  cause: Wrong transformers class (e.g. MusicgenForConditionalGeneration instead of MusicgenMelodyForConditionalGeneration). Both load from the same checkpoint.
+  fix: Read the model card. Verify class matches use case. Log type(model).__name__ on load. Watch for "unused kwargs" warnings.
+  verify: Output reflects conditioning input (melody-conditioned music actually follows the melody).
+  tags: [silent, wrong-class, transformers]
+
+- id: 5.1
+  area: tensors
+  symptom: "RuntimeError: mat1 and mat2 must have the same dtype, but got Float and Half"
+  cause: Preprocessor outputs float32 but model is float16.
+  fix: Cast inputs to next(model.parameters()).dtype before forward pass.
+  verify: Forward pass succeeds.
+  tags: [dtype, fp16]
+
+- id: 5.2
+  area: tensors
+  symptom: "Expected all tensors on same device, found cuda:0 and cpu"
+  cause: Mixed device tensors.
+  fix: Always align device AND dtype before tensor math. Use a helper align_tensors(reference, *tensors).
+  verify: Forward pass succeeds.
+  tags: [device]
+
+- id: 6
+  area: tensors
+  symptom: Cryptic dimension errors on audio/video processing.
+  cause: Audio arrives as 1D/2D/3D depending on source. Video frames are NHWC but PyTorch wants NCHW.
+  fix: Always normalize audio to 3D (B,C,T) with unsqueeze. For video, permute(0,3,1,2) for PyTorch ops, permute back to NHWC for ComfyUI.
+  verify: Operation runs on all input shapes.
+  tags: [audio, video, shape]
+
+- id: 11.1
+  area: audio
+  symptom: Aliasing artifacts after sample-rate conversion.
+  cause: F.interpolate(linear) introduces high-frequency aliasing.
+  fix: Use torchaudio.transforms.Resample (polyphase) with import fallback to F.interpolate.
+  verify: A/B against polyphase reference.
+  tags: [audio, resample]
+
+- id: 11.2
+  area: audio
+  symptom: Audible clicks at audio crossfades; visible seams at video crossfades.
+  cause: Linear blend ramp.
+  fix: Use raised-cosine: fade = 0.5*(1 - cos(linspace(0,1)*pi)).
+  verify: Listen / view at crossfade boundary.
+  tags: [crossfade]
+
+- id: 26
+  area: audio-contract
+  symptom: Downstream node crashes with "'Tensor' has no attribute 'sample_rate'."
+  cause: Returned a raw tensor where AUDIO dict was expected.
+  fix: ComfyUI AUDIO type is `{"waveform": Tensor[B,C,T], "sample_rate": int}`. Always wrap. Always update sample_rate after resampling.
+  verify: All audio nodes accept and return the dict.
+  tags: [audio, contract]
+
+- id: 34
+  area: memory
+  symptom: Python process grows multi-GB over a long session and gets killed.
+  cause: Unbounded module-level dict cache. torch.cuda.empty_cache() doesn't free Python references.
+  fix: Use BoundedCache (OrderedDict + max_size eviction). Provide explicit clear affordance. Document that restart is the only true reset.
+  verify: Run 500 prompts; memory plateaus.
+  tags: [memory, cache, leak]
+
+- id: 40
+  area: vram
+  symptom: CUDA OOM despite ComfyUI thinking it freed enough VRAM.
+  cause: Manually .to("cuda") models are invisible to ComfyUI's LRU registry; it can't evict them.
+  fix: Use comfy.model_management.load_model_gpu(model). Or maintain manual unload + empty_cache discipline (Section 3) and unload before next heavy model.
+  verify: nvidia-smi shows model freed after manual unload.
+  tags: [vram, lru, mm]
+
+- id: 12
+  area: caching
+  symptom: Data-fetch node returns stale results on re-execution.
+  cause: ComfyUI caches outputs when inputs unchanged.
+  fix: Implement IS_CHANGED returning time.time() (always refresh) or file mtime (refresh on change). Don't add to compute-heavy nodes that don't need it.
+  verify: Re-queue a workflow; data-fetch node runs again.
+  tags: [is_changed, cache]
+
+- id: 25
+  area: caching
+  symptom: IS_CHANGED crashes hashing a tensor.
+  cause: Connected inputs arrive as None during IS_CHANGED, just like VALIDATE_INPUTS.
+  fix: Check None first. Return float('nan') to force re-execute when value unavailable. Treat IS_CHANGED as a perf hint, not a contract.
+  verify: Connected slot input doesn't crash.
+  tags: [is_changed, none]
+
+- id: 30
+  area: paths
+  symptom: Output files end up in wrong directory across launch methods or are blocked by ComfyUI security.
+  cause: Relative paths or hand-rolled path construction.
+  fix: Use folder_paths.get_output_directory() and folder_paths.get_temp_directory(). Use temp_dir for intermediates, output_dir for deliverables.
+  verify: File appears in ComfyUI's file browser.
+  tags: [paths, folder_paths]
+
+- id: 35
+  area: caching
+  symptom: Node re-executes every run despite identical inputs (or sticks on old result).
+  cause: Non-hashable object in input chain breaks ComfyUI's signature builder.
+  fix: Keep inputs as plain types (str, int, float, bool, list, dict, tuple). Don't wrap MODEL/IMAGE/AUDIO. Convert complex objects to hashable representation first.
+  verify: Hash-stable across runs.
+  tags: [signature, cache]
+
+- id: 37
+  area: network
+  symptom: Flaky WiFi crashes the entire pipeline.
+  cause: Hard dependency on requests + assume network up.
+  fix: requests -> urllib fallback chain. Return demo data on exception with log.warning. Ship default registry data.
+  verify: Disable network; node still runs with demo data.
+  tags: [network, fallback, offline]
+
+- id: 38
+  area: data
+  symptom: Hardcoded camera/category/distance lists scattered across code.
+  cause: No external registry.
+  fix: Ship JSON registry in data/. Load once, cache in module. Validate on load. Provide reload via IS_CHANGED tied to mtime. Ship a sensible default so node works out of box.
+  verify: Edit JSON; node picks up new entries on reload.
+  tags: [registry, json, config]
+
+- id: 42
+  area: metadata
+  symptom: Generated audio file has no provenance — can't reproduce a week later.
+  cause: WAV/MP3 has no embedded metadata by default.
+  fix: Use mutagen to embed workflow JSON in WAV ICMT comment chunk or MP3 ID3 TXXX frame.
+  verify: Read metadata back from file.
+  tags: [metadata, mutagen, provenance]
+
+- id: 43
+  area: telemetry
+  symptom: Need to push custom status messages to frontend during long ops; ProgressBar only does percent.
+  cause: ProgressBar can't carry custom data.
+  fix: PromptServer.instance.send_sync("namespace.status", {"node": uid, "message": ..., "progress": ...}). Requires JS frontend listener to consume.
+  verify: Frontend receives custom event.
+  tags: [send_sync, telemetry, frontend]
+
+- id: 18
+  area: workflow-json
+  symptom: Two nodes silently share an ID; only one executes.
+  cause: last_node_id was lower than an actual node ID after manual JSON edit; UI assigned colliding ID.
+  fix: Always set last_node_id = max(node IDs) + 1 after manual edits. Same for last_link_id.
+  verify: All node IDs unique; counters >= max.
+  tags: [json, counter, collision]
+
+- id: 18.3
+  area: workflow-json
+  symptom: Connection line missing in ComfyUI even though links[] entry exists.
+  cause: Link cross-references must agree in 3 places: links[] array, source node's outputs[slot].links, target node's inputs[slot].link. Any mismatch silently drops the connection.
+  fix: Maintain all three references when editing JSON. Use a builder pattern.
+  verify: validate_links() script checks all three places.
+  tags: [json, links, integrity]
+
+- id: 19.4
+  area: workflow-json
+  symptom: Workflow JSON is corrupt and hand-editing isn't fixing it.
+  cause: Compounded edits.
+  fix: Nuclear option — rebuild from blank canvas in the UI, save fresh, diff against broken version.
+  verify: Fresh JSON loads cleanly.
+  tags: [json, recovery]
+
+- id: 51
+  area: workflow-json
+  symptom: After removing a widget from INPUT_TYPES, saved workflows load with values mapped into the wrong widgets.
+  cause: widgets_values is positional. Removal shifts subsequent positions.
+  fix: Manually delete the corresponding positional entry from widgets_values in EVERY saved workflow JSON. Prefer append-only INPUT_TYPES changes. Commit code + JSON together.
+  verify: Audit script loads each workflow and checks widget count vs array length.
+  tags: [widgets, json, removal]
+
+- id: 7.1
+  area: safety
+  symptom: User-supplied/scraped text reaches LLM without filtering.
+  cause: No content filter layer.
+  fix: Two-layer defense — keyword/regex blocklist (instant) + LLM system prompt that refuses unsafe content.
+  verify: Smoke test with adversarial inputs.
+  tags: [safety, filter]
+
+- id: 7.4
+  area: safety
+  symptom: Content filter substitutes [BLEEP] sentinel; breaks immersion in narrative output.
+  cause: Single sentinel announces every substitution.
+  fix: Replace sentinel with rotating pool of period-appropriate minced oaths (_MINCED_OATHS list of 30+ entries). Preserve original capitalization. Cycle through pool by counter.
+  verify: Read 5 outputs; substitutions feel natural and not repeated.
+  tags: [safety, filter, narrative, oaths]
+
+- id: 7.5
+  area: safety
+  symptom: LLM occasionally types wrong character name in dialogue body (Rex vs Vex).
+  cause: Hardcoded blocklist won't generalize.
+  fix: Build authoritative roster from [VOICE: NAME] markup. Regex find capitalized 3-8 char tokens in addressable positions. Use difflib.get_close_matches against roster with cutoff=0.55. Skip COMMON_WORDS. Log every repair.
+  verify: Run on archived output; warning log matches gut judgment.
+  tags: [safety, names, difflib, fuzzy]
+
+- id: 7.6
+  area: pool-sizing
+  symptom: A pool of N looks plenty but collapses when filtered.
+  cause: Effective size = N per filter, not N total. 9 voice presets with only 2 female = 2 effective for any female-filtered draw.
+  fix: Audit pool sizing per filtered subset. Either reclassify ambiguous slots, expand the pool, or accept duplication and log POOL_EXHAUSTED loudly.
+  verify: For each filter, count remaining entries vs max demand.
+  tags: [pool, filter, sizing]
+
+- id: 10
+  area: regression
+  symptom: "Done" was reported but next ComfyUI restart shows stale files / missing widgets / wrong paths.
+  cause: Skipped regression checklist.
+  fix: |
+    Run all 15 steps after EVERY code change:
+    1. Sync ALL changed files to custom_nodes
+    2. Clear __pycache__ in BOTH locations
+    3. Hash-compare every .py file
+    4. Hash-compare README/requirements/workflow JSONs
+    5. ast.parse every .py
+    6. Grep for dead references
+    7. Verify cross-imports resolve
+    8. Widget audit (INPUT_TYPES vs widgets_values)
+    9. Workflow JSON internal consistency
+    10. Commit and push (Start-Job/batch on Windows)
+    11. Verify push landed on remote
+    12. Restart ComfyUI fully and run end-to-end
+    13. Statistical RNG harness if RNG-adjacent
+    14. GitHub HEAD lockstep verification
+    15. Scan for 0-byte/BOM/missing registrations on remote
+  verify: Every step passes before declaring done.
+  tags: [regression, checklist]
+
+- id: 10.2
+  area: git
+  symptom: Pushed to remote but remote doesn't actually have your changes intact.
+  cause: CRLF/LF conversion, credential helper hangs, partial commits, branch confusion, encoding corruption.
+  fix: |
+    Local before push: find -size 0; head -c3 file | hexdump for BOM; ast.parse; grep NODE_CLASS_MAPPINGS.
+    Remote after push: git fetch origin <branch>; git log --oneline origin/<branch> -3; git diff HEAD origin/<branch> (must be empty).
+  verify: Local HEAD == remote HEAD SHA.
+  tags: [git, lockstep, verification]
+
+- id: 10.3
+  area: rng
+  symptom: Probabilistic feature (easter egg, sampler, jitter) silently broken — eyeball check passes, real rate is 0% or 100%.
+  cause: RNG poisoning, seed bug, frozen rng instance.
+  fix: |
+    Ship tests/probability_check.py — 10,000 trials, assert observed within ±1.5% of target. Use SystemRandom for variance separated from any seeded determinism.
+  verify: Test runs in <1s; PASS before commit.
+  tags: [rng, statistical, test]
+
+- id: 14
+  area: deps
+  symptom: Removed library still referenced by code/widgets/workflows after the swap.
+  cause: Half-removed dependency.
+  fix: |
+    1. Remove imports/loaders/inference/unload code
+    2. Remove from requirements.txt (if no other node uses)
+    3. Update README
+    4. Grep entire codebase case-insensitive
+    5. Distinguish code refs (bugs) from comment/changelog refs (OK)
+    6. Remove related widgets
+    7. Update widgets_values in ALL workflow JSONs
+    8. Test pipeline end-to-end without old dep installed
+  verify: Pipeline runs after old dep uninstalled.
+  tags: [removal, deps, cleanup]
+
+- id: 16
+  area: ai-autonomy
+  symptom: AI assistant relays "you need to run pip install X" instead of doing it.
+  cause: Asking the user to do work the AI can do itself.
+  fix: |
+    Golden rule: if a senior pair-programmer would just do it, the AI should just do it. Install packages, fix errors, sync files, run regression, commit, push — batch related changes, report summary at end. Only escalate when a decision is required or a wall is hit (auth prompts, etc.).
+  verify: Number of "please run this" handoffs trends toward zero.
+  tags: [autonomy, ux, workflow]
+
+- id: 39
+  area: testing
+  symptom: Iteration is slow because every test requires a full ComfyUI restart.
+  cause: Logic intertwined with ComfyUI wiring.
+  fix: Extract pure functions into separate module with no ComfyUI dependency. Test with pytest. Use ast.parse for syntax (0.1s). Reserve restart for integration only.
+  verify: pytest runs in 1-2s.
+  tags: [test, ast, pure-fn]
+
+- id: 52.1
+  area: encoding
+  symptom: Mojibake (ÃƒÆ' garbage) in Python source files after PowerShell edit.
+  cause: Set-Content uses system default encoding (often UTF-16LE), re-encodes UTF-8 multi-byte sequences.
+  fix: Use [System.IO.File]::WriteAllText($path, $content, [System.Text.Encoding]::UTF8). Or write from Linux side.
+  verify: head -c3 file | xxd shows no BOM; non-ASCII chars intact.
+  tags: [powershell, encoding, utf-8]
+
+- id: 52.2
+  area: encoding
+  symptom: Subtle .py import failures or integrity hash mismatches after PowerShell write.
+  cause: BOM (EF BB BF) prepended by Out-File / Set-Content.
+  fix: Use [System.IO.File]::WriteAllBytes($path, [System.Text.Encoding]::UTF8.GetBytes($content)).
+  verify: head -c3 file | xxd shows no BOM bytes.
+  tags: [powershell, bom]
+
+- id: 52.3
+  area: sandbox
+  symptom: File written from sandbox doesn't appear on Windows host.
+  cause: Mount layer doesn't propagate writes reliably.
+  fix: Base64-encode in sandbox, decode with WriteAllBytes on Windows side.
+  verify: Fresh git clone shows the file.
+  tags: [mount, sandbox, transfer]
+
+- id: 53
+  area: subprocess
+  symptom: ffmpeg subprocess hangs forever; CPU time ~0 but process alive.
+  cause: Both stdout=PIPE and stderr=PIPE filled the OS pipe buffer; ffmpeg blocks on stderr write while Python blocks on stdin write (classic pipe deadlock).
+  fix: |
+    stdin=PIPE; stdout=DEVNULL; stderr=NamedTemporaryFile(mode="w+b").
+    Stream frames, then proc.wait(), then read temp file.
+    Never use proc.communicate() for video — buffers everything in memory.
+  verify: Get-Process python* shows CPU advancing; render completes.
+  tags: [subprocess, ffmpeg, deadlock, pipe]
+
+- id: 54
+  area: git
+  symptom: All git commands hang forever in MCP shell, including `git --version`.
+  cause: Global LFS filter (process=git-lfs filter-process) launches git-lfs.exe for every git op even on non-LFS repos. Compounded by Windows Defender locking child processes.
+  fix: Strip [filter "lfs"] block from ~/.gitconfig. Add Defender exclusion for C:\Program Files\Git from an admin PowerShell window.
+  verify: git --version returns instantly.
+  tags: [git, lfs, defender, hang]
+
+- id: 55
+  area: discovery
+  symptom: ComfyUI isn't where standard path guesses say it is (Desktop App).
+  cause: Desktop App installs launcher to AppData but workspace to Documents.
+  fix: Use `Get-Process python* | Select Id, Path` to find the running interpreter; the workspace is its parent's parent.
+  verify: Path matches the running process.
+  tags: [discovery, paths, desktop-app]
+
+- id: 57
+  area: paths
+  symptom: Output files end up nested inside the node pack instead of in ComfyUI's output dir.
+  cause: os.path.dirname(__file__) chain miscount when constructing paths.
+  fix: Use os.path.expanduser("~") + "Documents/ComfyUI/output" or folder_paths.get_output_directory(). Never chain dirname() to navigate up.
+  verify: Output appears in expected directory.
+  tags: [paths, output_dir, sandbox]
+
+- id: 58
+  area: pipeline-sync
+  symptom: Same parameter has different defaults at parser/prompt/renderer layers.
+  cause: Multi-layer pipeline; one layer updated, others not.
+  fix: Grep for the value across the whole codebase before changing it. Add a hard cap at the rendering layer as a safety net (`min(value, MAX)`).
+  verify: All layers report same value.
+  tags: [pipeline, sync, multi-layer]
+
+- id: 59
+  area: io
+  symptom: User wanted only the final MP4 but got an intermediate WAV too.
+  cause: Intermediate node wrote WAV to disk in addition to passing AUDIO downstream.
+  fix: Only terminal output nodes write permanent files. Intermediates pass via in-memory AUDIO dict.
+  verify: Workflow produces a single deliverable per render.
+  tags: [io, intermediate, output]
+
+- id: 60
+  area: output_node
+  symptom: Video/audio node has no preview thumbnail in graph editor.
+  cause: OUTPUT_NODE returns plain tuple.
+  fix: |
+    Return {"ui": {"images": [{"filename": fname, "subfolder": "", "type": "output"}]}, "result": (path,)}.
+    Extract thumbnail at ~30% into video (not frame 0). Make thumbnail optional — empty list on extract failure.
+  verify: Preview shows in graph editor after render.
+  tags: [output_node, preview, ui]
+
+- id: 61
+  area: llm
+  symptom: External reviewers consistently flag "weak ending" across many episodes; prompt fixes don't help.
+  cause: Revision-pass token budget sized from `target_words` instead of actual draft length. Revision decapitates Scene 4 mid-word; downstream similarity/length checks pass within tolerance.
+  fix: |
+    draft_token_estimate = int(len(draft_text) / 3.5)
+    revision_tokens = max(int(draft_token_estimate * 1.25), int(target_words * 2.0), 2048)
+    revision_tokens = min(revision_tokens, 8192)
+    Log the budget so the bug is visible next time.
+  verify: Compare revision output character count to draft; ratio should be ~1.0, not 0.75.
+  tags: [llm, tokens, revision, critique]
+
+- id: 62
+  area: ai-continuity
+  symptom: Each new AI session burns 30+ minutes of context rediscovering project state.
+  cause: ROADMAP.md describes ambitions but not state, queue, or rules.
+  fix: |
+    Add `🤖 NEW CONVERSATION HANDOFF — READ THIS FIRST` section at top of ROADMAP.md with:
+    1) Current shipped state (version, tag, commit SHAs)
+    2) Recent commits with file paths and line numbers
+    3) Next priority feature with full design spec
+    4) Standing rules (DO NOT VIOLATE)
+    5) First moves for next session (git status, branch, build, test)
+    Update at the end of EVERY session before closing.
+  verify: Next session reads the handoff and starts productive work in <5 minutes.
+  tags: [continuity, roadmap, handoff, ai-workflow]
+
+- id: 63
+  area: hygiene
+  symptom: Public repo cluttered with KICKOFF/QA_SIGNOFF/PEER_REVIEW dev artifacts.
+  cause: Dev docs committed to public tree.
+  fix: |
+    Keep public repo to README/ROADMAP/LICENSE/CLAUDE.md only. For deletes, run `git status` first then `git rm <one file at a time>` — git rm cascade fails if any listed file is already missing from working tree.
+  verify: Brand-new user clone contains only what's needed to install and run.
+  tags: [hygiene, public-repo, git-rm]
+
+- id: 64
+  area: procedural
+  symptom: Listeners notice "the same cast" across episodes; or one character missing dialogue.
+  cause: Pool too small (collisions); or pool entry contains a space which breaks single-token regex parser.
+  fix: |
+    N first × M last must be > 1000. Pre-1931 public domain only for franchise-flavored names. No actor full names. No character compound names (Schrute/Vader/Skywalker). All entries must be parser-compatible (no spaces). Ship CI test asserting both.
+  verify: tests/cast_pool_check.py passes.
+  tags: [procedural, copyright, parser, combinatorics]
+
+- id: 65
+  area: pool-sizing
+  symptom: Reviewers say "the female characters all sound the same."
+  cause: Voice preset table classified only 2 of 10 as female. CAST_GENDER_POOL_EXHAUSTED on 3-female episodes silently reused presets.
+  fix: |
+    Reclassify androgynous slots to fill underserved subsets (en_speaker_7 → female brings effective female pool from 2 to 3). Or expand pool. Or accept duplication with loud POOL_EXHAUSTED log.
+  verify: Audit per-subset count vs max demand for every filter.
+  tags: [tts, bark, gender, pool]
+
+# End of bible. Total entries: 70.
