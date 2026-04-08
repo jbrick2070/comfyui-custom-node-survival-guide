@@ -1,6 +1,6 @@
 # ComfyUI Custom Node & Workflow JSON Development — Best Practices & Lessons Learned
 
-**Version 1.1 — SIGNAL LOST Edition**
+**Version 1.2 — SIGNAL LOST Edition**
 
 Jeffrey A. Brick
 
@@ -8,7 +8,7 @@ April 2026
 
 Every rule in this document was learned the hard way.
 
-**How this guide was made:** I am not a coder. I am a healthcare IT project manager who builds AI creative tools as a side pursuit. Every single line of code in my ComfyUI node packs --- ComfyUI-Goofer and ComfyUI-OldTimeRadio (SIGNAL LOST) --- was written by Claude, Anthropic's AI assistant, across dozens of sessions. The v1.0 sections (1--52) were discovered over several weeks of building with Claude Code (Anthropic's command-line coding agent). The v1.1 sections (53--60) were discovered in a single intensive Claude Cowork session (Anthropic's desktop AI tool) while building the SIGNAL LOST audio-video pipeline. I never manually edited a workflow wire, typed a widget value, or wrote a line of Python. Every bug, every fix, every architectural pattern in this guide came from directing Claude to build, test, break, diagnose, and repair ComfyUI custom nodes on my behalf. If that changes how you read this document --- good. It should. This is what AI-assisted development actually looks like in practice: you bring the creative vision and domain knowledge, the AI brings the code, and the lessons learned are real regardless of who typed them.
+**How this guide was made:** I am not a coder. I am a healthcare IT project manager who builds AI creative tools as a side pursuit. Every single line of code in my ComfyUI node packs --- ComfyUI-Goofer and ComfyUI-OldTimeRadio (SIGNAL LOST) --- was written by Claude, Anthropic's AI assistant, across dozens of sessions. The v1.0 sections (1--52) were discovered over several weeks of building with Claude Code (Anthropic's command-line coding agent). The v1.1 sections (53--60) were discovered in a single intensive Claude Cowork session (Anthropic's desktop AI tool) while building the SIGNAL LOST audio-video pipeline. The v1.2 additions (sections 61--65, plus extensions to sections 7, 9, and 10) were discovered during the SIGNAL LOST v1.2.0 production cycle — narrative engine bug fixes, LLM token-budget decapitation traps, content-filter rotation patterns, fuzzy-match leak guards, statistical regression harnesses, GitHub lockstep verification protocol, and the discipline of writing roadmaps for the *next* AI session rather than just for humans. I never manually edited a workflow wire, typed a widget value, or wrote a line of Python. Every bug, every fix, every architectural pattern in this guide came from directing Claude to build, test, break, diagnose, and repair ComfyUI custom nodes on my behalf. If that changes how you read this document --- good. It should. This is what AI-assisted development actually looks like in practice: you bring the creative vision and domain knowledge, the AI brings the code, and the lessons learned are real regardless of who typed them.
 
 ## Table of Contents
 
@@ -207,6 +207,51 @@ Older PowerShell (5.x) doesn't support &&. Use semicolons. Also, PowerShell's de
 > **Encoding Lesson**
 >
 > We pushed a README through PowerShell and all emoji headers turned into garbled bytes on GitHub. Fix: write files with Python using encoding=\'utf-8\', or avoid emoji entirely.
+
+#### 9.4 PowerShell Treats Git's stderr as a Native Command Error
+
+Git writes most of its normal status output (`To https://github.com/...`, `[new tag] v1.2.0 -> v1.2.0`, branch advance arrows) to **stderr**, not stdout. PowerShell sees any text on stderr from a native command and wraps it in a scary-looking error block:
+
+```
+git : To https://github.com/jbrick2070/Whatever.git
+At line:18 char:1
++ git push origin v1.2.0
++ ~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (...) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+```
+
+**The push actually succeeded.** The error block is PowerShell editorializing on stderr text it doesn't understand. Look for the actual git output line — `[new tag] v1.2.0 -> v1.2.0` or `4b33563..7b67bae main -> main` — embedded inside the error block. That's the truth. The "NativeCommandError" wrapper is noise.
+
+The mitigation is simple but counterintuitive: ignore the error block, look for the real git output, and verify with `git log --oneline -3` after every push to confirm the commit landed. Don't try to suppress stderr — you need to see real errors when they happen.
+
+#### 9.5 The `git push origin main` From a Feature Branch Trap
+
+This is the most expensive Windows-git mistake in the SIGNAL LOST development cycle. You're sitting on a feature branch (e.g., `v1.2-narrative-beta`), you've committed, you run `git push origin main`, and git says **"Everything up-to-date."** You believe the push worked. Hours later you discover nothing landed because there was nothing to push to `main` from your current position.
+
+```
+git push origin main          # WRONG — pushes nothing if you're not on main
+git push origin <currentbr>   # RIGHT — pushes the branch you're actually on
+```
+
+The fix is to always use the explicit branch name in the push command, and to read git's output for the literal `branch -> branch` confirmation line. If the push command says "Everything up-to-date" and you expected commits to land, **you pushed the wrong branch**. Fix it before doing anything else.
+
+Better yet: hand the user PowerShell blocks that include `git status` first so they can see what branch they're actually on before they push. Never assume the user is on the branch you think they are.
+
+#### 9.6 Always Bake `cd` Into User-Facing PowerShell Blocks
+
+When handing a non-developer user (or yourself in a different terminal) a PowerShell block to run, **always start with `cd <absolute path>`** even if you "know" they're already in the right directory. They aren't. They closed the previous terminal. They opened a new one in `C:\Users\<them>` by default. They were in a sibling repo. Bake the `cd` in. The cost is one line; the savings on "I ran your command and it said nothing happened" is enormous.
+
+```powershell
+cd C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio
+git status
+git add nodes/gemma4_orchestrator.py
+git commit -m "..."
+git push origin v1.2-narrative-beta    # explicit branch
+git log --oneline -3                    # verify locally
+```
+
+Five lines, four safety nets, zero ambiguity.
 
 ### Section 31: HuggingFace Cache & Windows Path Issues
 
@@ -1294,6 +1339,104 @@ Strip actor names, character names, studio names, and brand references. Key patt
 
 Replace all weapons with bananas. "Machine gun" → "bunch of bananas", "stabbed" → "poked with a banana". Sort replacements longest-first so "machine gun" matches before "gun".
 
+#### 7.4 Rotating Euphemism Pools (Don't Ship `[BLEEP]`)
+
+A content filter that substitutes a single sentinel like `[BLEEP]` into output works for moderation but breaks immersion in narrative pipelines — every substitution announces "this was censored." Replace the sentinel with a **rotating pool of period-appropriate euphemisms** and preserve the original word's capitalization style. The substitution disappears into the prose instead of breaking the fourth wall.
+
+```python
+_MINCED_OATHS = [
+    # Golden-age radio
+    "Golly", "Gee", "Gee whiz", "Jeepers", "Jiminy", "Jiminy Cricket",
+    "Heavens", "Good heavens", "My stars", "Goodness gracious",
+    "For Pete's sake", "By Jove", "Great Scott", "Cheese and crackers",
+    # Pulp adventure
+    "Blazes", "Thunderation", "Hot dog", "Holy smokes", "Holy mackerel",
+    "Suffering succotash", "Leapin' lizards", "Good grief", "Gadzooks", "Zounds",
+    # Sci-fi space-opera
+    "Stars above", "By the stars", "Great galaxies", "Sweet cosmos",
+    "Thundering comets", "Sputtering satellites",
+]
+
+def _content_filter(text: str) -> tuple:
+    replacements = []
+    cursor = [0]
+    def _replace(match):
+        word = match.group(0)
+        replacements.append(word.lower())
+        oath = _MINCED_OATHS[cursor[0] % len(_MINCED_OATHS)]
+        cursor[0] += 1
+        # Preserve original capitalization style
+        if word.isupper():
+            return oath.upper()
+        if word[0].isupper():
+            return oath
+        return oath.lower()
+    pattern = r'\b(?:' + '|'.join(re.escape(w) for w in sorted(_BLOCKED_WORDS, key=len, reverse=True)) + r')\b'
+    cleaned = re.sub(pattern, _replace, text, flags=re.IGNORECASE)
+    return cleaned, replacements
+```
+
+For child-safe pipelines, swap the pool for *Gosh*, *Heck*, *Goodness*, *Oh my*, *Cripes*. For sword-and-sorcery, swap for *By the Nine*, *Mother of dragons*, *Hells*, *Damnation* (period-flavor cursing). The mechanism is identical; the pool changes to match the genre.
+
+#### 7.5 Procedural Name Leak Guards (Fuzzy-Match, Not Blocklists)
+
+When an LLM occasionally types the wrong character name inside dialogue body — addressing a character as "Rex" when the cast sheet says "Vex" — the wrong fix is a hardcoded blocklist. The right fix is structural fuzzy-matching against your authoritative roster:
+
+```python
+import difflib, re
+
+# Extract real cast from authoritative markup
+roster = set(re.findall(r'\[VOICE:\s*([A-Z][A-Z0-9_]+)\s*,', script_text))
+roster_list = sorted(roster)
+leaks_fixed = 0
+
+# Direct-address pattern: capitalized 3-8 char tokens not in roster
+addr_pat = re.compile(r'(?<=[,\s])([A-Z][a-z]{2,7})(?=[.,!?\s])')
+
+COMMON_WORDS = {  # English words that look like names
+    "the", "and", "but", "for", "with", "from", "into", "that", "this",
+    "then", "than", "when", "what", "will", "were", "been", "have", "just",
+    "only", "some", "such", "very", "now", "yes", "no", "ok", "sir",
+    "doctor", "captain", "commander", "listen", "look", "hey", "wait",
+    "stop", "please", "thanks", "maybe", "never", "always",
+}
+
+def fix_leak(m):
+    nonlocal leaks_fixed
+    token = m.group(1)
+    upper = token.upper()
+    if upper in roster:
+        return token
+    if token.lower() in COMMON_WORDS:
+        return token
+    match = difflib.get_close_matches(upper, roster_list, n=1, cutoff=0.55)
+    if match:
+        leaks_fixed += 1
+        return match[0].title()
+    return token
+
+script_text = addr_pat.sub(fix_leak, script_text)
+if leaks_fixed:
+    log.warning("[NameLeakGuard] repaired %d leak(s) — roster=%s",
+                leaks_fixed, roster_list)
+```
+
+The cutoff value (`0.55`) is critical. Tune empirically: too low and you false-positive on real proper nouns the LLM legitimately invented; too high and you miss obvious typos. Run on archived output and tune until the warning log matches your gut judgment.
+
+**Why this beats a blocklist:** zero hardcoded names, adapts as cast pools grow, logs every repair so you can audit what the LLM was leaking, and falls back gracefully when difflib finds no close match (the unknown token passes through untouched).
+
+#### 7.6 Pool Sizing Per Filtered Subset
+
+A pool with N entries does not have an effective size of N for every consumer — it has an effective size of N **per filter applied**. A TTS pipeline with 9 voice presets has plenty of headroom for a 4-character episode but may collapse to 2 effective presets once you apply a gender filter, then collapse to 0 after de-duplication when a 3-female cast walks in.
+
+Audit pool sizing per filtered subset, not per total. Example: 9 voice presets, only 2 classified female → effective female pool = 2 → any cast with 3+ female characters will silently collide on the same preset and produce two characters who sound identical. The fix is one of:
+
+1. **Reclassify androgynous slots** to fill the underserved subset (e.g., promote `en_speaker_7` from male to female to give a 3rd distinct female voice).
+2. **Expand the underlying pool** with new entries.
+3. **Accept duplication** and explicitly log it (`POOL_EXHAUSTED` warning) so the user can see the constraint.
+
+Never let a per-subset pool collision happen silently. Log the warning even when you accept the duplication.
+
 ### Section 10: Regression Testing Checklist
 
 Run this entire checklist after EVERY code change, before considering the work done. No step is optional.
@@ -1322,9 +1465,68 @@ Run this entire checklist after EVERY code change, before considering the work d
 
 ### 12. Restart ComfyUI fully (not just re-queue) and run the workflow end-to-end
 
+### 13. Run the statistical RNG sanity harness if any RNG-adjacent code changed
+
+### 14. Verify GitHub HEAD lockstep against local after every push (see 10.2)
+
+### 15. Scan for 0-byte files, BOM corruption, and missing node registrations on the remote
+
 #### 10.1 Structured Logging
 
 Use Python's logging module with named loggers. Prefix messages with stage context so you can trace exactly where a regression occurs. When a bug hits, the structured log tells you which clip, which frame count, and which stage failed.
+
+#### 10.2 GitHub HEAD Lockstep Verification
+
+Pushing to a remote is not the same as the remote receiving your changes intact. Windows CRLF/LF conversion, credential helper hangs, partial commits, branch/main confusion, and silent encoding corruption are all real and all common. After every push, verify lockstep:
+
+```bash
+# Local checks (run before push)
+find . -name "*.py" -size 0                  # Zero-byte files
+head -c 3 nodes/*.py | hexdump | grep "ef bb bf"  # BOM markers
+python -c "import ast; [ast.parse(open(f).read()) for f in glob.glob('nodes/*.py')]"
+grep "NODE_CLASS_MAPPINGS" __init__.py       # Registration intact
+
+# Remote checks (run after push)
+git fetch origin <branch>
+git log --oneline origin/<branch> -3         # Remote shows expected commits
+git diff HEAD origin/<branch>                # Should be empty
+```
+
+The single most common failure mode on Windows is `git push origin main` from a feature branch silently doing nothing because there's nothing to push to `main` from the current branch tip — git reports "Everything up-to-date" and you assume success. Always check the actual branch name in `git log`'s output (`branch -> branch`) matches what you intended.
+
+#### 10.3 Statistical RNG Sanity Harness
+
+If your code has any probabilistic feature (easter egg, A/B sampler, jitter, coin flip, sampling threshold), ship a tiny test that runs the same probabilistic check 10,000 times and asserts the observed rate matches the target within tolerance. This is the only way to catch RNG poisoning — eyeballing a few runs is not enough.
+
+```python
+# tests/probability_check.py
+"""Sanity check — verifies easter-egg fires at the documented rate."""
+from secrets import SystemRandom
+
+TARGET_RATE = 0.11
+N_TRIALS = 10_000
+TOLERANCE = 0.015  # ±1.5%
+
+def main():
+    rng = SystemRandom()
+    hits = sum(1 for _ in range(N_TRIALS) if rng.random() < TARGET_RATE)
+    observed = hits / N_TRIALS
+    delta = abs(observed - TARGET_RATE)
+    print(f"Sanity check — {N_TRIALS:,} trials")
+    print(f"  Target:   {TARGET_RATE:.1%}")
+    print(f"  Observed: {observed:.2%}  ({hits:,} hits)")
+    print(f"  Delta:    {delta:.2%}  (tolerance {TOLERANCE:.1%})")
+    if delta <= TOLERANCE:
+        print("  STATUS: PASS")
+        return 0
+    print("  STATUS: FAIL — RNG is biased")
+    return 1
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+```
+
+Ten thousand trials runs in well under a second. The tolerance band (`±1.5%`) is wide enough to never false-positive on healthy RNG and narrow enough to catch a stream that's stuck at 0% or 100%. Make this part of your regression checklist (step 13 above) and run it before every commit that touches RNG-adjacent code.
 
 ### Section 14: Removing a Dependency Cleanly
 
@@ -1774,4 +1976,190 @@ return {
 
 **Note:** This specific thumbnail implementation was written by Cowork but has not yet been verified in a live ComfyUI render at time of writing. The pattern matches ComfyUI's documented OUTPUT_NODE behavior, but edge cases (subfolder resolution, temp vs output directory) may need adjustment.
 
-*End of Document — v1.1 (SIGNAL LOST Edition)*
+### Section 61: LLM Revision Pass Token Decapitation (Diagnosed Across Multiple Episodes in Cowork)
+
+**Context:** SIGNAL LOST v1.2 added a critique-and-revise loop to the Gemma 4 script writer — the LLM generates a draft, critiques itself, then rewrites incorporating the critique. Across multiple test episodes, every external reviewer gave the same feedback: *"the ending is weak."* The opening was praised, the middle was praised, the dialogue was praised, but Scene 4 always landed flat. Cowork tried prompt-level fixes (ending discipline rules, paired bookend instructions, "commit to the bold beat" directives) and none of them moved the needle.
+
+**The diagnosis:** Reading the actual ComfyUI logs showed the smoking gun. The revision pass was budgeted at `max(target_words * 2.0, 1024)` which gave ~2080 tokens for a typical 8-minute episode. But the draft was running ~10,000 characters (~2,500 tokens), and the revision was producing ~7,600 characters and then **stopping mid-word**:
+
+```
+[VOICE: KYLE, male, 40s, clipped, stressed] Impact. Small thing hit us.
+Micro-meteorite. Hull breach minor near Manifold
+[Gemma4] Inference complete in 536.0s.
+[Critique] Revision pass complete (7600 chars)
+[Critique] Checks & Critiques complete — revised script accepted (similarity=74.8%, length ratio=75%).
+```
+
+The revision pass was decapitating Scene 4 because the token budget was sized from the original `target_words` instruction, not from the actual draft length. The downstream similarity check (74.8%) and length-ratio check (75%) both passed because the truncation was inside acceptable bounds. The script that shipped was missing its ending. Reviewers were correct about the symptom but wrong about the cause — the writing wasn't weak, the writing was *missing*.
+
+**The fix:** Size the revision token budget from the actual draft character count, not from the original `target_words` parameter:
+
+```python
+# WRONG — sizes from prompt intent, ignores draft reality
+revision_tokens = max(int(target_words * 2.0), 1024)
+revision_tokens = min(revision_tokens, 8192)
+
+# RIGHT — sizes from draft length with safety floors and ceiling
+draft_token_estimate = int(len(draft_text) / 3.5)   # ~3.5 chars/token English
+revision_tokens = max(
+    int(draft_token_estimate * 1.25),                # 25% headroom
+    int(target_words * 2.0),                         # never below original
+    2048,                                            # absolute floor
+)
+revision_tokens = min(revision_tokens, 8192)         # absolute ceiling
+log.info("[Critique] Revision token budget: %d (draft_est=%d, target_words=%d)",
+         revision_tokens, draft_token_estimate, target_words)
+```
+
+**Cowork-specific lesson:** When external reviewers consistently identify the same narrative weakness across multiple episodes, **read the actual generation logs before touching the prompt**. Prompt-level fixes for what is actually a token-budget bug will always fail and waste hours of iteration. The log line that gives away the bug is usually short and unremarkable — `[Critique] Revision pass complete (7600 chars)` does not look like a smoking gun until you compare it against the draft length.
+
+**Rule:** Any LLM call that operates over previously-generated content must size its output budget from the **content**, not from the original generation params. The original params represent intent; the content represents reality. Budget for reality.
+
+### Section 62: ROADMAP.md as AI Session Continuity Brief
+
+**Context:** SIGNAL LOST v1.2 was built across multiple Cowork sessions over several weeks. Each session, the new Cowork instance had to spend 30+ minutes of context budget rediscovering "where are we, what shipped, what's queued, what are the standing rules" before any productive work could happen. Long sessions ran out of context not because the work was hard but because the context budget was burned on archaeology.
+
+**The fix Cowork built:** Restructure `ROADMAP.md` with a `🤖 NEW CONVERSATION HANDOFF` section at the top, written specifically for a cold-start AI assistant rather than for humans. Include:
+
+1. **Current shipped state** — version, tag, commit SHA, commit message of the most recent merge
+2. **Recent commits with file paths and line numbers** — not just "fixed bug" but "FIX-2 (~line 234) replaced `[BLEEP]` with `_MINCED_OATHS` rotation in `_content_filter`"
+3. **Next priority feature with full design spec** — phase-by-phase, where to plug it in, which file, approximate line range
+4. **Standing rules (user preferences) — DO NOT VIOLATE** — code style, forbidden patterns, operational constraints, things that look like nice-to-haves but are actually hard rules
+5. **First moves for next session** — `git status`, `git pull`, branch checkout, build targets, test commands, in order
+
+```markdown
+## 🤖 NEW CONVERSATION HANDOFF — READ THIS FIRST
+
+If you are a fresh Claude opening this repo with no prior conversation context,
+this section is your continuity brief. Read it before doing anything else.
+
+### Where we are (end of session 2026-04-08)
+
+**v1.2.0 is SHIPPED to main.** Tag `v1.2.0` exists. README is polished.
+
+| Commit | What landed |
+|--------|-------------|
+| `ce07e70` | README v1.2 polish |
+| `7b67bae` | Merge `v1.2-narrative-beta` → `main`, tagged `v1.2.0` |
+| `d9a03f8` | v1.2.0.5 bug fixes (revision budget + minced oaths + female pool + leak guard) |
+
+### What's queued for v1.3
+[full spec with file paths, line refs, phase-by-phase implementation steps]
+
+### Standing rules (DO NOT VIOLATE)
+- No baked character names anywhere in code or comments
+- No hardcoded blocklists for names — use difflib structural matching
+- All git commands run manually in PowerShell with `cd` baked in
+- Verify GitHub HEAD lockstep against local after every push
+- Always run `python tests/lemmy_rng_check.py` before declaring done
+
+### First moves for next session
+1. git status (confirm clean main)
+2. git pull origin main
+3. git checkout -b v1.3-arc-enhancer
+4. Build _arc_check_and_rewrite_bookends() per spec above
+5. Run regression: AST parse + Lemmy RNG check
+```
+
+The cost is ~10 minutes of writing at the end of a session. The savings on the next session's first 30 minutes is dramatic — instead of "let me explore the repo and figure out what's going on" you get straight to "I read the handoff, here's the PowerShell block to branch and start work."
+
+**Cowork-specific lesson:** Treat the roadmap as a **structured prompt for your future AI collaborator**. It is one. Write it in the imperative voice, with specific file paths and line numbers, with rules that read like constraints rather than suggestions. The next AI is going to read this cold and start making decisions immediately — give it everything it needs to make the right ones.
+
+**Rule:** Any project that will span multiple AI sessions needs a continuity handoff doc, and the doc needs to be updated at the end of each session before the conversation closes. A roadmap that only describes ambitions is useless to the next session; a roadmap that describes state, queue, rules, and first moves is priceless.
+
+### Section 63: Production Repo Hygiene — No Dev Artifacts in Public Trees
+
+**Context:** SIGNAL LOST v1.2 development generated a lot of intermediate documentation: `BUG_FIX_GUIDE_v1.2.md`, `KICKOFF_v1.2.md`, `LEMMY_QA_GUIDE.md`, `v1.2-planning.md`, `QA_GUIDE_v1.2_beta.md`, `QA_SIGNOFF_v1.1.md`, `PEER_REVIEW_REQUEST_v1.2_beta.md`, `GEMINI_RNG_AUDIT.md`. All of them were useful during development. None of them belong in the shipped repository.
+
+**The user's instruction:** *"no qa signoff just prod ready files and beat needed pdf files"* — translation: ship only the things a downstream user needs to install, run, and understand the node pack. Everything else is dev artifact and should live in your local notes, not in the public tree.
+
+**The cleanup pattern Cowork applied:**
+
+1. List all `.md` files in the repo
+2. For each one, ask: "would a brand-new user who just installed this from ComfyUI Manager need this file?"
+3. If the answer is no, `git rm` it
+4. Verify only `README.md`, `ROADMAP.md`, `LICENSE`, and `CLAUDE.md` (per-repo project instructions) remain in markdown form
+5. Test files belong in `tests/`, not in the repo root
+
+**The git rm cascade gotcha:** Cowork ran into a real failure mode here. When deleting multiple files via `git rm file1.md file2.md file3.md`, if **any** of those files has already been deleted from the working tree (e.g., via Bash `rm` earlier in the session), git fails on the missing file and **does not stage the others** — fatal error, zero deletions land. The fix is to delete files one at a time, or to check `git status` first and only `git rm` files that are still present:
+
+```powershell
+git status                    # See which files git knows about
+git rm file1.md               # Stage one at a time
+git rm file2.md
+git rm file3.md
+git commit -m "cleanup: remove stale dev artifacts"
+```
+
+**Cowork-specific lesson:** When operating in a Cowork session that has both Bash and PowerShell tooling available, file operations done via Bash do not always synchronize cleanly with git operations done via PowerShell — they're separate processes with separate views of the working tree. Prefer one tool consistently for file ops within a single staging cycle, or use `git status` as the source of truth before every `git rm`.
+
+**Rule:** Public node-pack repos should contain only what a brand-new user needs. Dev artifacts (planning docs, kickoff notes, peer review requests, QA signoffs, internal audits) belong in a separate private notes location. Ship narrow.
+
+### Section 64: Cast Pool Combinatorics & Public Domain Safety
+
+**Context:** SIGNAL LOST procedurally generates character names from first/last name pools. The v1.0 pools were small enough that name collisions across episodes were noticeable — listeners would recognize "the same cast" even though the per-episode RNG draws were unique. v1.2 expanded the pools to maximize uniqueness while staying defensible against trademark claims.
+
+**The math Cowork applied:** With `N` first names and `M` last names, the combinatoric space is `N × M` unique full names. For a 4-character episode drawn from a pool that allows duplicates only at the per-episode level, you want `N × M ≫ 4`, ideally `N × M > 1000` for "feels random across hundreds of episodes." SIGNAL LOST v1.2 ships `154 × 54 = 8,316` unique combinations.
+
+**The copyright safety filter Cowork applied:**
+
+1. **Public domain only for franchise-flavored names** — pre-1931 in the United States (current public domain cutoff for character names tied to specific works). Sherlock Holmes, Allan Quatermain, Captain Nemo, Wendy Darling are safe. Indiana Jones, James Bond, Luke Skywalker are not.
+2. **Generic given names from pop culture franchises are safe** — Homer, Bart, Marge, Lisa from The Simpsons are common given names with no character-specific trademark; "Bart Simpson" together is risky but "Bart" alone in a sci-fi context is fine. Same logic for Office characters (Michael, Pam, Kevin), Bradbury characters (Beatty, Spender, Eckels), and PKD-flavored generic names.
+3. **Last names of public figures are safe** — Pryor, Williams, Carrey, O'Toole as last names cannot be trademarked; they're common surnames belonging to many real people.
+4. **Strip franchise-specific compound names** — "Schrute," "Banzai," "Whorfin," "Krusty," "Wiggum," "Zarkov," "Skywalker," "Vader" all need to come out. Common-word last names that happen to also be franchise characters are case-by-case judgment calls.
+5. **No actor names as full names** — "Steve Carell" is identifiable; "Steve" or "Carell" alone is fine.
+
+**The single-token regex constraint:** SIGNAL LOST's `[VOICE: NAME, ...]` parser uses a single-token regex (`[A-Z][A-Z0-9_]+`), so name pool entries cannot contain spaces. "Perfect Tommy" must become "Tommy"; "Van Houten" must become "Houten". Always validate name pool entries against your downstream parser before adding them — a name with a space will silently break the cast assignment for that episode and you'll spend an hour wondering why one character is missing dialogue.
+
+**Cowork-specific lesson:** When building procedural content pools, the math is the easy part. The legal hygiene and parser-compatibility validation are where the bugs hide. Ship a small validation script that asserts `N × M > THRESHOLD` and that no entry contains spaces, and run it in CI:
+
+```python
+# tests/cast_pool_check.py
+from nodes.gemma4_orchestrator import _FIRST_NAMES, _LAST_NAMES
+
+assert all(' ' not in n for n in _FIRST_NAMES), "First name with space breaks parser"
+assert all(' ' not in n for n in _LAST_NAMES), "Last name with space breaks parser"
+combos = len(_FIRST_NAMES) * len(_LAST_NAMES)
+assert combos > 1000, f"Pool too small: {combos}"
+print(f"Cast pool OK: {len(_FIRST_NAMES)} × {len(_LAST_NAMES)} = {combos:,} unique combinations")
+```
+
+**Rule:** Procedural content pools for shipped code need three safety nets — combinatoric size, parser compatibility, and copyright defensibility. Bake all three into a CI test.
+
+### Section 65: TTS Voice Preset Pool Sizing Per Filtered Subset
+
+**Context:** SIGNAL LOST v1.2 uses Bark TTS with `en_speaker_0` through `en_speaker_9` — 10 English-native voice presets. The pipeline classifies each preset by gender (male/female/androgynous) and the cast assignment logic enforces gender match between the script's `[VOICE: NAME, gender, ...]` markup and the assigned preset. v1.1 had this working for typical 4-character episodes; v1.2 broke when an episode generated a 3-female cast.
+
+**The bug:** The `_VOICE_PROFILES` table classified only 2 presets as female (`en_speaker_4` and `en_speaker_9`). Episodes with 3 or more female characters would exhaust the female pool, the de-duplication loop would re-roll 10 times trying to find an unused female preset, fail, and accept the duplicate with a warning:
+
+```
+[Gemma4Director] CAST_GENDER_POOL_EXHAUSTED: ZARA (female) reusing preset v2/en_speaker_9
+```
+
+The pipeline kept running, the episode kept rendering, and two characters (VEX and ZARA) ended up with the same Bark voice. External reviewers consistently flagged this as "the female characters all sound the same" and Cowork initially diagnosed it as a writing problem (Pattern 5 vocal blueprints needing tightening) when it was actually a pool-sizing problem.
+
+**The fix:** Reclassify `en_speaker_7` from male/androgynous to female. Bark labels this preset as androgynous in its documentation; in English it reads as a younger, lighter voice that fits naturally as a 20s-30s female slot. This brought the effective female pool from 2 to 3, which covers any realistic SIGNAL LOST cast.
+
+```python
+# BEFORE
+("v2/en_speaker_7", "male",   "en", {"sharp", "anxious", "20s", "30s"}),  # androgynous but reads male
+
+# AFTER
+("v2/en_speaker_7", "female", "en", {"sharp", "anxious", "nervous", "20s", "30s"}),
+# Reclassified to female to prevent CAST_GENDER_POOL_EXHAUSTED on 3-female episodes.
+# Bark labels en_speaker_7 as androgynous — in English it reads soft/lighter so we
+# use it as the "younger" female slot (20s, anxious/sharp). Gives us 3 distinct
+# female presets (4, 7, 9) covering young/warm-adult/mature ranges.
+```
+
+**Cowork-specific lesson:** When a "writing quality" complaint maps to "two characters share an identifying attribute" (voice, name, color, costume), check the **assignment layer** before touching the writing layer. Pool exhaustion bugs masquerade as creative bugs because the symptom is on the surface — listeners hear identical voices and conclude "the writer didn't differentiate the characters" when the writer actually did and the pipeline collapsed two distinct characters onto one preset.
+
+**The general rule:** Audit assignment pool sizing against the **maximum filtered subset demand**, not the total pool size. A pool of 10 with 2 female entries has an effective female pool of 2 — and any 3-female cast will collide. The fix is one of:
+
+1. Reclassify ambiguous slots to fill the underserved subset
+2. Expand the underlying pool with new entries
+3. Accept duplication explicitly with a `POOL_EXHAUSTED` log warning
+
+Never let a per-subset collision happen silently. Even when you accept the duplication, log it loudly enough that a reader of the production logs can see the constraint.
+
+*End of Document — v1.2 (SIGNAL LOST Edition)*
