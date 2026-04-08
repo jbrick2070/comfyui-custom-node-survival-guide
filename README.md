@@ -30,7 +30,7 @@ ComfyUI also caches node outputs and can skip execution when it decides outputs 
 
 ## Quick-start survival guide
 
-Ten high-leverage habits that prevent most custom-node failures.
+Twelve high-leverage habits that prevent most custom-node failures.
 
 ### 1. Treat `custom_nodes/` as a deployment target, not your workspace
 
@@ -64,7 +64,7 @@ Those unique name strings are how ComfyUI identifies your node — and how every
 
 ### 7. Design widget evolution like a migration problem
 
-**This is the single most under-documented gotcha in ComfyUI:** workflow JSON stores widget values by **position index**, not by name. Add or reorder widgets in `INPUT_TYPES` and old workflows silently map prior values onto the wrong widget. Treat input changes like database schema migrations, not casual edits.
+**This is the single most under-documented gotcha in ComfyUI:** workflow JSON stores widget values by **position index**, not by name. Add or reorder widgets in `INPUT_TYPES` and old workflows silently map prior values onto the wrong widget. Treat input changes like database schema migrations, not casual edits. When you must add a widget, write a script that walks every workflow JSON in your repo and pads the `widgets_values` array for the affected node type at the exact insertion position. See "Workflow JSON stability" below for the full recipe.
 
 ### 8. Understand caching, or you'll debug "missing execution" forever
 
@@ -83,6 +83,14 @@ Example: the `AUDIO` type is a `dict` with a `waveform` tensor shaped `[B, C, T]
 `torch.cuda.empty_cache()` releases *unoccupied cached* memory from PyTorch's allocator. It does **not** free memory still referenced by live tensors or models, and it doesn't increase memory available to PyTorch — it mainly helps with fragmentation and `nvidia-smi` reporting.
 
 In long-running sessions, you must delete references to GPU objects first, *then* call `empty_cache()`. The pattern is: load → run → delete references → `empty_cache()`.
+
+### 11. Never share an RNG between reproducibility and variance
+
+If your node calls `random.seed(x)` anywhere — commonly to make outputs reproducible from a fingerprint or user-supplied seed — **every subsequent `random.random()` call in the same process becomes deterministic**. Any probabilistic feature in the same execution (easter eggs, variance rolls, jitter, Monte Carlo noise) will silently freeze into an always-on or always-off state for any given input. The RNG is process-global; seeding it is not a local operation. Keep determinism and variance in separate RNG streams. See "RNG, determinism, and variance" below for the fix.
+
+### 12. Priority reservation needs two-pass iteration
+
+When you assign items from a shared pool (voice presets, GPU streams, ports, cache slots) and some recipients require **locked** assignments while others draw from the same pool, process the locked recipients first. A single-pass loop in dict-insertion order will let a regular recipient claim a locked item before the priority branch runs, causing a silent collision. Two-pass iteration — priority keys first, regular keys second — is the only safe pattern. See "Silent failure triage" below.
 
 ---
 
@@ -104,7 +112,7 @@ Three pillars matter for node authors:
 
 ## Silent failure triage
 
-Most "this makes no sense" bugs fall into three buckets. Classify fast, fix fast.
+Most "this makes no sense" bugs fall into four buckets. Classify fast, fix fast.
 
 ### Stale code — import didn't change
 
@@ -122,7 +130,60 @@ Breakpoints don't hit, logs don't appear. ComfyUI skipped your node because outp
 
 Your node executes but gets nonsensical parameters — wrong booleans, shifted strings. Widget values in saved workflow JSON are mapped by position index.
 
-**Fix:** Check whether you've added, removed, or reordered widgets since the workflow was saved. If so, the workflow JSON is out of sync. Update it or implement migration logic.
+**Fix:** Check whether you've added, removed, or reordered widgets since the workflow was saved. If so, the workflow JSON is out of sync. Update it or implement migration logic. See "Workflow JSON stability" for the migration recipe.
+
+### Stale allocation — two recipients share a pool resource
+
+Your node runs, no errors are thrown, but downstream output shows two recipients with the same supposedly-unique resource — two characters with the same voice, two requests routed to the same port, two caches writing to the same slot. The pool allocator iterated in dict-insertion order, and a regular recipient drew the resource before a priority recipient's lock was applied.
+
+**Fix:** Two-pass iteration. Process priority recipients first so their reservations land in the used-set, then process regular recipients:
+
+```python
+all_keys       = list(assignments.keys())
+priority_keys  = [k for k in all_keys if is_priority(k)]
+regular_keys   = [k for k in all_keys if not is_priority(k)]
+
+used_pool = set()
+for key in priority_keys + regular_keys:
+    assign_from_pool(key, used_pool)
+```
+
+Never rely on dict ordering to enforce priority. Single-pass loops over shared pools are a recipe for silent collisions that only show up in final output, not in logs.
+
+---
+
+## RNG, determinism, and variance
+
+ComfyUI custom nodes frequently want **both** reproducibility (same seed → same output) and **variance** (probabilistic features that stay genuinely random across repeated runs of the same config). These two goals are fundamentally incompatible if they share a single RNG stream.
+
+### The trap
+
+Python's module-level `random` is **process-global**. When your node calls `random.seed(fingerprint)` to make outputs reproducible from a seed or input hash, every subsequent call to `random.random()`, `random.choice()`, etc., anywhere in the same process — including inside unrelated easter eggs, variance rolls, jitter, and Monte Carlo features — becomes deterministic for that run. If the fingerprint is the same, the "random" probabilistic feature fires the same way every time. If the fingerprint differs, the feature still fires based on the sequence, not on genuine OS entropy.
+
+The symptom is a probabilistic feature that appears **frozen** — either always on or always off — for any given widget configuration. You will chase this bug for hours thinking the logic is wrong. The logic is fine. The RNG is poisoned.
+
+### The fix: separate RNG streams
+
+For any probabilistic feature that must stay genuinely random across repeated runs of the same config, create a dedicated RNG stream using `random.SystemRandom()` at module level. It draws from OS entropy (`os.urandom`) and is completely immune to `random.seed()`:
+
+```python
+from random import SystemRandom
+
+# Module-level, OS-backed entropy.
+# Immune to random.seed() called anywhere else in the process.
+_VARIANCE_RNG = SystemRandom()
+
+def maybe_trigger_easter_egg():
+    if _VARIANCE_RNG.random() < 0.11:
+        return True
+    return False
+```
+
+For reproducibility, keep using the seeded module-level `random` as you normally would. The two streams never interact.
+
+### The general principle
+
+Determinism and variance must live in separate RNG streams. If you want both, you need two RNGs. This applies beyond easter eggs — any time you mix reproducible generation with stochastic sampling (jitter, dropout, noise injection, A/B selection), audit your RNG sources and make sure the variance stream isn't being silently seeded upstream.
 
 ---
 
@@ -160,6 +221,33 @@ Widget evolution is the other major compatibility axis:
 
 ComfyUI also supports hidden inputs (`PROMPT`, `EXTRA_PNGINFO`, `UNIQUE_ID`) via the `hidden` key in `INPUT_TYPES`. These are useful for caching namespacing, metadata embedding, and cross-node coordination — but they tie you to ComfyUI's server contract, so keep them stable.
 
+### The widget migration recipe
+
+Adding a single new widget to `INPUT_TYPES` shifts every subsequent widget's index by one. Every workflow JSON that references your node must have a new entry inserted into its `widgets_values` array at the exact insertion position, or the node will run with garbage inputs and no error — booleans passing through as strings, dropdowns reading the wrong slot, silent data corruption all the way through the pipeline.
+
+The safe migration procedure:
+
+1. **Add the widget to `INPUT_TYPES`** in the position you want it to occupy. Note the zero-based index.
+2. **Write a migration script** that walks every workflow JSON in your `workflows/` directory (and any examples in `README.md` or docs), finds nodes with the target `type`/`class_type`, and inserts the new default value into each `widgets_values` array at the same index.
+3. **Verify every workflow** by computing `expected = len(required) + len(optional)` from your `INPUT_TYPES` definition and asserting `len(widgets_values) == expected` for every affected node.
+4. **Boot ComfyUI and load each workflow** to confirm no silent value shifts.
+
+There is no such thing as a "safe additive" widget change once a workflow has been saved. `INPUT_TYPES` is a schema. Schema changes require data migrations.
+
+### Test workflow discipline
+
+If your node pack has optional expensive features (multi-pass LLM loops, self-critique, outline competitions, upscaling passes, quality boosters), **your test/QA workflows must explicitly disable them**. Don't inherit defaults — defaults change, and a test workflow that silently picks up a newly-enabled-by-default feature will blow its wall-time budget without anyone noticing until the next release.
+
+Encode the purpose in the widget values, not just the filename:
+
+- **`test.json`** → fastest possible run, every expensive feature explicitly OFF
+- **`lite.json`** → one or two expensive features ON for quality validation
+- **`full.json`** → all expensive features ON for final-quality output
+
+Budget the wall time of each workflow and regression-check after every release. If `test.json` ever exceeds its budget, something drifted — either a default changed, a feature was added to the critical path, or an inference call quietly scaled up. Catch it immediately while the change is fresh.
+
+This is not optional for node packs with LLM or diffusion stages. A "test" workflow that takes 40 minutes instead of 10 because `self_critique` and `open_close` defaulted to true is a real bug that burns real GPU hours and real user trust.
+
 ---
 
 ## Dependency and VRAM hygiene
@@ -188,6 +276,28 @@ Two safe patterns:
 ### Transformers v5 compatibility
 
 Transformers v5 removes deprecated pipeline classes including `SummarizationPipeline` and `TranslationPipeline`. If your node pack uses these, migrate to `TextGenerationPipeline` or modern chat-model patterns.
+
+### Background thread noise from third-party libraries
+
+Large ML libraries frequently spawn background threads at model-load time for housekeeping tasks — auto-conversion probes, telemetry, cache warming, safetensors checks. These threads can throw scary-looking exceptions into your logs when their HTTP calls fail, even though the model itself loads and runs fine.
+
+A real example: `transformers` spawns `Thread-auto_conversion` on certain model loads to POST to a Hugging Face conversion endpoint and check for safetensors availability. If the endpoint returns HTML, nothing, or is blocked by a corporate proxy, the thread raises `json.decoder.JSONDecodeError` into the log. The model loads fine. The exception is cosmetic. But users will file bug reports, and you will waste hours convincing yourself your node is broken when it isn't.
+
+**Fix pattern: mock the offending module at import time**, before any third-party library has a chance to spawn its thread:
+
+```python
+# At the very top of your node pack's __init__.py, before importing transformers:
+import sys
+import types as _types
+
+_mock_sc = _types.ModuleType("transformers.safetensors_conversion")
+_mock_sc.auto_conversion = lambda *args, **kwargs: None
+sys.modules["transformers.safetensors_conversion"] = _mock_sc
+```
+
+Note that some model load paths (e.g., Bark) bypass this kind of mock by re-importing the real module or using a different code path. If the exception only appears for specific models, document it as known non-blocking log noise rather than chasing a fix that's worse than the problem.
+
+**General principle:** when you see a scary exception in logs, first verify whether the operation that's supposedly failing actually affects output. If inference runs correctly and output is clean, the exception is likely from a background housekeeping thread and should be either mocked at import time or documented as tolerated noise — not debugged as a real failure.
 
 ### VRAM lifecycle management
 
