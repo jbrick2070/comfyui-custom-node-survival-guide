@@ -997,4 +997,57 @@ bugs:
   tags: [hygiene, public-repo, git-rm]
   legacy_id: "63"
 
+- id: "12.19"
+  phase: 12
+  area: vram
+  symptom: |
+    Transformers/LLM model "unloads" but VRAM never actually drops. Next model load
+    OOMs with an absurd allocation number (e.g. 31.70 GiB allocated on a 16 GB card).
+    `del model; gc.collect(); torch.cuda.empty_cache()` has no effect.
+  cause: |
+    A helper like `_run_with_timeout` built on `concurrent.futures.ThreadPoolExecutor`
+    abandons its worker thread when the wall-clock timeout fires. The abandoned thread
+    keeps a live Python reference to the model (closures, local vars, streamer state),
+    so `del` on the cache dict drops only one of several references. GC cannot collect
+    the model, and the GPU memory backing those tensors stays pinned.
+  fix: |
+    Before deleting references, explicitly move the model to CPU. Even when other live
+    references exist, `.cpu()` frees the CUDA tensors backing the weights:
+      try:
+          cache["model"].cpu()
+      except Exception:
+          pass
+      del cache["model"]; cache.clear()
+      gc.collect(); torch.cuda.empty_cache()
+    Also in the generate path: detach output tensors to CPU, then explicitly
+    `del new_tokens_cpu, output, inputs, streamer; torch.cuda.empty_cache()` before
+    returning. Log `torch.cuda.memory_allocated()/1e9` after unload as telemetry.
+  verify: Post-unload telemetry reads ~0.03 GiB allocated. Next model load does not OOM.
+  tags: [vram, transformers, threadpoolexecutor, timeout, gemma, leak]
+  legacy_id: ""
+
+- id: "12.20"
+  phase: 12
+  area: llm-output
+  symptom: |
+    Long generation runs produce scripts with garbled, duplicated, or out-of-place
+    text blocks that look like error messages or partial prompts bleeding into the
+    narrative. Downstream parsers and assemblers choke on the corruption.
+  cause: |
+    A timeout wrapper around an LLM pass (e.g. critique-revision, arc-enhancer-echo)
+    returns its fallback text directly concatenated into the same string stream as
+    the real model output. When the main script body is built by joining strings,
+    the fallback text gets welded into the script with no sentinel to distinguish it.
+  fix: |
+    Never inject timeout fallback text into the same stream as model output. Return
+    a structured result like {"ok": False, "reason": "timeout", "fallback": "..."} or
+    a sentinel such as `<<TIMEOUT_FALLBACK reason="...">>...<<END>>`. The assembler
+    detects the sentinel and either drops the block, retries, or substitutes a clean
+    default. The raw fallback text must never reach the final script body.
+  verify: |
+    Force a timeout in the pass. The final script contains no fallback text and no
+    sentinel markers - either a clean retry/default or a cleanly omitted section.
+  tags: [llm, timeout, fallback, sentinel, script-corruption]
+  legacy_id: ""
+
 # End of bible.
