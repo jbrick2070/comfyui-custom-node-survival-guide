@@ -771,6 +771,18 @@ bugs:
   tags: [attention, flash-attention, logging, clarity]
   legacy_id: "NEW"
 
+- id: "11.06"
+  phase: 11
+  area: attention
+  symptom: Downstream input formatting crashes with slice or dict errors on `apply_chat_template`.
+  cause: Migrating from Gemma 4 (multimodal `AutoProcessor`) to standard models like Mistral Nemo (flat `AutoTokenizer`) requires different chat structural types. Gemma4Processor requires `{"role": "user", "content": [{"type": "text", "text": prompt}]}` while normal tokenizers expect `{"role": "user", "content": prompt}`.
+  fix: |
+    Add dynamic checks when building chat pipelines `is_gemma = "gemma" in model_id.lower()`. 
+    Conditionally wrap the content arrays depending on model type.
+  verify: Both multimodal models and standard tokens process standard prompts without KeyError or TypeErrors.
+  tags: [tokenizer, autoprocessor, multimodal, apply_chat_template]
+  legacy_id: "NEW"
+
 # ─────────────────────────────────────────────────────────────
 # PHASE 12 — REGRESSION, GIT, HANDOFF
 # Testing, autonomy, git hygiene, session continuity, repo cleanliness.
