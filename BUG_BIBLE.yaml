@@ -1050,4 +1050,47 @@ bugs:
   tags: [llm, timeout, fallback, sentinel, script-corruption]
   legacy_id: ""
 
+- id: "12.21"
+  phase: 12
+  area: vram
+  symptom: |
+    Large models (26B-A4B, 31B) fail to load even in 4-bit mode on standard 16GB
+    VRAM hardware. Windows throws "The paging file is too small for this operation
+    to complete" (os error 1455) or ComfyUI quietly kills the process.
+  cause: |
+    Before quantization, the raw weights must be deserialized into System RAM.
+    Models like Gemma 26B cause a massive >60GB memory spike that exhausts the
+    Windows page file, leading to OS-level defensive kills before the shrunken
+    4-bit model can ever be handed to the GPU.
+  fix: |
+    Manually expand the Windows Virtual Memory (Page File) to 100,000 MB+ to
+    absorb the spike. This permits the loader to survive the unpacking phase.
+    However, the resulting model still exceeds 16GB VRAM and requires offloading.
+  verify: |
+    Windows System Performance settings show 100,000 MB paging file.
+    Gemma 26B loader completes weight deserialization without OS crash.
+  tags: [vram, paging-file, windows, gemma-26b, oom]
+  legacy_id: ""
+
+- id: "12.22"
+  phase: 12
+  area: environment
+  symptom: |
+    TypeError: Params4bit.__new__() got an unexpected keyword argument '_is_hf_initialized'
+    triggered when trying to load 4-bit models with CPU offloading enabled.
+  cause: |
+    The `llm_int8_enable_fp32_cpu_offload=True` flag in BitsAndBytesConfig causes
+    a fatal signature mismatch inside the PyTorch `Params4bit` initialization
+    bridge on Windows. The library is fundamentally incapable of offloading
+    4-bit quantized layers to System RAM at this time.
+  fix: |
+    Revert to models that fit comfortably within physical VRAM (e.g. Gemma 4B/E4B).
+    Use the "True Single Switch" architecture to prevent VRAM duplication across
+    nodes, ensuring the limited 16GB VRAM budget is never accidentally doubled.
+  verify: |
+    Remove the offload flag. Re-run with E4B-it. Generations complete without
+    TypeError.
+  tags: [vram, cpu-offload, params4bit, windows, bitsandbytes, pytorch]
+  legacy_id: ""
+
 # End of bible.
