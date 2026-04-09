@@ -1093,4 +1093,55 @@ bugs:
   tags: [vram, cpu-offload, params4bit, windows, bitsandbytes, pytorch]
   legacy_id: ""
 
+12.23:
+  title: Ghost Node Registration (Import Gap)
+  symptom: |
+    Boot logs show: "Failed to load 'OTR_NodeName': module '...' has no attribute 'NodeName'".
+  cause: |
+    Consolidating architectures or refactoring node classes without cleaning up the
+    `NODE_CLASS_MAPPINGS` or `_NODE_MODULES` lists in the package `__init__.py`. 
+    ComfyUI still attempts to import the deleted/moved class from the original path.
+  fix: |
+    Scrub `__init__.py` after every refactor. Ensure the registration dict exactly 
+    matches the classes currently exported by the node modules.
+  verify: |
+    "✓ All N nodes loaded successfully" appears in the console with 0 skips.
+  tags: [infrastructure, boot-fail, registration, refactor]
+  legacy_id: ""
+
+12.24:
+  title: Unconsumed Configuration (Ghost Variables)
+  symptom: |
+    Changes to node widgets (e.g. 'pacing') have no effect on the output, even 
+    though the code appears to extract the values.
+  cause: |
+    A logic implementation gap where a dictionary (like `pacing = plan.get("pacing")`)
+    is initialized but the loop or downstream logic relies on hardcoded local 
+    defaults instead of the extracted variables.
+  fix: |
+    Audit the execution loop to ensure all extracted configuration variables are
+    actually applied to the data processing stack.
+  verify: |
+    Adjusting a widget (e.g. halving seconds) results in a measurable 50% change
+    in the produced audio/image manifolds.
+  tags: [pacing, logic, audio-engine, bug]
+  legacy_id: ""
+
+12.25:
+  title: Misnamed Safety Caps (Semantic Drifting)
+  symptom: |
+    A variable appears to store a user-defined duration but is internally capped
+    at a tiny value (e.g. 200ms) that conflicts with the variable name's purpose.
+  cause: |
+    Legacy "safety guards" left in the code that hard-truncate input values to 
+    prevent stacking artifacts but weren't updated when the system moved to a 
+    more robust buffering or pacing model.
+  fix: |
+    Remove the hardcoded `min(val, small_cap)` guards in favor of the production-plan's
+    pacing standards.
+  verify: |
+    `render_log` shows expected durations (e.g. 750ms) instead of the 200ms ceiling.
+  tags: [audio, timing, logic, reggresion]
+  legacy_id: ""
+
 # End of bible.
