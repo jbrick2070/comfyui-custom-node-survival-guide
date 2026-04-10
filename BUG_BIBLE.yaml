@@ -783,6 +783,16 @@ bugs:
   tags: [tokenizer, autoprocessor, multimodal, apply_chat_template]
   legacy_id: "NEW"
 
+- id: "11.07"
+  phase: 11
+  area: performance
+  symptom: 4GB GPUs "slow to a crawl" during story generation despite no direct OOM.
+  cause: Multi-pass LLM cycles (Critique, Open-Close, Arc Enhancer) force the model to stay active over multiple inference windows. On 4GB cards, the cumulative KV cache and model offloading overhead over 5+ passes causes extreme bus latency.
+  fix: Implement an "Optimization Profile" (Obsidian/One-Shot) that defaults all iterative passes to OFF. One prompt, one script, zero offload cycles.
+  verify: 4GB script generation completes in a single window without the "crawling" effect found in multi-pass runs.
+  tags: [vram, 4gb, obsidian, performance, offloading]
+  legacy_id: "NEW"
+
 # ─────────────────────────────────────────────────────────────
 # PHASE 12 — REGRESSION, GIT, HANDOFF
 # Testing, autonomy, git hygiene, session continuity, repo cleanliness.
@@ -1154,6 +1164,145 @@ bugs:
   verify: |
     `render_log` shows expected durations (e.g. 750ms) instead of the 200ms ceiling.
   tags: [audio, timing, logic, reggresion]
+  legacy_id: ""
+
+12.26:
+  title: cache_dir dirname() Miscount (The Custom Node Path Trap)
+  symptom: |
+    `from_pretrained(model_id, local_files_only=True, cache_dir=...)` fails with
+    "Cannot find the requested files in the disk cache" even though the model is
+    fully downloaded and the symlinks are intact. Hub fallback triggers a redundant
+    multi-GB internet download on every single run.
+  cause: |
+    Using `os.path.dirname()` chains to navigate from `__file__` to the models
+    directory is fragile and error-prone. The typical custom node sits at:
+      `ComfyUI/custom_nodes/MyPack/nodes/my_node.py`
+    Three dirname() calls resolve to `custom_nodes/` (wrong), not `ComfyUI/`.
+    The computed `cache_dir` points to a non-existent `custom_nodes/models/` path,
+    so `local_files_only=True` always fails and the Hub fallback fires.
+    This is invisible because the Hub fallback silently succeeds (downloading to
+    the WRONG location) and the pipeline appears to "work" — just with a 10-minute
+    network penalty every startup.
+  fix: |
+    NEVER use dirname() chains to compute cache_dir. Instead, derive it from
+    the HF_HOME environment variable (set in prestartup_script.py):
+      cache_dir = os.path.join(
+          os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface")),
+          "hub"
+      )
+    This resolves correctly regardless of the node's filesystem depth.
+    Apply to EVERY `from_pretrained()` call: tokenizer, model, processor, BarkModel,
+    MusicgenForConditionalGeneration, AutoProcessor, etc.
+  verify: |
+    Add a log line: `log.info("cache_dir resolved to: %s", cache_dir_path)`.
+    Confirm it shows `ComfyUI/models/huggingface/hub`, NOT `custom_nodes/models/...`.
+    Confirm "loaded from cache (no HTTP checks)" appears in logs with zero "Fetching" lines.
+  tags: [cache_dir, dirname, paths, huggingface, from_pretrained, windows]
+  legacy_id: ""
+
+12.27:
+  title: Windows Symlink Slash Direction in HF Hub Cache
+  symptom: |
+    Model files exist in the blobs/ directory with correct hashes, but
+    `from_pretrained(local_files_only=True)` cannot find them. The snapshots/
+    directory contains symlinks that appear valid in Explorer but fail when
+    the transformers library tries to resolve them.
+  cause: |
+    The Hugging Face Hub library creates symlinks in `snapshots/<hash>/` pointing
+    to `../../blobs/<blob_hash>`. On Windows, the `huggingface_hub` download code
+    creates these with backslashes (`..\..\blobs\<hash>`), but if a "fix" script
+    rewrites them to forward slashes (`../../blobs/<hash>`), the Windows symlink
+    target resolution fails silently. The file "exists" as a symlink but cannot
+    be opened, so `transformers` reports it as missing.
+    Conversely, on WSL or Git Bash, forward slashes work but backslashes break.
+    The slash direction must match the OS that CREATED the symlink.
+  fix: |
+    On native Windows: always use backslashes in symlink targets.
+    On WSL/Linux: always use forward slashes.
+    Never "fix" symlinks by normalizing slashes without testing `os.path.exists()`
+    on the RESOLVED path afterward.
+    Best practice: use `os.readlink()` to get the current target, then
+    `os.path.exists(os.path.join(symlink_dir, target))` to validate resolution.
+  verify: |
+    For each file in snapshots/<hash>/:
+      target = os.readlink(filepath)
+      resolved = os.path.join(os.path.dirname(filepath), target)
+      assert os.path.exists(resolved), f"Broken: {filepath} -> {target}"
+  tags: [windows, symlink, huggingface, cache, blobs, slashes]
+  legacy_id: ""
+
+12.28:
+  title: Global HF Cache Duplication (The 208 GB Trap)
+  symptom: |
+    Disk usage grows unexpectedly. Model downloads appear to succeed but take
+    twice as long as expected. `C:\Users\<user>\.cache\huggingface\hub\` contains
+    full copies of models that also exist in the project's custom HF_HOME directory.
+  cause: |
+    When `cache_dir` is not explicitly passed to `from_pretrained()`, the library
+    falls back to the global default (`~/.cache/huggingface/hub/`). Even when
+    `HF_HOME` is correctly set via environment variable, certain code paths
+    (especially Hub fallback after `local_files_only=True` failure) ignore the
+    env var and download to the global cache. Over time, this silently duplicates
+    every model — 208 GB of wasted space was observed in one real-world case.
+    Additionally, `.lock` and `.incomplete` files from failed/interrupted downloads
+    accumulate in the global cache and can deadlock subsequent download attempts.
+  fix: |
+    1. Pass `cache_dir` explicitly in EVERY `from_pretrained()` call (see 12.26).
+    2. After hardening, audit and purge the global cache:
+       `shutil.rmtree(os.path.expanduser("~/.cache/huggingface/hub/models--*"))`
+    3. Periodically scan for `.lock` and `.incomplete` files in both caches:
+       `Get-ChildItem -Recurse -Include *.lock,*.incomplete -Force | Remove-Item`
+    4. Never assume HF_HOME alone prevents global cache writes.
+  verify: |
+    After a full pipeline run, check:
+      `Get-ChildItem ~/.cache/huggingface/hub -Directory | Measure-Object`
+    Count should be 0. All models load from the project's HF_HOME/hub/ only.
+  tags: [huggingface, cache, disk, duplication, cleanup, windows]
+  legacy_id: ""
+
+12.29:
+  title: Silent Sample Rate Mismatch (The 2/3 Speed Bug)
+  symptom: |
+    Audio from a secondary model (e.g. MusicGen at 32 kHz) plays at the wrong
+    speed when mixed into a primary audio bus (e.g. 48 kHz). Opening theme sounds
+    slow and pitched down. No error is raised.
+  cause: |
+    The assembler node stitches waveform tensors by concatenation without checking
+    that all inputs share the same sample rate. When a 32 kHz waveform is treated
+    as 48 kHz, it plays at 2/3 speed (32000/48000 = 0.667). The math is silent —
+    no shape error, no dtype error, no device error. The only symptom is audible.
+  fix: |
+    Every audio input path must resample to the target bus rate before mixing.
+    Use `torchaudio.functional.resample(waveform, orig_sr, target_sr)` with a
+    numpy `scipy.signal.resample_poly` fallback. Add a log line:
+      `log.info("Resampled %dHz -> %dHz", orig_sr, target_sr)`
+    Include a same-rate no-op path that skips the resample when rates already match.
+  verify: |
+    MusicGen outputs at 32 kHz. Main bus is 48 kHz. Resampled audio plays at
+    correct speed and pitch. Log shows "Resampled 32000Hz -> 48000Hz".
+  tags: [audio, resample, sample-rate, silent, musicgen, assembler]
+  legacy_id: ""
+
+12.30:
+  title: audiocraft Windows Install Trap (av + spacy Pin Conflict)
+  symptom: |
+    Attempting to install `audiocraft` (Meta's MusicGen library) on Windows +
+    Python 3.12 fails with dependency conflicts. Even if forced, it breaks
+    existing packages in the ComfyUI venv.
+  cause: |
+    audiocraft pins `av==11.0.0` and `spacy==3.5.2`, both of which conflict
+    with ComfyUI's existing dependency tree. The `av` pin requires C compilation
+    (MSVC) which most users don't have. Even when installed, the spacy pin
+    downgrades tokenizers, breaking transformers.
+  fix: |
+    Do NOT use audiocraft. Use `transformers.MusicgenForConditionalGeneration` +
+    `AutoProcessor` instead — both are already installed via the main transformers
+    package. Same model weights, same output quality, zero extra dependencies.
+    For AudioLDM/AudioGen, similarly use the transformers-native API.
+  verify: |
+    `pip show audiocraft` returns "not installed". MusicGen generation works
+    via transformers API. No MSVC or spacy required.
+  tags: [audiocraft, musicgen, windows, dependencies, av, spacy, python312]
   legacy_id: ""
 
 # End of bible.
