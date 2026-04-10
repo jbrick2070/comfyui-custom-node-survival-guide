@@ -1,5 +1,5 @@
 # ComfyUI Custom Node Bug Bible
-# Machine-readable lessons learned shipping Goofer + ComfyUI-OldTimeRadio (SIGNAL LOST).
+# Machine-readable lessons learned shipping complex custom nodes and multi-model pipelines.
 #
 # Organized in the order an AI actually writes and debugs a custom node pack:
 #   01. Bootstrap & Discovery
@@ -231,7 +231,7 @@ bugs:
   area: naming
   symptom: Two node packs declare the same NODE_CLASS_MAPPINGS key. One silently disappears from UI.
   cause: ComfyUI lets one win silently on collision.
-  fix: Always namespace node IDs with your pack name (Goofer_Sanitizer, not Sanitizer). Treat keys as permanent public API, never rename.
+  fix: Always namespace node IDs with your pack name (MyPack_Sanitizer, not Sanitizer). Treat keys as permanent public API, never rename.
   verify: Grep ComfyUI registry for collisions before publishing.
   tags: [naming, namespace, collision]
   legacy_id: "22"
@@ -419,7 +419,7 @@ bugs:
 - id: "07.01"
   phase: 7
   area: vram
-  symptom: CUDA OOM when running Phi-3 + LTX-Video sequentially even though each fits.
+  symptom: CUDA OOM when running an LLM + a video generation model sequentially even though each fits.
   cause: Models loaded at import time stay resident. Or no explicit unload between models.
   fix: Lazy-load pattern (model=None until first call). Explicit _unload_model() that del's globals + torch.cuda.empty_cache(). Sequence pipeline so each heavy model unloads before the next loads.
   verify: nvidia-smi shows VRAM freed between stages.
@@ -450,7 +450,7 @@ bugs:
   phase: 7
   area: model-class
   symptom: Model loads without error but ignores conditioning input and produces garbage.
-  cause: Wrong transformers class (e.g. MusicgenForConditionalGeneration instead of MusicgenMelodyForConditionalGeneration). Both load from the same checkpoint.
+  cause: Wrong transformers class (e.g. AudioModelForConditionalGeneration instead of AudioModelMelodyForConditionalGeneration). Both load from the same checkpoint.
   fix: Read the model card. Verify class matches use case. Log type(model).__name__ on load. Watch for "unused kwargs" warnings.
   verify: Output reflects conditioning input (melody-conditioned music actually follows the melody).
   tags: [silent, wrong-class, transformers]
@@ -647,7 +647,7 @@ bugs:
 - id: "10.03"
   phase: 10
   area: safety
-  symptom: LLM occasionally types wrong character name in dialogue body (Rex vs Vex).
+  symptom: LLM occasionally types wrong character name in dialogue body (Alice vs Bob).
   cause: Hardcoded blocklist won't generalize.
   fix: "Build authoritative roster from [VOICE: NAME] markup. Regex find capitalized 3-8 char tokens in addressable positions. Use difflib.get_close_matches against roster with cutoff=0.55. Skip COMMON_WORDS. Log every repair."
   verify: Run on archived output; warning log matches gut judgment.
@@ -682,7 +682,7 @@ bugs:
   cause: Voice preset table classified only 2 of 10 as female. CAST_GENDER_POOL_EXHAUSTED on N-female episodes silently reused presets.
   fix: Reclassify androgynous slots to fill underserved subsets. Or expand pool. Or accept duplication with loud POOL_EXHAUSTED log.
   verify: Audit per-subset count vs max demand for every filter.
-  tags: [tts, bark, gender, pool]
+  tags: [tts, generation, pool]
   legacy_id: "65"
 
 - id: "10.07"
@@ -775,9 +775,9 @@ bugs:
   phase: 11
   area: attention
   symptom: Downstream input formatting crashes with slice or dict errors on `apply_chat_template`.
-  cause: Migrating from Gemma 4 (multimodal `AutoProcessor`) to standard models like Mistral Nemo (flat `AutoTokenizer`) requires different chat structural types. Gemma4Processor requires `{"role": "user", "content": [{"type": "text", "text": prompt}]}` while normal tokenizers expect `{"role": "user", "content": prompt}`.
+  cause: Migrating from a multimodal LLM (multimodal `AutoProcessor`) to standard models like a standard text LLM (flat `AutoTokenizer`) requires different chat structural types. MultimodalProcessor requires `{"role": "user", "content": [{"type": "text", "text": prompt}]}` while normal tokenizers expect `{"role": "user", "content": prompt}`.
   fix: |
-    Add dynamic checks when building chat pipelines `is_gemma = "gemma" in model_id.lower()`. 
+    Add dynamic checks when building chat pipelines `is_multimodal = "vision" in model_id.lower()`. 
     Conditionally wrap the content arrays depending on model type.
   verify: Both multimodal models and standard tokens process standard prompts without KeyError or TypeErrors.
   tags: [tokenizer, autoprocessor, multimodal, apply_chat_template]
@@ -1045,7 +1045,7 @@ bugs:
     `del new_tokens_cpu, output, inputs, streamer; torch.cuda.empty_cache()` before
     returning. Log `torch.cuda.memory_allocated()/1e9` after unload as telemetry.
   verify: Post-unload telemetry reads ~0.03 GiB allocated. Next model load does not OOM.
-  tags: [vram, transformers, threadpoolexecutor, timeout, gemma, leak]
+  tags: [vram, transformers, threadpoolexecutor, timeout, llm, leak]
   legacy_id: ""
 
 - id: "12.20"
@@ -1081,7 +1081,7 @@ bugs:
     to complete" (os error 1455) or ComfyUI quietly kills the process.
   cause: |
     Before quantization, the raw weights must be deserialized into System RAM.
-    Models like Gemma 26B cause a massive >60GB memory spike that exhausts the
+    Models like a 20B+ model cause a massive >60GB memory spike that exhausts the
     Windows page file, leading to OS-level defensive kills before the shrunken
     4-bit model can ever be handed to the GPU.
   fix: |
@@ -1090,8 +1090,8 @@ bugs:
     However, the resulting model still exceeds 16GB VRAM and requires offloading.
   verify: |
     Windows System Performance settings show 100,000 MB paging file.
-    Gemma 26B loader completes weight deserialization without OS crash.
-  tags: [vram, paging-file, windows, gemma-26b, oom]
+    a 20B+ model loader completes weight deserialization without OS crash.
+  tags: [vram, paging-file, windows, llm-26b, oom]
   legacy_id: ""
 
 - id: "12.22"
@@ -1106,7 +1106,7 @@ bugs:
     bridge on Windows. The library is fundamentally incapable of offloading
     4-bit quantized layers to System RAM at this time.
   fix: |
-    Revert to models that fit comfortably within physical VRAM (e.g. Gemma 4B/E4B).
+    Revert to models that fit comfortably within physical VRAM (e.g. a multimodal LLMB/E4B).
     Use the "True Single Switch" architecture to prevent VRAM duplication across
     nodes, ensuring the limited 16GB VRAM budget is never accidentally doubled.
   verify: |
@@ -1118,7 +1118,7 @@ bugs:
 12.23:
   title: Ghost Node Registration (Import Gap)
   symptom: |
-    Boot logs show: "Failed to load 'OTR_NodeName': module '...' has no attribute 'NodeName'".
+    Boot logs show: "Failed to load 'MyPack_NodeName': module '...' has no attribute 'NodeName'".
   cause: |
     Consolidating architectures or refactoring node classes without cleaning up the
     `NODE_CLASS_MAPPINGS` or `_NODE_MODULES` lists in the package `__init__.py`. 
@@ -1191,8 +1191,8 @@ bugs:
           "hub"
       )
     This resolves correctly regardless of the node's filesystem depth.
-    Apply to EVERY `from_pretrained()` call: tokenizer, model, processor, BarkModel,
-    MusicgenForConditionalGeneration, AutoProcessor, etc.
+    Apply to EVERY `from_pretrained()` call: tokenizer, model, processor, CustomAudioModel,
+    AudioModelForConditionalGeneration, AutoProcessor, etc.
   verify: |
     Add a log line: `log.info("cache_dir resolved to: %s", cache_dir_path)`.
     Confirm it shows `ComfyUI/models/huggingface/hub`, NOT `custom_nodes/models/...`.
@@ -1263,7 +1263,7 @@ bugs:
 12.29:
   title: Silent Sample Rate Mismatch (The 2/3 Speed Bug)
   symptom: |
-    Audio from a secondary model (e.g. MusicGen at 32 kHz) plays at the wrong
+    Audio from a secondary model (e.g. an audio synthesis model at 32 kHz) plays at the wrong
     speed when mixed into a primary audio bus (e.g. 48 kHz). Opening theme sounds
     slow and pitched down. No error is raised.
   cause: |
@@ -1278,58 +1278,58 @@ bugs:
       `log.info("Resampled %dHz -> %dHz", orig_sr, target_sr)`
     Include a same-rate no-op path that skips the resample when rates already match.
   verify: |
-    MusicGen outputs at 32 kHz. Main bus is 48 kHz. Resampled audio plays at
+    an audio synthesis model outputs at 32 kHz. Main bus is 48 kHz. Resampled audio plays at
     correct speed and pitch. Log shows "Resampled 32000Hz -> 48000Hz".
-  tags: [audio, resample, sample-rate, silent, musicgen, assembler]
+  tags: [audio, resample, sample-rate, silent, audio-model, assembler]
   legacy_id: ""
 
 12.30:
   title: audiocraft Windows Install Trap (av + spacy Pin Conflict)
   symptom: |
-    Attempting to install `audiocraft` (Meta's MusicGen library) on Windows +
+    Attempting to install `audiocraft` (Meta's an audio synthesis model library) on Windows +
     Python 3.12 fails with dependency conflicts. Even if forced, it breaks
     existing packages in the ComfyUI venv.
   cause: |
-    audiocraft pins `av==11.0.0` and `spacy==3.5.2`, both of which conflict
+    The library pins `av==11.0.0` and `spacy==3.5.2`, both of which conflict
     with ComfyUI's existing dependency tree. The `av` pin requires C compilation
     (MSVC) which most users don't have. Even when installed, the spacy pin
     downgrades tokenizers, breaking transformers.
   fix: |
-    Do NOT use audiocraft. Use `transformers.MusicgenForConditionalGeneration` +
+    Do NOT use the standalone complex library. Use `transformers.AudioModelForConditionalGeneration` +
     `AutoProcessor` instead — both are already installed via the main transformers
     package. Same model weights, same output quality, zero extra dependencies.
     For AudioLDM/AudioGen, similarly use the transformers-native API.
   verify: |
-    `pip show audiocraft` returns "not installed". MusicGen generation works
+    `pip show the_complex_lib` returns "not installed". an audio synthesis model generation works
     via transformers API. No MSVC or spacy required.
-  tags: [audiocraft, musicgen, windows, dependencies, av, spacy, python312]
+  tags: [dependencies, audio-model, windows, dependencies, av, spacy, python312]
   legacy_id: ""
 
 12.31:
-  title: Implicit repo_id Migration Warnings (Kokoro)
+  title: Implicit repo_id Migration Warnings (TTS Library)
   symptom: |
     The terminal spams deprecation/migration warnings such as "Implicit repo_id
     is deprecated" during model initialization, polluting the clean boot logs.
   cause: |
-    The `kokoro.KPipeline` (or similar HuggingFace hub consumer) changed its default
+    The `my_tts_lib.Pipeline` (or similar HuggingFace hub consumer) changed its default
     behavior to warn when relying on implicit language code mapping instead of
     an explicit repository identifier.
   fix: |
-    Explicitly declare the target repository even if it's the default. For Kokoro,
-    instantiate with `KPipeline(lang_code='b', repo_id='hexgrad/Kokoro-82M')`.
+    Explicitly declare the target repository even if it's the default. For example,
+    instantiate with `KPipeline(lang_code='b', repo_id='org/Model-82M')`.
     This locks the dependency resolution path and suppresses the warning, keeping
     the startup log clean.
   verify: |
     Restart ComfyUI and run a generation. The text console remains clean with zero
     deprecation warnings.
-  tags: [kokoro, huggingface, deprecation, warnings, repo_id, clean-boot]
+  tags: [tts, huggingface, deprecation, warnings, repo_id, clean-boot]
   legacy_id: ""
 
 12.32:
   title: Telemetry Case-Sensitivity and Pre-flight CPU Bottlenecks
   symptom: |
     The VRAM Telemetry HUD tracks some models correctly but misses new ones
-    (like "Nemo 12B"). At the same time, the `VoiceHealth` pre-flight check executes
+    (like "Model 12B"). At the same time, the `VoiceHealth` pre-flight check executes
     extremely slowly, bottlenecking the pipeline boot.
   cause: |
     1. The telemetry tracker matched substring sizes (e.g., "12b") case-sensitively,
@@ -1343,7 +1343,7 @@ bugs:
     2. Explicitly append `.to("cuda")` (or the dynamic detected device) to all
        health check tensors to force hardware acceleration during pre-flight.
   verify: |
-    Telemetry captures Mistral Nemo 12B in its output overlay. VoiceHealth checks
+    Telemetry captures Model 12B in its output overlay. VoiceHealth checks
     complete in <4.0 seconds.
   tags: [telemetry, vram, case-sensitive, cuda, health-check, bottleneck]
   legacy_id: ""
