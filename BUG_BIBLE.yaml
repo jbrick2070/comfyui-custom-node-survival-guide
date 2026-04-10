@@ -1305,4 +1305,47 @@ bugs:
   tags: [audiocraft, musicgen, windows, dependencies, av, spacy, python312]
   legacy_id: ""
 
+12.31:
+  title: Implicit repo_id Migration Warnings (Kokoro)
+  symptom: |
+    The terminal spams deprecation/migration warnings such as "Implicit repo_id
+    is deprecated" during model initialization, polluting the clean boot logs.
+  cause: |
+    The `kokoro.KPipeline` (or similar HuggingFace hub consumer) changed its default
+    behavior to warn when relying on implicit language code mapping instead of
+    an explicit repository identifier.
+  fix: |
+    Explicitly declare the target repository even if it's the default. For Kokoro,
+    instantiate with `KPipeline(lang_code='b', repo_id='hexgrad/Kokoro-82M')`.
+    This locks the dependency resolution path and suppresses the warning, keeping
+    the startup log clean.
+  verify: |
+    Restart ComfyUI and run a generation. The text console remains clean with zero
+    deprecation warnings.
+  tags: [kokoro, huggingface, deprecation, warnings, repo_id, clean-boot]
+  legacy_id: ""
+
+12.32:
+  title: Telemetry Case-Sensitivity and Pre-flight CPU Bottlenecks
+  symptom: |
+    The VRAM Telemetry HUD tracks some models correctly but misses new ones
+    (like "Nemo 12B"). At the same time, the `VoiceHealth` pre-flight check executes
+    extremely slowly, bottlenecking the pipeline boot.
+  cause: |
+    1. The telemetry tracker matched substring sizes (e.g., "12b") case-sensitively,
+       so "12B" failed to trigger the model detection logic.
+    2. The `VoiceHealth` check instantiated its diagnostic audio/text tensors using
+       PyTorch defaults without explicitly moving them to the active device. They
+       ran on the CPU instead of the GPU.
+  fix: |
+    1. Always normalize telemetry strings with `.lower()` before substring matching
+       (e.g., `if "12b" in model_id.lower():`).
+    2. Explicitly append `.to("cuda")` (or the dynamic detected device) to all
+       health check tensors to force hardware acceleration during pre-flight.
+  verify: |
+    Telemetry captures Mistral Nemo 12B in its output overlay. VoiceHealth checks
+    complete in <4.0 seconds.
+  tags: [telemetry, vram, case-sensitive, cuda, health-check, bottleneck]
+  legacy_id: ""
+
 # End of bible.
