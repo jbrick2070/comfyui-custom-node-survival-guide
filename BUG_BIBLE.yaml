@@ -17,6 +17,13 @@
 #
 # Every entry keeps its original legacy_id so external references still resolve.
 # Each entry: id, phase, area, symptom, cause, fix, verify, tags, legacy_id.
+#
+# MAINTENANCE RULE: When adding or editing a bug entry, you MUST also:
+#   1. Update README.md (entry count, coverage table if new phase/area)
+#   2. Add or update the corresponding test in tests/bug_bible_regression.py
+#      (if the verify step can be checked by static file analysis)
+#   3. Run: python -m pytest tests/bug_bible_regression.py -v --pack-dir <your-pack>
+# All three files (README, YAML, test .py) must stay in sync at all times.
 
 schema:
   id: str             # new sequential id
