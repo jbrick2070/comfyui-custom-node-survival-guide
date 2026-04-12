@@ -14,6 +14,14 @@
 
 ---
 
+## Download
+
+[![Download Bug Bible Suite](https://img.shields.io/badge/Download-Bug_Bible_Suite-blue?style=for-the-badge)](https://github.com/jbrick2070/comfyui-custom-node-survival-guide/archive/refs/heads/main.zip)
+
+**[Click here to download the full test suite (.zip)](https://github.com/jbrick2070/comfyui-custom-node-survival-guide/archive/refs/heads/main.zip)** — includes the `tests/bug_bible_regression.py` suite and the 94-entry `BUG_BIBLE.yaml` knowledge base.
+
+---
+
 ## Read This
 
 - **[tests/bug_bible_regression.py](./tests/bug_bible_regression.py)** — automated regression test suite. 23 machine-executable tests across 10 phases (including the new Three-File Contract enforcement). Point it at any custom node pack, get a pass/fail report in under 2 seconds. Pure static analysis—no ComfyUI runtime needed.
