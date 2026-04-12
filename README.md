@@ -10,6 +10,8 @@
 
 **Latest run:** 21 passed, 2 xfailed, 0 failed (1.65s)
 
+**Latest Addition (BUG-12.36):** Upgraded `bug_bible_regression.py` explicitly filtering `.venv` directories to avoid false-positives on third-party `__init__.py` files and `subprocess.Popen` calls doing node tests.
+
 ---
 
 ## Read This
