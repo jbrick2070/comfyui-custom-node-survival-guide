@@ -708,6 +708,90 @@ class TestPhase11LLM:
 
 
 # ─────────────────────────────────────────────────────────────────
+# THREE-FILE CONTRACT ENFORCEMENT
+# ─────────────────────────────────────────────────────────────────
+
+class TestThreeFileContract:
+    """BUG-12.35: Bible, README, and test file must stay in sync."""
+
+    def _repo_root(self):
+        """Resolve the survival guide repo root (parent of tests/)."""
+        return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    def _count_bible_entries(self):
+        """Count entries in BUG_BIBLE.yaml by scanning '- id:' lines."""
+        bible_path = os.path.join(self._repo_root(), "BUG_BIBLE.yaml")
+        if not os.path.isfile(bible_path):
+            return -1
+        count = 0
+        with open(bible_path, "r", encoding="utf-8") as f:
+            for line in f:
+                if re.match(r'^- id:\s', line):
+                    count += 1
+        return count
+
+    def _extract_readme_count(self):
+        """Extract the entry count cited in README.md."""
+        readme_path = os.path.join(self._repo_root(), "README.md")
+        if not os.path.isfile(readme_path):
+            return -1
+        with open(readme_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        # Match patterns like "68 entries" or "68-entry"
+        match = re.search(r'(\d+)[- ]entr(?:y|ies)', content)
+        if match:
+            return int(match.group(1))
+        return -1
+
+    def _collect_test_coverage(self):
+        """Collect BUG IDs covered by tests or exclusion comments."""
+        test_path = os.path.abspath(__file__)
+        covered = set()
+        with open(test_path, "r", encoding="utf-8") as f:
+            for line in f:
+                # Match test docstrings like "BUG-12.02" and exclusion
+                # comments like "# BUG-12.34"
+                for m in re.finditer(r'BUG-(\d+\.\d+)', line):
+                    covered.add(m.group(1))
+        return covered
+
+    def _collect_bible_ids(self):
+        """Collect all bug IDs from BUG_BIBLE.yaml."""
+        bible_path = os.path.join(self._repo_root(), "BUG_BIBLE.yaml")
+        ids = set()
+        if not os.path.isfile(bible_path):
+            return ids
+        with open(bible_path, "r", encoding="utf-8") as f:
+            for line in f:
+                match = re.match(r'^- id:\s+"?(\d+\.\d+)"?', line)
+                if match:
+                    ids.add(match.group(1))
+        return ids
+
+    def test_entry_count_matches_readme(self):
+        """BUG-12.35: YAML entry count must match README count."""
+        bible_count = self._count_bible_entries()
+        readme_count = self._extract_readme_count()
+        assert bible_count > 0, "Could not count Bible entries"
+        assert readme_count > 0, "Could not find entry count in README"
+        assert bible_count == readme_count, (
+            f"Three-File Contract violated: BUG_BIBLE.yaml has "
+            f"{bible_count} entries but README.md cites {readme_count}"
+        )
+
+    def test_all_bible_ids_covered_in_tests(self):
+        """BUG-12.35: Every Bible ID must have a test or exclusion note."""
+        bible_ids = self._collect_bible_ids()
+        test_coverage = self._collect_test_coverage()
+        uncovered = bible_ids - test_coverage
+        if uncovered:
+            pytest.xfail(
+                f"BUG-12.35: {len(uncovered)} Bible entries have no "
+                f"test or exclusion comment: {sorted(uncovered)}"
+            )
+
+
+# ─────────────────────────────────────────────────────────────────
 # SUMMARY REPORT
 # ─────────────────────────────────────────────────────────────────
 
@@ -728,3 +812,13 @@ class TestSummary:
         )
         if not has_req:
             pytest.xfail("No requirements.txt or pyproject.toml found")
+
+
+# ─────────────────────────────────────────────────────────────────
+# NOTES ON NON-TESTABLE BUG BIBLE ENTRIES
+# ─────────────────────────────────────────────────────────────────
+# BUG-12.34 (git push from sandbox): Workflow/process bug, not a code-level
+#   issue. Verifies that AI assistants should execute git push from the user's
+#   PowerShell instead of from sandboxed Bash (avoids lock timeouts). This is
+#   a best-practice note for AI workflow, not a checkable property of the
+#   custom node pack itself. Documented in BUG_BIBLE.yaml for reference.

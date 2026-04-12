@@ -1417,3 +1417,30 @@ bugs:
     confirms remote state updated correctly. No .git/index.lock remains after push.
   tags: [git, push, sandbox, windows, permissions, lock, handoff]
   legacy_id: ""
+
+- id: "12.35"
+  phase: 12
+  area: maintenance
+  symptom: |
+    Bug Bible entry added or edited but README entry count is stale, pytest test
+    file has no matching test or exclusion note, or README coverage table is missing
+    the new phase/area. Drift between the three files causes AI assistants to miss
+    checks or report wrong totals.
+  cause: |
+    The Three-File Contract was not enforced. Any change to BUG_BIBLE.yaml must be
+    mirrored in README.md (entry count, coverage table) and in
+    tests/bug_bible_regression.py (new test or documented exclusion). Forgetting
+    any one of the three creates silent drift.
+  fix: |
+    Every commit that touches BUG_BIBLE.yaml must also touch README.md and
+    tests/bug_bible_regression.py. Verify sync with:
+      1. Count entries in YAML: grep -c "^- id:" BUG_BIBLE.yaml
+      2. Confirm README cites the same count.
+      3. Confirm test file covers the entry (test function or exclusion comment).
+    Add this as a pre-commit mental checklist or scripted check.
+  verify: |
+    grep -c "^- id:" BUG_BIBLE.yaml matches the count in README.md. Every id in
+    the YAML has either a corresponding test function or a documented exclusion
+    comment in bug_bible_regression.py.
+  tags: [maintenance, three-file-contract, readme, pytest, sync, drift]
+  legacy_id: ""

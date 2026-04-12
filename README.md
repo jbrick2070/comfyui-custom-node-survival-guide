@@ -2,12 +2,12 @@
 
 **By Jeffrey A. Brick** · April 2026
 
-Automated regression testing for ComfyUI custom node packs. 21 pytest tests that catch ghost registrations, BOM corruption, VRAM leaks, pipe deadlocks, widget errors, and 16 other failure modes in under 2 seconds — no ComfyUI runtime required. Backed by a 68-entry knowledge base of real failure modes.
+Automated regression testing for ComfyUI custom node packs. 21 pytest tests that catch ghost registrations, BOM corruption, VRAM leaks, pipe deadlocks, widget errors, and 16 other failure modes in under 2 seconds — no ComfyUI runtime required. Backed by a 93-entry knowledge base of real failure modes.
 
 ## Read This
 
 - **[tests/bug_bible_regression.py](./tests/bug_bible_regression.py)** — automated regression test suite. 21 machine-executable tests across 9 phases. Point it at any custom node pack, get a pass/fail report in under 2 seconds. Pure static analysis—no ComfyUI runtime needed.
-- **[BUG_BIBLE.yaml](./BUG_BIBLE.yaml)** — the reference knowledge base. 68 entries across 12 phases. Each entry: `id, phase, area, symptom, cause, fix, verify, tags`. Greppable, parseable. Use this for manual lookups or when building new tests.
+- **[BUG_BIBLE.yaml](./BUG_BIBLE.yaml)** — the reference knowledge base. 93 entries across 12 phases. Each entry: `id, phase, area, symptom, cause, fix, verify, tags`. Greppable, parseable. Use this for manual lookups or when building new tests.
 
 ## How To Use
 
@@ -52,7 +52,7 @@ python -m pytest <path-to-survival-guide>/tests/bug_bible_regression.py -v --pac
 | 07 | BUG-07.01, 07.03 | VRAM: no module-scope loads, flush after unload |
 | 09 | BUG-09.02 | Subprocess: Popen cleanup, no communicate() with video pipes |
 | 11 | BUG-12.33 | LLM: prompt length guards on generate() calls |
-| 12 | BUG-12.02, 12.06, 12.07 | Repo hygiene: AST parse, workflow link integrity, stale imports |
+| 12 | BUG-12.02, 12.06, 12.07, 12.35 | Repo hygiene: AST parse, workflow link integrity, stale imports, Three-File Contract sync |
 
 ### Requirements
 
