@@ -1395,3 +1395,25 @@ bugs:
     VRAM_CEILING_EXCEEDED no longer appears in logs.
   tags: [vram, llm, prompt-length, context-cap, prefill, stall, nemo, bitsandbytes, warmup]
   legacy_id: ""
+
+- id: "12.34"
+  phase: 12
+  area: git
+  symptom: |
+    AI assistant attempts to push from sandbox/Cowork environment, encounters .git/index.lock
+    file that cannot be removed due to sandbox permissions, process times out after 30-60 seconds,
+    and hands back a PowerShell block for manual execution.
+  cause: |
+    Sandboxed git operations (Bash, MCP PowerShell) cannot acquire or release filesystem locks
+    reliably on Windows hosts. Even successful file writes leave stale lock state. The git command
+    then blocks indefinitely waiting for lock release, followed by a timeout.
+  fix: |
+    Do not have the AI attempt git push from the sandbox. Instead, AI should generate a copy-paste
+    PowerShell block with explicit `cd`, `git add <files>`, `git commit -m "msg"`, and `git push`.
+    User pastes and executes in 10-15 seconds. This saves 3+ minutes per push vs sandbox timeout
+    retry cycles.
+  verify: |
+    Push succeeds in local PowerShell within 15 seconds. Lockstep check (local HEAD == origin HEAD)
+    confirms remote state updated correctly. No .git/index.lock remains after push.
+  tags: [git, push, sandbox, windows, permissions, lock, handoff]
+  legacy_id: ""
