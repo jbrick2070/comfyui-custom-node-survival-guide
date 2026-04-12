@@ -73,6 +73,20 @@ bugs:
   tags: [paths, output_dir, sandbox]
   legacy_id: "57"
 
+- id: "01.04"
+  phase: 1
+  area: discovery
+  symptom: |
+    Killing ComfyUI's process hangs indefinitely. taskkill /F /IM python.exe or Stop-Process -Name python never completes on a GPU system.
+  cause: |
+    ComfyUI Desktop is an Electron app. The visible process is ComfyUI.exe (or comfyui.exe), not python.exe. CUDA-bound Python subprocesses hold GPU memory handles that prevent clean termination when you kill the inner process. The Electron wrapper must be killed first — it tears down the child tree cleanly.
+  fix: |
+    Discover the actual process name before writing any restart/kill logic. On Windows: Get-Process | Where-Object { $_.ProcessName -match "ComfyUI" }. Kill the outermost wrapper: Stop-Process -Name ComfyUI -Force. Never target python.exe on a system where ComfyUI runs as a Desktop app. Wait 3 seconds after kill before relaunching to let CUDA release.
+  verify: |
+    After Stop-Process -Name ComfyUI -Force, the process disappears within 5 seconds. No orphaned python.exe processes remain. GPU memory is fully released (nvidia-smi shows 0 MiB for the process).
+  tags: [discovery, desktop-app, electron, process-kill, cuda, gpu, restart]
+  legacy_id: ""
+
 # ─────────────────────────────────────────────────────────────
 # PHASE 02 — ENVIRONMENT & DEPENDENCIES
 # Python, pip, venvs, CUDA wheels, HF cache, transformers, encoding.
@@ -362,6 +376,20 @@ bugs:
   verify: Producer always runs before consumer.
   tags: [execution-order, dummy-link]
   legacy_id: "50"
+
+- id: "05.06"
+  phase: 5
+  area: completion-check
+  symptom: |
+    Automation script declares MISSION COMPLETE but expected output artifacts (MP4, PNG) do not exist. Pipeline appeared to succeed when it actually failed silently.
+  cause: |
+    The completion check uses dict.get("completed", True) — defaulting to True when the key is missing. Any history entry, even a partial or failed one, passes the check. The script never verifies that actual output files were produced.
+  fix: |
+    Never default completion status to True. Use dict.get("completed", False). After status check passes, also verify that expected output artifacts exist on disk before declaring success. Example: check for the output MP4/PNG/WAV files listed in the workflow's SaveImage or SaveAudio nodes.
+  verify: |
+    Run a workflow that is expected to produce an MP4. Kill the server mid-run. The automation script must report FAILED, not MISSION COMPLETE. Alternatively: grep the auto-operator source for .get("completed", True) — it must not exist.
+  tags: [execution-model, automation, false-success, artifact-check, completion]
+  legacy_id: ""
 
 # ─────────────────────────────────────────────────────────────
 # PHASE 06 — CACHING & IS_CHANGED

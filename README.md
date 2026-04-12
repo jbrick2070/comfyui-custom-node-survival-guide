@@ -4,13 +4,13 @@
 
 ## 🔴 HEADLINE — Automated Regression Suite for Custom Node Packs
 
-**94-entry knowledge base + 23 pytest tests** → Catch ghost registrations, BOM corruption, VRAM leaks, pipe deadlocks, widget errors, and 18 other failure modes **in under 2 seconds**. No ComfyUI runtime. No manual grepping. Machine-executable verification.
+**96-entry knowledge base + 24 pytest tests** → Catch ghost registrations, BOM corruption, VRAM leaks, pipe deadlocks, widget errors, and 20 other failure modes **in under 2 seconds**. No ComfyUI runtime. No manual grepping. Machine-executable verification.
 
 **Tested against:** [ComfyUI-OldTimeRadio v2.0 (v2.0-visual-engine)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/tree/v2.0-visual-engine) — production multi-model LLM + TTS + video animation pipeline on RTX 5080, 16 GB VRAM, Windows.
 
 **Latest run:** 21 passed, 2 xfailed, 0 failed (1.65s)
 
-**Latest Addition (BUG-12.36):** Upgraded `bug_bible_regression.py` explicitly filtering `.venv` directories to avoid false-positives on third-party `__init__.py` files and `subprocess.Popen` calls doing node tests.
+**Latest Additions (BUG-01.04, BUG-05.06):** BUG-01.04: ComfyUI Desktop runs as an Electron wrapper — killing `python.exe` hangs on CUDA handles; kill `ComfyUI.exe` instead. BUG-05.06: Automation scripts using `dict.get("completed", True)` declare false success without checking output artifacts exist.
 
 ---
 
@@ -18,14 +18,14 @@
 
 [![Download Bug Bible Suite](https://img.shields.io/badge/Download-Bug_Bible_Suite-blue?style=for-the-badge)](https://github.com/jbrick2070/comfyui-custom-node-survival-guide/archive/refs/heads/main.zip)
 
-**[Click here to download the full test suite (.zip)](https://github.com/jbrick2070/comfyui-custom-node-survival-guide/archive/refs/heads/main.zip)** — includes the `tests/bug_bible_regression.py` suite and the 94-entry `BUG_BIBLE.yaml` knowledge base.
+**[Click here to download the full test suite (.zip)](https://github.com/jbrick2070/comfyui-custom-node-survival-guide/archive/refs/heads/main.zip)** — includes the `tests/bug_bible_regression.py` suite and the 96-entry `BUG_BIBLE.yaml` knowledge base.
 
 ---
 
 ## Read This
 
 - **[tests/bug_bible_regression.py](./tests/bug_bible_regression.py)** — automated regression test suite. 23 machine-executable tests across 10 phases (including the new Three-File Contract enforcement). Point it at any custom node pack, get a pass/fail report in under 2 seconds. Pure static analysis—no ComfyUI runtime needed.
-- **[BUG_BIBLE.yaml](./BUG_BIBLE.yaml)** — the reference knowledge base. 94 entries across 12 phases. Each entry: `id, phase, area, symptom, cause, fix, verify, tags`. Greppable, parseable. Use this for manual lookups or when building new tests.
+- **[BUG_BIBLE.yaml](./BUG_BIBLE.yaml)** — the reference knowledge base. 96 entries across 12 phases. Each entry: `id, phase, area, symptom, cause, fix, verify, tags`. Greppable, parseable. Use this for manual lookups or when building new tests.
 
 ## How To Use
 

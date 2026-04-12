@@ -797,6 +797,36 @@ class TestThreeFileContract:
 # SUMMARY REPORT
 # ─────────────────────────────────────────────────────────────────
 
+class TestPhase05CompletionCheck:
+    """BUG-05.06: Automation scripts must not default completion to True."""
+
+    def test_no_false_success_defaults(self, py_files):
+        """BUG-05.06: No .get("completed", True) — defaulting to True
+        causes automation scripts to declare success without checking
+        actual output artifacts.
+
+        This catches the pattern: status.get("completed", True) or
+        data.get("completed", True) where a missing key is treated
+        as success instead of failure.
+        """
+        violations = []
+        pattern = re.compile(
+            r'\.get\(\s*["\']completed["\']\s*,\s*True\s*\)'
+        )
+        for fpath in py_files:
+            with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                for lineno, line in enumerate(f, 1):
+                    if pattern.search(line):
+                        violations.append(
+                            f"{os.path.basename(fpath)}:{lineno}: {line.strip()}"
+                        )
+        assert not violations, (
+            "BUG-05.06: Found .get('completed', True) — defaulting to True "
+            "causes false success. Use .get('completed', False) instead.\n"
+            + "\n".join(violations)
+        )
+
+
 class TestSummary:
     """Final summary assertions."""
 
@@ -819,6 +849,12 @@ class TestSummary:
 # ─────────────────────────────────────────────────────────────────
 # NOTES ON NON-TESTABLE BUG BIBLE ENTRIES
 # ─────────────────────────────────────────────────────────────────
+# BUG-01.04 (Electron wrapper process name): Runtime discovery issue, not a
+#   code-level check. ComfyUI Desktop runs as ComfyUI.exe (Electron), not
+#   python.exe. Killing python.exe hangs on CUDA handles. Must discover the
+#   actual process name dynamically before writing restart logic. Not testable
+#   via static analysis — requires runtime process inspection.
+#
 # BUG-12.34 (git push from sandbox): Workflow/process bug, not a code-level
 #   issue. Verifies that AI assistants should execute git push from the user's
 #   PowerShell instead of from sandboxed Bash (avoids lock timeouts). This is
