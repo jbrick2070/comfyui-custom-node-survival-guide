@@ -2,11 +2,11 @@
 
 **By Jeffrey A. Brick** · April 2026
 
-Automated regression testing for ComfyUI custom node packs. 21 pytest tests that catch ghost registrations, BOM corruption, VRAM leaks, pipe deadlocks, widget errors, and 16 other failure modes in under 2 seconds — no ComfyUI runtime required. Backed by a 93-entry knowledge base of real failure modes.
+Automated regression testing for ComfyUI custom node packs. 23 pytest tests that catch ghost registrations, BOM corruption, VRAM leaks, pipe deadlocks, widget errors, and 18 other failure modes in under 2 seconds — no ComfyUI runtime required. Backed by a 93-entry knowledge base of real failure modes from shipping production pipelines.
 
 ## Read This
 
-- **[tests/bug_bible_regression.py](./tests/bug_bible_regression.py)** — automated regression test suite. 21 machine-executable tests across 9 phases. Point it at any custom node pack, get a pass/fail report in under 2 seconds. Pure static analysis—no ComfyUI runtime needed.
+- **[tests/bug_bible_regression.py](./tests/bug_bible_regression.py)** — automated regression test suite. 23 machine-executable tests across 10 phases (including the new Three-File Contract enforcement). Point it at any custom node pack, get a pass/fail report in under 2 seconds. Pure static analysis—no ComfyUI runtime needed.
 - **[BUG_BIBLE.yaml](./BUG_BIBLE.yaml)** — the reference knowledge base. 93 entries across 12 phases. Each entry: `id, phase, area, symptom, cause, fix, verify, tags`. Greppable, parseable. Use this for manual lookups or when building new tests.
 
 ## How To Use
@@ -101,12 +101,14 @@ TestPhase12Regression::test_all_py_files_parse ................... PASSED
 TestPhase12Regression::test_workflow_json_link_integrity ......... PASSED
 TestPhase12Regression::test_no_stale_v2_imports .................. PASSED
 TestPhase11LLM::test_generate_calls_have_length_guard ........... XFAIL
+TestThreeFileContract::test_entry_count_matches_readme ........... PASSED
+TestThreeFileContract::test_all_bible_ids_covered_in_tests ....... XFAIL
 TestSummary::test_pack_has_init .................................. PASSED
 TestSummary::test_pack_has_requirements .......................... PASSED
-======================== 20 passed, 1 xfailed in 1.69s =========================
+======================== 21 passed, 2 xfailed in 1.65s =========================
 ```
 
-20 passed, 1 xfail (BUG-12.33 — LLM length guard is informational, not blocking), 0 failed.
+21 passed, 2 xfail (BUG-12.33 — LLM length guard is informational; BUG-12.35 — coverage gap on untested Bible entries), 0 failed.
 
 ---
 
