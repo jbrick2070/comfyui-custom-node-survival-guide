@@ -2,6 +2,16 @@
 
 **By Jeffrey A. Brick** · April 2026
 
+---
+
+## 🚀 Current Status: Testing Against OldTimeRadio v2.0
+
+This regression suite is in active development and tested against [ComfyUI-OldTimeRadio v2.0 (v2.0-visual-engine branch)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/tree/v2.0-visual-engine) — a production multi-model LLM + TTS + video animation pipeline on RTX 5080, 16 GB VRAM, Windows. The 93-entry knowledge base and 23 automated tests were built from real failure modes hit in this pipeline.
+
+**Latest regression run:** 21 passed, 2 xfailed, 0 failed (1.65s)
+
+---
+
 Automated regression testing for ComfyUI custom node packs. 23 pytest tests that catch ghost registrations, BOM corruption, VRAM leaks, pipe deadlocks, widget errors, and 18 other failure modes in under 2 seconds — no ComfyUI runtime required. Backed by a 93-entry knowledge base of real failure modes from shipping production pipelines.
 
 ## Read This
