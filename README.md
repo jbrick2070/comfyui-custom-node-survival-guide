@@ -2,22 +2,30 @@
 
 **By Jeffrey A. Brick** · April 2026
 
-A machine-readable bug-and-fix database for ComfyUI custom node development. Every entry is a real failure mode encountered shipping complex production node packs. Built to be loaded by AI coding assistants as a reference, with minimal token cost.
+Automated regression testing for ComfyUI custom node packs. 21 pytest tests that catch ghost registrations, BOM corruption, VRAM leaks, pipe deadlocks, widget errors, and 16 other failure modes in under 2 seconds — no ComfyUI runtime required.
 
 ## Read This
 
-- **[BUG_BIBLE.yaml](./BUG_BIBLE.yaml)** — the entire knowledge base. 67 entries across 12 phases. Each entry: `id, phase, area, symptom, cause, fix, verify, tags`. Greppable, parseable, no prose fluff.
-- **[tests/bug_bible_regression.py](./tests/bug_bible_regression.py)** — automated regression test suite. Runs the `verify` checks from the Bible against any ComfyUI custom node pack. 21 tests, under 2 seconds, no ComfyUI runtime needed.
+- **[tests/bug_bible_regression.py](./tests/bug_bible_regression.py)** — automated regression test suite. 21 machine-executable tests across 9 phases. Point it at any custom node pack, get a pass/fail report in under 2 seconds. Pure static analysis—no ComfyUI runtime needed.
+- **[BUG_BIBLE.yaml](./BUG_BIBLE.yaml)** — the reference knowledge base. 67 entries across 12 phases. Each entry: `id, phase, area, symptom, cause, fix, verify, tags`. Greppable, parseable. Use this for manual lookups or when building new tests.
 
 ## How To Use
 
-**Humans:** open `BUG_BIBLE.yaml`, ctrl-F by `area:` (architecture, widgets, vram, transformers, git, workflow-json, llm, pool-sizing, etc.) or by `tags:`.
+**AI assistants building custom nodes:** Run the regression suite after every code change. It catches bugs before they ship.
 
-**AI assistants:** load `BUG_BIBLE.yaml` at the start of any ComfyUI custom-node task. Match the user's symptom against `symptom:` fields, then apply the `fix:`, then run `verify:`.
+```bash
+cd your-custom-node-pack
+pip install pytest
+python -m pytest <path-to-survival-guide>/tests/bug_bible_regression.py -v --pack-dir .
+```
 
-## Automated Regression Testing
+**Humans debugging a specific failure:** Open `BUG_BIBLE.yaml`, ctrl-F by `area:` (architecture, widgets, vram, transformers, git, workflow-json, llm, pool-sizing, etc.) or by `tags:` to find matching entries. Read the `cause` and `fix` fields.
 
-The regression test suite turns the Bible's `verify` fields into executable assertions. Point it at any custom node pack and get a pass/fail report in under 2 seconds.
+**AI assistants without automated testing yet:** Load `BUG_BIBLE.yaml` at the start of a session. Match the user's symptom against `symptom:` fields, apply the `fix:`, then verify manually using the `verify:` field as a checklist.
+
+## Automated Regression Testing — The Main Feature
+
+The pytest suite encodes the Bug Bible's `verify` fields as executable assertions. Point it at any custom node pack directory. In under 2 seconds, you get a full pass/fail report. No ComfyUI runtime, no model downloads, no manual grepping.
 
 ### Quick Start
 
