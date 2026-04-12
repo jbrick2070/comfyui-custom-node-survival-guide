@@ -1444,3 +1444,17 @@ bugs:
     comment in bug_bible_regression.py.
   tags: [maintenance, three-file-contract, readme, pytest, sync, drift]
   legacy_id: ""
+
+- id: "12.36"
+  phase: 12
+  area: testing
+  symptom: |
+    Regression test suite fails with "0-byte Python files found: __init__.py" or "Popen without cleanup" on files inside internal virtual environment folders.
+  cause: |
+    Automated directory traversals (like os.walk) collecting `.py` files for AST scanning or static analysis don't naturally exclude local environment directories like `.venv` or `venv`. Python packaging and downloaded wheels often contain 0-byte init modules and varied coding styles that violate strict custom node rules.
+  fix: |
+    Explicitly exclude `.venv` and `venv` from any `os.walk` or glob list when collecting files for testing or sanity checking. Example: `dirs[:] = [d for d in dirs if d not in ("__pycache__", ".git", ".venv", "venv")]`.
+  verify: |
+    Running static regression tests against the custom node project with an active `.venv` works cleanly and yields no false positives from third party library internals.
+  tags: [testing, os-walk, venv, false-positives, static-analysis]
+  legacy_id: ""

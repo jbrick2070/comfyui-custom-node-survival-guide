@@ -56,10 +56,12 @@ def pack_dir(request):
 
 @pytest.fixture(scope="session")
 def py_files(pack_dir):
-    """Collect all .py files in the pack (excluding __pycache__)."""
+    """Collect all .py files in the pack (excluding __pycache__).
+    BUG-12.36: Also explicitly excludes internal virtual environment folders like .venv.
+    """
     found = []
     for root, dirs, files in os.walk(pack_dir):
-        dirs[:] = [d for d in dirs if d != "__pycache__" and d != ".git"]
+        dirs[:] = [d for d in dirs if d not in ("__pycache__", ".git", ".venv", "venv")]
         for f in files:
             if f.endswith(".py"):
                 found.append(os.path.join(root, f))

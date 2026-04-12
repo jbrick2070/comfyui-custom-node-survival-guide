@@ -4,7 +4,7 @@
 
 ## 🔴 HEADLINE — Automated Regression Suite for Custom Node Packs
 
-**93-entry knowledge base + 23 pytest tests** → Catch ghost registrations, BOM corruption, VRAM leaks, pipe deadlocks, widget errors, and 18 other failure modes **in under 2 seconds**. No ComfyUI runtime. No manual grepping. Machine-executable verification.
+**94-entry knowledge base + 23 pytest tests** → Catch ghost registrations, BOM corruption, VRAM leaks, pipe deadlocks, widget errors, and 18 other failure modes **in under 2 seconds**. No ComfyUI runtime. No manual grepping. Machine-executable verification.
 
 **Tested against:** [ComfyUI-OldTimeRadio v2.0 (v2.0-visual-engine)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/tree/v2.0-visual-engine) — production multi-model LLM + TTS + video animation pipeline on RTX 5080, 16 GB VRAM, Windows.
 
@@ -15,7 +15,7 @@
 ## Read This
 
 - **[tests/bug_bible_regression.py](./tests/bug_bible_regression.py)** — automated regression test suite. 23 machine-executable tests across 10 phases (including the new Three-File Contract enforcement). Point it at any custom node pack, get a pass/fail report in under 2 seconds. Pure static analysis—no ComfyUI runtime needed.
-- **[BUG_BIBLE.yaml](./BUG_BIBLE.yaml)** — the reference knowledge base. 93 entries across 12 phases. Each entry: `id, phase, area, symptom, cause, fix, verify, tags`. Greppable, parseable. Use this for manual lookups or when building new tests.
+- **[BUG_BIBLE.yaml](./BUG_BIBLE.yaml)** — the reference knowledge base. 94 entries across 12 phases. Each entry: `id, phase, area, symptom, cause, fix, verify, tags`. Greppable, parseable. Use this for manual lookups or when building new tests.
 
 ## How To Use
 
