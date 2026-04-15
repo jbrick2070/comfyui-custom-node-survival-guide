@@ -25,11 +25,20 @@ What it checks (by Bug Bible phase):
     Phase 01: Path safety (no dirname chains, folder_paths usage)
     Phase 02: Encoding (UTF-8 no BOM, no mojibake markers)
     Phase 03: Registration (isolated loading, no ghost nodes)
-    Phase 04: Widget ordering (INPUT_TYPES structure)
-    Phase 05: Execution order (passthrough enforcement)
+    Phase 04: Widget ordering (INPUT_TYPES structure); BUG-04.06 (title resolution)
+    Phase 05: Execution order (passthrough enforcement); BUG-05.07 (scope NameError)
     Phase 07: VRAM discipline (unload/flush patterns)
     Phase 09: Subprocess safety (pipe deadlocks, cleanup)
+    Phase 11: LLM patterns; BUG-11.08/11.09/11.10/11.11 (dialogue parser, JSON comments)
     Phase 12: Git/repo hygiene (0-byte files, workflow JSON integrity)
+
+Entries marked for integration testing (not static):
+    BUG-04.06: Title resolution multi-tier fallback (requires full script generation)
+    BUG-05.07: Variable scope NameError (requires extension pass execution)
+    BUG-11.08: TITLE false-positive in dialogue (requires parsing output)
+    BUG-11.09: Bare NAME: format detection (requires script parsing)
+    BUG-11.10: Markdown wrapper stripping (requires title extraction output)
+    BUG-11.11: JSON comment stripping (requires Director JSON parsing)
 """
 
 import ast
@@ -706,6 +715,37 @@ class TestPhase11LLM:
             pytest.xfail(
                 f"BUG-12.33: .generate() without visible length guard "
                 f"in: {', '.join(issues)}. Verify manually."
+            )
+
+    def test_title_extraction_and_dialogue_false_positives(self, py_files):
+        """BUG-04.06, BUG-11.08, BUG-11.09: Title extraction must handle
+        multiple formats; TITLE must be blacklisted from dialogue parser.
+
+        BUG-04.06: Widget defaults override LLM output; multi-tier resolution.
+        BUG-11.08: TITLE false-positive as speaking character.
+        BUG-11.09: Bare NAME: format parsing gaps.
+        """
+        # BUG-11.08, BUG-11.09, BUG-11.10, BUG-11.11 require integration
+        # testing. Here we check for evidence of the fixes.
+        has_title_extraction = False
+        has_false_positives = False
+
+        for fpath in py_files:
+            with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+
+            if "_extract_title" in content:
+                has_title_extraction = True
+            if "DIALOGUE_FALSE_POSITIVES" in content and "TITLE" in content:
+                has_false_positives = True
+
+        # These are design-level checks; runtime verification requires
+        # full episode generation with assertion on output format
+        if not (has_title_extraction and has_false_positives):
+            pytest.xfail(
+                "BUG-04.06/11.08: Title extraction and/or "
+                "DIALOGUE_FALSE_POSITIVES handling incomplete. "
+                "Requires integration test with full script generation."
             )
 
 

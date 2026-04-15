@@ -272,6 +272,20 @@ bugs:
 # Widget positional pitfalls, hidden inputs, validation, lazy inputs.
 # ─────────────────────────────────────────────────────────────
 
+- id: "04.06"
+  phase: 4
+  area: widgets
+  symptom: Node widget default value overrides LLM-generated output on every run; file paths, titles, seed values lock to hardcoded defaults.
+  cause: Workflow JSON hardcodes widget defaults (e.g. "The Last Frequency") on multiple nodes. Title extraction only handles dict format, not list format, so falls through to widget default silently on every run.
+  fix: |
+    (1) Clear hardcoded defaults in workflow JSON — set to empty string "" on writer/video nodes.
+    (2) Add multi-tier title resolution: LLM-parsed (first), derived from content (second), widget fallback (third), hard-fail if stuck default (last).
+    (3) Log `TITLE_TRACE | raw="..." | parsed="..." | final="..."` so future runs surface the decision.
+    (4) In title-extraction code, scan both dict-format top-level `title` and list-format `{"type": "title", "value": ...}` tokens.
+  verify: Filename and title vary across 5 consecutive runs. TITLE_TRACE logs show non-stuck values. No fallback to stuck default shows in logs.
+  tags: [widget-default, title, stuck, override, workflow-json]
+  legacy_id: BUG-LOCAL-035
+
 - id: "04.01"
   phase: 4
   area: widgets
@@ -390,6 +404,16 @@ bugs:
     Run a workflow that is expected to produce an MP4. Kill the server mid-run. The automation script must report FAILED, not MISSION COMPLETE. Alternatively: grep the auto-operator source for .get("completed", True) — it must not exist.
   tags: [execution-model, automation, false-success, artifact-check, completion]
   legacy_id: ""
+
+- id: "05.07"
+  phase: 5
+  area: execution
+  symptom: NameError crash on every extension-pass run: `name '_false_positives' is not defined`. Extension pass silently short-circuits; every episode ships at un-extended word count.
+  cause: Module-level constant is `_DIALOGUE_FALSE_POSITIVES` (line ~1545) but extension-pass code references abbreviated local name `_false_positives` (never bound). Python raises NameError, surrounding try/except logs it and returns unchanged.
+  fix: Change reference to correct module-level constant name `_DIALOGUE_FALSE_POSITIVES`. Search the entire codebase for both the old and new name to confirm no stray references remain.
+  verify: grep shows only the constant definition and the corrected references. Next real run emits target word counts instead of 0% extension.
+  tags: [typo, extension, name-error, refactor, scope]
+  legacy_id: BUG-LOCAL-036
 
 # ─────────────────────────────────────────────────────────────
 # PHASE 06 — CACHING & IS_CHANGED
@@ -827,6 +851,61 @@ bugs:
   verify: 4GB script generation completes in a single window without the "crawling" effect found in multi-pass runs.
   tags: [vram, 4gb, obsidian, performance, offloading]
   legacy_id: "NEW"
+
+- id: "11.08"
+  phase: 11
+  area: llm
+  symptom: ScriptWriter DONE line shows expected characters list (e.g. "ANNOUNCER, DRACULA MALONE, TITLE, ...") but dialogue parser only recovers 0-2 lines instead of 20+. TITLE string is listed as a speaking character.
+  cause: Writer prompt addition required `TITLE: <name>` as first output line. Both streaming detector and post-stream parser match `NAME: text` shape as dialogue, and neither blacklist contained `TITLE`. Every title line got booked as character TITLE speaking the title text, polluting cast, eating word budget, nudging self-critique into deletion.
+  fix: |
+    (1) Add `"TITLE"` to `_DIALOGUE_FALSE_POSITIVES` frozenset (line ~1545).
+    (2) Add `"TITLE"` to streaming heartbeat's inline false-positive tuple (line ~1885).
+    (3) Before `_parse_script`, extract `TITLE:` line via `_extract_title_from_script_text`, strip all `TITLE:` lines from script_text with regex, inject extracted value into title-resolution block. Log `TITLE_STRIP | extracted=...`.
+  verify: Next run shows `TITLE_STRIP | extracted='...'` AND ScriptWriter DONE's Characters list does NOT contain `TITLE`. Filename still varies. `TITLE_TRACE source=llm` still resolves correctly.
+  tags: [title, dialogue-parser, false-positive, regression, cast-roster]
+  legacy_id: BUG-LOCAL-037
+
+- id: "11.09"
+  phase: 11
+  area: llm
+  symptom: BatchBark finds 0 dialogue lines despite Grammarian reporting 20+. Bark bus renders only ANNOUNCER with no character dialogue. Silent 20-line drop between parser and BatchBark.
+  cause: |
+    Three compounding gaps in FORMAT_NORM / parser chain for Mistral's bare `NAME: text` dialogue style:
+    (1) FORMAT_NORM skip heuristic treated `canonical_count >= 5` raw `NAME:` matches as already canonical; skipped LLM rewrite. But `_parse_script` had no pattern for bare `NAME: text` (only bracket tags).
+    (2) `_parse_script` bare `NAME:` lines hit "treat as direction" fallback and were lost.
+    (3) Permissive 2B-fallback only fired if dialogue_count == 0; one stray malformed tag short-circuited recovery of 20+ legitimate lines.
+  fix: |
+    (1) Add diagnostic `DIALOGUE_TRACK: 07_AFTER_PARSE | count=N` checkpoint right after parser (makes silent drop visible).
+    (2) Tighten FORMAT_NORM skip heuristic: require `has_dialogue AND has_scenes AND has_cast` (all three, not just one).
+    (3) Add v5 VOICE pattern (bare `NAME: dialogue`) as first-class regex before fallback, registers as `{"type":"dialogue"}` token directly.
+    (4) Loosen 2B-fallback guard: trigger on `dialogue_count < 3 AND raw-text has 5+ NAME: matches` instead of just `== 0`.
+  verify: Next run shows `DIALOGUE_TRACK: 07_AFTER_PARSE | count=N` matching streaming count. `[BatchBark] Found N dialogue lines` shows N >= 15 for normal run (was 0 before). MP4 audio contains character dialogue.
+  tags: [format-norm, parser, bare-dialogue, mistral, skip-heuristic, fallback]
+  legacy_id: BUG-LOCAL-038
+
+- id: "11.10"
+  phase: 11
+  area: llm
+  symptom: Title extracted as `'** Bioluminal Tide'` (leading markdown bold wrapper leaks). Every downstream consumer carries the cosmetic garbage in logs, filenames, overlays.
+  cause: LLM emitted `TITLE: **Bioluminal Tide**` (markdown bold wrapping the value). `_RE_TITLE_LINE` only strips `**` prefix BEFORE word TITLE and suffix AFTER trailing quote. Lazy capture `(.+?)` grabbed leading `**` of the value and retained it. Post-processing only did `strip()` + quote-strip, no markdown-wrapper strip.
+  fix: In `_extract_title_from_script_text`, add regex substitutions right after quote-strip to peel leading/trailing `*`/`_` runs (1-3 chars) plus surrounding whitespace, then re-run quote-strip so nested cases like `**"Title"**` land clean. Add empty-result guard so `TITLE: ****` residue returns `""` not invalid.
+  verify: Next run's log shows `TITLE_TRACE ... resolved='Bioluminal Tide'` (no leading `**`). Existing unwrapped titles unchanged. Filename varies per episode (BUG-LOCAL-035 regression guard).
+  tags: [title-extraction, regex, markdown, post-processing, cosmetic]
+  legacy_id: BUG-LOCAL-039
+
+- id: "11.11"
+  phase: 11
+  area: llm
+  symptom: "`ValueError: Failed to parse production plan JSON. Repair pass logged Expecting property name enclosed in double quotes: line 13 column 42.` Director produced 3491-char output but json.loads() rejected it."
+  cause: Mistral emitted JavaScript-style `//` line comments inside JSON values, e.g. `"v2/en_speaker_8", // Reserved for LEMMY`. Python `json.loads()` does not accept comments. Existing repair pass stripped trailing commas and tried brace-closure but never stripped comments, so parse always failed at first `//`. Truncation (open braces) was secondary issue masked by comment failure.
+  fix: |
+    Add `_strip_json_comments()` state-machine parser that removes `// ...` to end-of-line only outside quoted strings (preserving URL-like values such as `v2/en_speaker_8`). Wire into `_extract_json` at three points:
+    (1) after first raw `json.loads()` fails, strip comments + trailing commas and retry.
+    (2) before truncation-repair brace closure.
+    (3) in last-resort brace-scan path. Run before trailing-comma stripping so `value, // comment\n}` collapses cleanly.
+  verify: Next run shows `[LLMDirector] Plan: N voices, N SFX cues, N music cues` instead of FATAL. Runs with clean JSON (no comments) hit first `json.loads()` and skip stripper entirely — zero perf cost on clean path.
+  tags: [director, json-parse, llm-output, comments, mistral, truncation]
+  legacy_id: BUG-LOCAL-040
 
 # ─────────────────────────────────────────────────────────────
 # PHASE 12 — REGRESSION, GIT, HANDOFF
