@@ -408,7 +408,9 @@ bugs:
 - id: "05.07"
   phase: 5
   area: execution
-  symptom: NameError crash on every extension-pass run: `name '_false_positives' is not defined`. Extension pass silently short-circuits; every episode ships at un-extended word count.
+  symptom: |
+    NameError crash on every extension-pass run: `name '_false_positives' is not defined`.
+    Extension pass silently short-circuits; every episode ships at un-extended word count.
   cause: Module-level constant is `_DIALOGUE_FALSE_POSITIVES` (line ~1545) but extension-pass code references abbreviated local name `_false_positives` (never bound). Python raises NameError, surrounding try/except logs it and returns unchanged.
   fix: Change reference to correct module-level constant name `_DIALOGUE_FALSE_POSITIVES`. Search the entire codebase for both the old and new name to confirm no stray references remain.
   verify: grep shows only the constant definition and the corrected references. Next real run emits target word counts instead of 0% extension.
@@ -1565,3 +1567,68 @@ bugs:
     Running static regression tests against the custom node project with an active `.venv` works cleanly and yields no false positives from third party library internals.
   tags: [testing, os-walk, venv, false-positives, static-analysis]
   legacy_id: ""
+
+- id: "02.14"
+  phase: 2
+  area: huggingface
+  symptom: |
+    Loading a single-file `.ckpt` (SD 1.5 / SDXL) via
+    `diffusers.StableDiffusionPipeline.from_single_file()` from inside a
+    ComfyUI sidecar subprocess (`stdout=PIPE, stderr=PIPE`) on Windows
+    with offline-first rules produces one of four OSError/UnpicklingError
+    stacks depending on which layer fires first:
+      1. `_pickle.UnpicklingError: Weights only load failed ...
+         pytorch_lightning.callbacks.model_checkpoint.ModelCheckpoint
+         was not an allowed global`
+      2. `ModuleNotFoundError: No module named 'pytorch_lightning'`
+      3. `OSError: [Errno 22] Invalid argument` inside
+         `snapshot_download -> thread_map -> tqdm.fp_write`
+      4. `OSError: [Errno 22] Invalid argument` inside
+         `tqdm.std.print_status` during pipeline inference step progress.
+  cause: |
+    Four stacked issues fire in sequence when the classic diffusers
+    single-file load path runs from a stdout-piped subprocess:
+      1. PyTorch 2.6+ changed `torch.load` default to `weights_only=True`;
+         legacy `.ckpt` pickles embed `pytorch_lightning` class metadata.
+      2. `pytorch_lightning` is not a hard dependency of diffusers; if
+         it is not installed, even `weights_only=False` fails to resolve
+         the class during unpickle.
+      3. diffusers falls back to `snapshot_download` to fetch the
+         diffusers-format model config from the HF Hub, violating any
+         `100%-local/offline` constraint and failing WinError 22 when
+         HF_HUB is unreachable or sandboxed.
+      4. Both the loading-phase and the inference-phase tqdm progress
+         bars write to a PIPE'd stdout that the parent process (ComfyUI)
+         never drains. Once the pipe backs up, every subsequent write
+         raises WinError 22.
+  fix: |
+    Apply all four in `_default_sd15_loader()` (or equivalent sidecar
+    loader entrypoint):
+      1. Monkey-patch `torch.load` to force `weights_only=False` via
+         `kwargs["weights_only"] = False` (override, not `setdefault`;
+         diffusers passes `weights_only=True` explicitly).
+      2. Inject a 3-level `pytorch_lightning` shim into `sys.modules`
+         with a placeholder `_ShimModelCheckpoint` class before load,
+         and pop it after load.
+      3. Bundle `configs/v1-inference.yaml` (CompVis, MIT) next to the
+         loader and pass `original_config=<local path>` +
+         `local_files_only=True` so diffusers skips the HF Hub entirely.
+      4. Silence tqdm on both paths:
+           - `diffusers.utils.logging.disable_progress_bar()`
+           - env: `HF_HUB_DISABLE_PROGRESS_BARS=1`,
+             `TRANSFORMERS_VERBOSITY=error`,
+             `DIFFUSERS_VERBOSITY=error`
+           - After `pipe = pipe.to(device)`:
+             `pipe.set_progress_bar_config(disable=True)`
+    Also: make the outer exception handler write the full traceback to
+    disk (e.g. `io/hyworld_in/<job>/anchor_error.log`) -- the `[Errno 22]`
+    alone loses every diagnostic signal.
+  verify: |
+    In a stdout-piped sidecar subprocess, load SD 1.5 once. A successful
+    first run (cold-load) takes ~8-12 s; a warm subsequent run with the
+    same pipe ~3-5 s per 512x512 inference. No `[Errno 22]`, no
+    `UnpicklingError`, no `ModuleNotFoundError` in the error log.
+    Regression: grep the sidecar source for the four hooks above -- all
+    four must be present, not just one or two.
+  tags: [sd15, sdxl, ckpt, diffusers, weights-only, pytorch-lightning, hf-hub-offline, tqdm-pipe, winerror22, subprocess, windows]
+  legacy_id: BUG-LOCAL-043

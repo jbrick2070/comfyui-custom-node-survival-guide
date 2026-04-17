@@ -900,3 +900,47 @@ class TestSummary:
 #   PowerShell instead of from sandboxed Bash (avoids lock timeouts). This is
 #   a best-practice note for AI workflow, not a checkable property of the
 #   custom node pack itself. Documented in BUG_BIBLE.yaml for reference.
+
+
+class TestPhase02BugBible0214:
+    """BUG-02.14 / BUG-LOCAL-043: SD 1.5 .ckpt offline/Windows four-layer fix.
+
+    Applies to any downstream custom-node project that loads a single-file
+    .ckpt via diffusers from inside a stdout-piped sidecar subprocess on
+    Windows. If the project does not live at the known OTR path, the test
+    is skipped cleanly.
+    """
+
+    ANCHOR_GEN_PATHS = [
+        r"C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\otr_v2\hyworld\anchor_gen.py",
+    ]
+
+    def test_bug_02_14_sd15_ckpt_four_layer_fix(self):
+        import pathlib, pytest
+        src = None
+        for candidate in self.ANCHOR_GEN_PATHS:
+            p = pathlib.Path(candidate)
+            if p.is_file():
+                src = p.read_text(encoding="utf-8")
+                break
+        if src is None:
+            pytest.skip("anchor_gen.py not found on this host; BUG-02.14 test is OTR-local")
+
+        # Layer 1: torch.load kwargs override (not setdefault)
+        assert 'kwargs["weights_only"] = False' in src or \
+               "kwargs['weights_only'] = False" in src, \
+               "BUG-02.14 layer 1: torch.load weights_only override missing"
+
+        # Layer 2: pytorch_lightning shim injected into sys.modules
+        assert "pytorch_lightning" in src and "sys.modules" in src, \
+               "BUG-02.14 layer 2: pytorch_lightning sys.modules shim missing"
+
+        # Layer 3: local original_config path + local_files_only=True
+        assert "original_config" in src and "local_files_only" in src, \
+               "BUG-02.14 layer 3: original_config + local_files_only missing"
+
+        # Layer 4: both tqdm silencers
+        assert "disable_progress_bar" in src, \
+               "BUG-02.14 layer 4a: disable_progress_bar missing"
+        assert "set_progress_bar_config" in src, \
+               "BUG-02.14 layer 4b: pipe.set_progress_bar_config missing"
