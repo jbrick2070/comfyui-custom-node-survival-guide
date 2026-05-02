@@ -1,0 +1,8 @@
+# Pytest / Python caches
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Sandbox markers occasionally left by tooling
+.sync_check_marker
+.reload_clean

@@ -1,0 +1,89 @@
+# llm_round_robin ladder config
+# ===============================
+#
+# This is the SINGLE place you maintain. Adding/removing a model is
+# a one-entry edit; no Python edits required.
+#
+# `last_reviewed` is the ISO-8601 date you last verified each rung
+# against provider docs. The runner emits a staleness warning when
+# this date is older than --staleness-days (default 60). Bump this
+# field whenever you re-verify the ladder so the alarm resets.
+#
+# Per-rung fields:
+#   id            (required)  — exact model id used in API calls
+#   endpoint      (optional)  — responses | chat | both | generate_content
+#                                Defaults to provider's endpoint_default.
+#   capabilities  (optional)  — list from {text, vision, tools, reasoning}.
+#                                Defaults to [text]. Used by the --needs
+#                                CLI flag to filter the ladder.
+#
+# Order matters. The runner walks the rungs top-to-bottom and uses
+# the first one that returns a non-empty response. Put the model you
+# want to land on first.
+
+last_reviewed: 2026-05-01
+
+providers:
+
+  openai:
+    endpoint_default: responses
+    models:
+      - id: gpt-5.5
+        endpoint: responses
+        capabilities: [text, tools, reasoning]
+      - id: gpt-5.5-pro
+        endpoint: responses
+        capabilities: [text, tools, reasoning]
+      - id: gpt-5.4
+        endpoint: responses
+        capabilities: [text, tools, reasoning]
+      - id: gpt-5.4-pro
+        endpoint: responses
+        capabilities: [text, tools, reasoning]
+      - id: gpt-5.4-mini
+        endpoint: responses
+        capabilities: [text, tools, reasoning]
+      - id: gpt-5.4-nano
+        endpoint: responses
+        capabilities: [text, reasoning]
+      - id: gpt-5.3-codex
+        endpoint: responses
+        capabilities: [text, tools, reasoning]
+      - id: gpt-5
+        endpoint: responses
+        capabilities: [text, tools, reasoning]
+      - id: gpt-4.1
+        endpoint: chat
+        capabilities: [text, tools]
+      - id: gpt-4o-mini
+        endpoint: chat
+        capabilities: [text]
+
+  gemini:
+    endpoint_default: generate_content
+    # Routing note: the customtools variant is tuned for bash / custom
+    # tool workflows — that maps directly to "ingest a code excerpt +
+    # a stack trace + reason" style consults that AI coding agents
+    # tend to issue. Keep it first.
+    models:
+      - id: gemini-3.1-pro-preview-customtools
+        capabilities: [text, tools, reasoning]
+      - id: gemini-3.1-pro-preview
+        capabilities: [text, vision, tools, reasoning]
+      - id: gemini-3-flash-preview
+        capabilities: [text, vision, tools]
+
+  nvidia:
+    endpoint_default: chat
+    # Free tier ~40 RPM (no token cap on most catalog models).
+    # Nemotron 49B is agentic-code tuned — preferred for OTR-style
+    # consults. Qwen3 235B is the heavy MoE fallback for reasoning
+    # nuts even Nemotron can't crack. Mistral-Nemotron is a familiar
+    # third voice.
+    models:
+      - id: nvidia/llama-3.3-nemotron-super-49b-v1.5
+        capabilities: [text, tools, reasoning]
+      - id: qwen/qwen3-235b-a22b-instruct-2507
+        capabilities: [text, reasoning]
+      - id: mistralai/mistral-nemotron
+        capabilities: [text]

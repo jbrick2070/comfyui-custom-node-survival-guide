@@ -1,159 +1,166 @@
-# ComfyUI Custom Node Bug Bible
+# ComfyUI Custom Node Survival Guide
 
-**By Jeffrey A. Brick** · April 2026
+**By Jeffrey A. Brick** · April–May 2026
 
-## 🔴 HEADLINE — Automated Regression Suite for Custom Node Packs
+A survival kit for ComfyUI custom-node authors who want their AI coding agent
+(Claude Code, Codex, Cursor, ChatGPT in agent mode, etc.) to do better QA, design
+review, and LLM-driven debugging on the user's own custom-node pack.
 
-**103-entry knowledge base + 24 pytest tests** → Catch ghost registrations, BOM corruption, VRAM leaks, pipe deadlocks, widget errors, and 20 other failure modes **in under 2 seconds**. No ComfyUI runtime. No manual grepping. Machine-executable verification.
+Two products live in this repo:
 
-**Tested against:** [ComfyUI-OldTimeRadio v2.0 (v2.0-visual-engine)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/tree/v2.0-visual-engine) — production multi-model LLM + TTS + video animation pipeline on RTX 5080, 16 GB VRAM, Windows.
+1. **`BUG_BIBLE.yaml` + `tests/bug_bible_regression.py`** — a 153-entry,
+   machine-readable bug bible plus an automated pytest suite that turns the
+   bible's `verify` fields into executable assertions. Point the suite at any
+   custom-node pack and get a pass/fail report in under 2 seconds. No ComfyUI
+   runtime, no model downloads, no manual grepping.
+2. **`llm_round_robin/`** — a drop-in addon that lets your AI agent call
+   ChatGPT, Gemini, and NVIDIA NIM for second opinions, with probe-first ladder
+   pruning, endpoint-aware dispatch, and capability-tag routing so the agent
+   never silently lands on a stale fallback model. See
+   [docs/llm_round_robin_explainer.md](./docs/llm_round_robin_explainer.md).
 
-**Latest run:** 21 passed, 2 xfailed, 0 failed (1.65s)
+## Why both live in the same repo
 
-**Latest Additions (BUG-04.06, BUG-05.07, BUG-11.08 through 11.11):** BUG-04.06: Widget defaults override LLM output; fix title resolution chain. BUG-05.07: Typo in extension-pass variable reference. BUG-11.08–11.11: Dialogue parser gaps (TITLE false-positive, bare NAME format, markdown wrapper leak, JSON comment injection).
+Same audience: an AI coding agent doing QA on a user's custom-node pack. The
+bible tells the agent *what to check for*; the round-robin addon gives the agent
+*reliable second opinions* on hard calls. Versioning them together keeps the
+agent's bibliography and consult tool in sync.
 
----
+## Quick start
 
-## Download
-
-[![Download Bug Bible Suite](https://img.shields.io/badge/Download-Bug_Bible_Suite-blue?style=for-the-badge)](https://github.com/jbrick2070/comfyui-custom-node-survival-guide/archive/refs/heads/main.zip)
-
-**[Click here to download the full test suite (.zip)](https://github.com/jbrick2070/comfyui-custom-node-survival-guide/archive/refs/heads/main.zip)** — includes the `tests/bug_bible_regression.py` suite and the 103-entry `BUG_BIBLE.yaml` knowledge base.
-
----
-
-## Read This
-
-- **[tests/bug_bible_regression.py](./tests/bug_bible_regression.py)** — automated regression test suite. 23 machine-executable tests across 10 phases (including the new Three-File Contract enforcement). Point it at any custom node pack, get a pass/fail report in under 2 seconds. Pure static analysis—no ComfyUI runtime needed.
-- **[BUG_BIBLE.yaml](./BUG_BIBLE.yaml)** — the reference knowledge base. 103 entries across 12 phases. Each entry: `id, phase, area, symptom, cause, fix, verify, tags`. Greppable, parseable. Use this for manual lookups or when building new tests.
-
-## How To Use
-
-**AI assistants building custom nodes:** Run the regression suite after every code change. It catches bugs before they ship.
+### 1. Run the bible regression suite against your pack
 
 ```bash
-cd your-custom-node-pack
+cd C:\Users\you\Documents\ComfyUI\custom_nodes\MyNodePack
 pip install pytest
 python -m pytest <path-to-survival-guide>/tests/bug_bible_regression.py -v --pack-dir .
 ```
 
-**Humans debugging a specific failure:** Open `BUG_BIBLE.yaml`, ctrl-F by `area:` (architecture, widgets, vram, transformers, git, workflow-json, llm, pool-sizing, etc.) or by `tags:` to find matching entries. Read the `cause` and `fix` fields.
-
-**AI assistants without automated testing yet:** Load `BUG_BIBLE.yaml` at the start of a session. Match the user's symptom against `symptom:` fields, apply the `fix:`, then verify manually using the `verify:` field as a checklist.
-
-## Automated Regression Testing — The Main Feature
-
-The pytest suite encodes the Bug Bible's `verify` fields as executable assertions. Point it at any custom node pack directory. In under 2 seconds, you get a full pass/fail report. No ComfyUI runtime, no model downloads, no manual grepping.
-
-### Quick Start
+Specific phase only (e.g. encoding checks):
 
 ```bash
-# From your custom node pack directory:
-cd C:\Users\you\Documents\ComfyUI\custom_nodes\MyNodePack
-
-# Run all checks:
-python -m pytest <path-to-survival-guide>/tests/bug_bible_regression.py -v --pack-dir .
-
-# Run specific phase (e.g., encoding checks only):
 python -m pytest <path-to-survival-guide>/tests/bug_bible_regression.py -v --pack-dir . -k "phase02"
 ```
 
-### What It Checks
+### 2. Drop the round-robin addon next to your pack
 
-| Phase | Bugs Covered | What It Verifies |
+```text
+your-custom-node-pack/
+├── __init__.py
+├── nodes/
+└── llm_round_robin/         ← copy from this repo
+    ├── __init__.py
+    ├── __main__.py
+    └── config/ladders.yaml
+```
+
+Set at least one provider key as a User env var, then:
+
+```bash
+python -m llm_round_robin \
+    --question docs/question.md \
+    --topic vram-budget \
+    --needs reasoning+tools \
+    --output-dir docs/consults
+```
+
+The agent reads `docs/consults/<date>-vram-budget__NN_synthesis.md` to absorb
+the consensus / disagreement between providers.
+
+See [`llm_round_robin/README.md`](./llm_round_robin/README.md) for the full
+setup and 5-step quickstart.
+
+### 3. Validate the bible after edits
+
+```bash
+python tools/reload_bug_bible.py
+```
+
+Catches missing keys, duplicate IDs, malformed tags, and deprecated mapping-form
+entries. Exits non-zero on issues so it's easy to wire into a pre-commit hook.
+
+## What the regression suite checks
+
+153 Bible entries across 12 phases; the pytest suite encodes the static-
+analysis-checkable subset as executable assertions.
+
+| Phase | Coverage | Sample bug IDs |
 |---|---|---|
-| 01 | BUG-01.02, 01.03 | Path safety: no dirname chains, folder_paths or safe anchor usage |
-| 02 | BUG-02.11, 02.12 | Encoding: UTF-8 no BOM, no mojibake, no 0-byte files |
-| 03 | BUG-03.01, 03.03, 12.23 | Registration: isolated loading, namespaced IDs, no ghost nodes |
-| 04 | BUG-04.01, 04.02, 12.06 | Widgets: valid INPUT_TYPES, workflow JSON integrity |
-| 05 | BUG-05.05 | Execution order: passthrough enforcement on boundary nodes |
-| 07 | BUG-07.01, 07.03 | VRAM: no module-scope loads, flush after unload |
-| 09 | BUG-09.02 | Subprocess: Popen cleanup, no communicate() with video pipes |
-| 11 | BUG-12.33 | LLM: prompt length guards on generate() calls |
-| 12 | BUG-12.02, 12.06, 12.07, 12.35 | Repo hygiene: AST parse, workflow link integrity, stale imports, Three-File Contract sync |
+| 01 Bootstrap & Discovery        | Path safety, no dirname chains, folder_paths usage | 01.02, 01.03 |
+| 02 Environment & Dependencies   | UTF-8 no BOM, no mojibake, no zero-byte files; SD 1.5 .ckpt offline-load | 02.11, 02.12, 02.14 |
+| 03 Registration & Loading       | Isolated per-node loading, namespaced IDs, no ghost registrations | 03.01, 03.03, 12.23 |
+| 04 INPUT_TYPES & Widgets        | Widget positional stability; workflow JSON integrity; preserved-vs-stripped auto-sense; socket-only types | 04.01, 04.02, 04.07–04.13 |
+| 05 Execution Model              | Coordination, migration, list outputs, interrupts, completion checks; feature-flag/role-policy decoupling | 05.05, 05.06, 05.08, 05.09 |
+| 06 Caching & IS_CHANGED         | Stale outputs, signature stability, leaks; model-platform empirical compat | 06.01–06.06 |
+| 07 Tensors, Audio, Video        | VRAM, dtype, audio contracts, motion-onset pad, sample-rate, composite layer ordering | 07.01–07.15 |
+| 08 I/O & Output Nodes           | Headless API, intermediates, preview thumbnails, OUTPUT_NODE discipline | 08.01–08.06 |
+| 09 Subprocess & Network         | Pipe deadlocks, asyncio, offline fallbacks | 09.02 |
+| 10 Safety, Pools, RNG           | Content filters, pool sizing, RNG correctness | 10.01–10.07 |
+| 11 LLM-Specific                 | Token budgets, prompt-detector contracts, format normalisers, three-tier resilience | 11.01–11.25 |
+| 12 Regression, Git, Handoff     | Repo hygiene, AST parse, workflow JSON link integrity, dedup foreign keys, ledger write-back, stale-LLM-API ladder | 12.02, 12.06, 12.07, 12.35, 12.39 |
 
-### Requirements
+## How an AI coding agent uses this kit
 
-- Python 3.10+
-- pytest (`pip install pytest`)
-- No ComfyUI runtime needed (pure static analysis)
+**Pattern 1 — open the bible at the start of a session.** Load `BUG_BIBLE.yaml`
+into context. Match the user's symptom against `symptom:` fields, apply the
+`fix:`, verify using the `verify:` field as a checklist.
 
-### Example Output
+**Pattern 2 — run the regression suite after every code change.** Pure static
+analysis; no ComfyUI runtime needed. Catches BOM corruption, ghost registrations,
+widget drift, VRAM leaks, pipe deadlocks before they ship.
 
-```
-tests/bug_bible_regression.py::TestPhase01Paths::test_no_deep_dirname_chains PASSED
-tests/bug_bible_regression.py::TestPhase02Encoding::test_no_bom_signatures PASSED
-tests/bug_bible_regression.py::TestPhase03Registration::test_no_ghost_node_registrations PASSED
-tests/bug_bible_regression.py::TestPhase05Execution::test_memory_boundary_has_passthrough PASSED
-tests/bug_bible_regression.py::TestPhase07VRAM::test_vram_flush_after_unload PASSED
-tests/bug_bible_regression.py::TestPhase09Subprocess::test_popen_has_cleanup PASSED
-tests/bug_bible_regression.py::TestPhase12Regression::test_all_py_files_parse PASSED
-======================== 20 passed, 1 xfailed in 1.69s =========================
-```
+**Pattern 3 — call the round-robin for second opinions on tough calls.** When
+the agent is choosing between architectures, evaluating a refactor, or stuck on
+a non-trivial bug, it writes the question to a markdown file and runs:
 
-### Adding Your Own Checks
-
-Each test maps to one or more Bug Bible entries. To add a new check, create a test method in the appropriate `TestPhaseNN` class. Name it after the bug ID and include the verify logic from the YAML entry. The `py_files`, `init_py`, `node_modules_dict`, and `workflow_jsons` fixtures give you access to the pack's files without boilerplate.
-
-## Latest Regression Run
-
-Tested against [ComfyUI-OldTimeRadio](https://github.com/jbrick2070/ComfyUI-OldTimeRadio) v2.0 branch (`abfc468`) on 2026-04-11. 27 node files, 5 workflow JSONs, 15 scripts.
-
-```
-TestPhase01Paths::test_no_deep_dirname_chains ..................... PASSED
-TestPhase01Paths::test_output_nodes_use_folder_paths ............. PASSED
-TestPhase02Encoding::test_no_bom_signatures ...................... PASSED
-TestPhase02Encoding::test_no_mojibake_markers .................... PASSED
-TestPhase02Encoding::test_no_zero_byte_files ..................... PASSED
-TestPhase03Registration::test_isolated_loading ................... PASSED
-TestPhase03Registration::test_no_ghost_node_registrations ........ PASSED
-TestPhase03Registration::test_namespaced_node_ids ................ PASSED
-TestPhase04Widgets::test_all_nodes_have_valid_input_types ........ PASSED
-TestPhase04Widgets::test_workflow_widget_counts .................. PASSED
-TestPhase05Execution::test_memory_boundary_has_passthrough ....... PASSED
-TestPhase07VRAM::test_no_module_scope_model_loads ................ PASSED
-TestPhase07VRAM::test_vram_flush_after_unload .................... PASSED
-TestPhase09Subprocess::test_popen_has_cleanup .................... PASSED
-TestPhase09Subprocess::test_no_communicate_for_video ............. PASSED
-TestPhase12Regression::test_all_py_files_parse ................... PASSED
-TestPhase12Regression::test_workflow_json_link_integrity ......... PASSED
-TestPhase12Regression::test_no_stale_v2_imports .................. PASSED
-TestPhase11LLM::test_generate_calls_have_length_guard ........... XFAIL
-TestThreeFileContract::test_entry_count_matches_readme ........... PASSED
-TestThreeFileContract::test_all_bible_ids_covered_in_tests ....... XFAIL
-TestSummary::test_pack_has_init .................................. PASSED
-TestSummary::test_pack_has_requirements .......................... PASSED
-======================== 21 passed, 2 xfailed in 1.65s =========================
+```bash
+python -m llm_round_robin --question q.md --topic <slug> --needs reasoning+tools
 ```
 
-21 passed, 2 xfail (BUG-12.33 — LLM length guard is informational; BUG-12.35 — coverage gap on untested Bible entries), 0 failed.
-
----
+Probe-first ladder pruning means the agent never silently lands on a stale
+fallback model.
 
 ## Maintenance Rule: The Three-File Contract
 
-**Every update to this project must touch all three files.** No exceptions, even for small changes.
+**Every update must touch all three files.** No exceptions.
 
 | Order | File | What To Update |
 |---|---|---|
-| 1 | `README.md` | Coverage areas, test table, entry count, any new instructions |
-| 2 | `BUG_BIBLE.yaml` | Add/edit/remove the bug entry with all fields |
-| 3 | `tests/bug_bible_regression.py` | Add/update the corresponding test assertion |
+| 1 | `README.md`                            | Coverage table, entry count, instructions |
+| 2 | `BUG_BIBLE.yaml`                       | Add/edit/remove the bug entry with all fields |
+| 3 | `tests/bug_bible_regression.py`        | Add/update the matching assertion (where statically checkable) |
 
-If you add a new bug to the Bible, add a matching test to the regression suite. If you fix a test, update the Bible's `verify` field. If either changes, update the README's test coverage table.
+Run `python tools/reload_bug_bible.py` to validate after every edit.
 
-This rule exists because partial updates cause silent drift: the Bible says one thing, the tests check something else, and the README describes a third version. AI assistants should treat this as a pre-commit checklist.
-
-### When To Add a New Test
-
-Not every Bible entry needs an automated test. Tests work best for static analysis checks (encoding, registration, AST structure, file patterns). Entries that require runtime (e.g., "model loads without OOM") or human judgment (e.g., "substitutions feel natural") belong in the Bible but not the test suite.
-
-A good rule: if the `verify` field can be checked by reading files without running ComfyUI, it should have a test.
+If the bible's `verify` field can be checked by reading files without running
+ComfyUI, it should have a corresponding test. Entries that require runtime
+(e.g. "model loads without OOM") or human judgment (e.g. "substitutions feel
+natural") belong in the Bible but not the test suite — they're documented as
+exclusions inline.
 
 ## Coverage Areas
 
-architecture · windows · powershell · git · huggingface · python · cuda · transformers · widgets · loading · coordination · migration · naming · hidden-inputs · validation · list-execution · lazy · interrupt · combo · asyncio · headless · execution-order · vram · model-class · tensors · audio · video · audio-contract · memory · caching · paths · network · data · metadata · telemetry · workflow-json · safety · pool-sizing · regression · rng · deps · ai-autonomy · testing · encoding · sandbox · subprocess · discovery · pipeline-sync · io · output_node · llm · ai-continuity · hygiene · procedural
+architecture · windows · powershell · git · huggingface · python · cuda ·
+transformers · widgets · loading · coordination · migration · naming ·
+hidden-inputs · validation · list-execution · lazy · interrupt · combo ·
+asyncio · headless · execution-order · vram · model-class · tensors · audio ·
+video · audio-contract · memory · caching · paths · network · data · metadata ·
+telemetry · workflow-json · safety · pool-sizing · regression · rng · deps ·
+ai-autonomy · testing · encoding · sandbox · subprocess · discovery ·
+pipeline-sync · io · output_node · llm · ai-continuity · hygiene · procedural ·
+llm-routing · ledger
+
+## Bonus — three-version YAML normalization experiment
+
+`docs/bonus_normalization_experiment/` is an optional, run-it-yourself
+experiment for readers curious about how different AI models handle the
+same "clean up this YAML" task. It snapshots the bible before and after
+a Claude (Opus class) normalization pass, prepares a question for the
+round-robin addon, and ships a comparison script that diffs the three
+versions. Nothing in there is authoritative — see the folder's README for
+context. Skip it if you're just here to use the bible + addon.
 
 ## License
 
-MIT. Use freely. If an entry helped you, the cost of admission is sending a new bug back as a YAML PR.
+MIT. Use freely. If an entry helped you, the cost of admission is sending a new
+bug back as a YAML PR.

@@ -66,11 +66,26 @@ def pack_dir(request):
 @pytest.fixture(scope="session")
 def py_files(pack_dir):
     """Collect all .py files in the pack (excluding __pycache__).
-    BUG-12.36: Also explicitly excludes internal virtual environment folders like .venv.
+
+    BUG-12.36: Also explicitly excludes internal virtual environment
+    folders like .venv.
+
+    Also excludes:
+      - the survival-guide's own ``tests/`` directory (the regression
+        test file contains literal mojibake patterns,
+        ``.get("completed", True)`` examples, and ``communicate()``
+        / ``ffmpeg`` mentions inside docstrings — those are PATTERN
+        DEFINITIONS, not violations);
+      - the bundled ``llm_round_robin/`` addon (it's a tool, not a
+        node pack file; tests for it live in ``tests/`` and run
+        separately).
     """
     found = []
+    excluded_dirs = (
+        "__pycache__", ".git", ".venv", "venv", "tests", "llm_round_robin"
+    )
     for root, dirs, files in os.walk(pack_dir):
-        dirs[:] = [d for d in dirs if d not in ("__pycache__", ".git", ".venv", "venv")]
+        dirs[:] = [d for d in dirs if d not in excluded_dirs]
         for f in files:
             if f.endswith(".py"):
                 found.append(os.path.join(root, f))
@@ -871,7 +886,20 @@ class TestSummary:
     """Final summary assertions."""
 
     def test_pack_has_init(self, pack_dir):
-        """Basic: Pack must have __init__.py."""
+        """Basic: Pack must have __init__.py.
+
+        Skipped when ``--pack-dir`` points at the survival-guide repo
+        itself: the repo is a knowledge-base / test harness, not a
+        custom-node pack, so it has no top-level ``__init__.py``.
+        Detection: the survival-guide repo contains a
+        ``BUG_BIBLE.yaml`` at its root.
+        """
+        if os.path.isfile(os.path.join(pack_dir, "BUG_BIBLE.yaml")):
+            pytest.skip(
+                "pack-dir is the survival-guide repo (not a custom-node "
+                "pack); no top-level __init__.py is expected here. "
+                "Re-run against an actual custom-node directory."
+            )
         assert os.path.isfile(os.path.join(pack_dir, "__init__.py")), (
             "No __init__.py in pack root"
         )

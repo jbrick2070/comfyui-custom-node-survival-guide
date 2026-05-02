@@ -120,7 +120,8 @@ bugs:
   fix: Do NOT attempt FA2 install on this platform. SageAttention + SDPA already active. Log a platform-accurate message so future you doesn't chase it again.
   verify: Startup log states "Flash Attention 2 NOT AVAILABLE - no prebuilt wheel for this platform" with exact torch/CUDA/arch. No attempt to install.
   tags: [flash-attention, sage-attention, blackwell, cuda13, torch210]
-  legacy_id: ""
+  legacy_id: "NEW"
+
 - id: "02.04"
   phase: 2
   area: huggingface
@@ -787,7 +788,8 @@ bugs:
     Log tokens-generated, budget, and wall-time per pass.
   verify: No more timeout failures at the outline stage; logs show wall time < budget with headroom.
   tags: [llm, sdpa, timeout, token-budget, wall-time]
-  legacy_id: ""
+  legacy_id: "NEW"
+
 - id: "11.03"
   phase: 11
   area: llm
@@ -798,7 +800,8 @@ bugs:
     Add directive: "Do NOT contradict the MIDDLE EVENTS summary below."
   verify: Read 5 rewritten endings; none contradict the middle-act content.
   tags: [llm, arc-enhancer, plot-spine, rewrite, continuity]
-  legacy_id: ""
+  legacy_id: "NEW"
+
 - id: "11.04"
   phase: 11
   area: llm
@@ -814,7 +817,8 @@ bugs:
     Log score and all 5 check values per episode. Log the echo phrase that bridges opening to closing.
   verify: Over N episodes, score distribution is visible in logs; you can grep bad runs by score < 3.
   tags: [llm, arc-enhancer, scoring, telemetry, observability]
-  legacy_id: ""
+  legacy_id: "NEW"
+
 - id: "11.05"
   phase: 11
   area: attention
@@ -826,18 +830,20 @@ bugs:
     The "Do not attempt install" line is the critical part - it stops the next contributor from chasing the wrong wheel.
   verify: Log message is unambiguous; next session does not attempt FA2 install.
   tags: [attention, flash-attention, logging, clarity]
-  legacy_id: ""
+  legacy_id: "NEW"
+
 - id: "11.06"
   phase: 11
   area: attention
   symptom: Downstream input formatting crashes with slice or dict errors on `apply_chat_template`.
   cause: Migrating from a multimodal LLM (multimodal `AutoProcessor`) to standard models like a standard text LLM (flat `AutoTokenizer`) requires different chat structural types. MultimodalProcessor requires `{"role": "user", "content": [{"type": "text", "text": prompt}]}` while normal tokenizers expect `{"role": "user", "content": prompt}`.
   fix: |
-    Add dynamic checks when building chat pipelines `is_multimodal = "vision" in model_id.lower()`.
+    Add dynamic checks when building chat pipelines `is_multimodal = "vision" in model_id.lower()`. 
     Conditionally wrap the content arrays depending on model type.
   verify: Both multimodal models and standard tokens process standard prompts without KeyError or TypeErrors.
   tags: [tokenizer, autoprocessor, multimodal, apply_chat_template]
-  legacy_id: ""
+  legacy_id: "NEW"
+
 - id: "11.07"
   phase: 11
   area: performance
@@ -846,7 +852,8 @@ bugs:
   fix: Implement an "Optimization Profile" (Obsidian/One-Shot) that defaults all iterative passes to OFF. One prompt, one script, zero offload cycles.
   verify: 4GB script generation completes in a single window without the "crawling" effect found in multi-pass runs.
   tags: [vram, 4gb, obsidian, performance, offloading]
-  legacy_id: ""
+  legacy_id: "NEW"
+
 - id: "11.08"
   phase: 11
   area: llm
@@ -1073,7 +1080,8 @@ bugs:
     Preserve your real changes by re-adding them explicitly by name.
   verify: git diff HEAD shows only the files you actually edited.
   tags: [git, crlf, line-endings, phantom-diff]
-  legacy_id: ""
+  legacy_id: "NEW"
+
 - id: "12.15"
   phase: 12
   area: git
@@ -1085,7 +1093,8 @@ bugs:
     Linux: `rm -f .git/index.lock`
   verify: git status runs cleanly.
   tags: [git, lockfile, recovery]
-  legacy_id: ""
+  legacy_id: "NEW"
+
 - id: "12.16"
   phase: 12
   area: git
@@ -1437,7 +1446,7 @@ bugs:
   verify: |
     `pip show the_complex_lib` returns "not installed". an audio synthesis model generation works
     via transformers API. No MSVC or spacy required.
-  tags: [dependencies, audio-model, windows, av, spacy, python312]
+  tags: [dependencies, audio-model, windows, dependencies, av, spacy, python312]
   legacy_id: ""
 
 - id: "12.31"
@@ -1661,7 +1670,7 @@ bugs:
 # SYNC_PROBE_MARKER
 
 # ─────────────────────────────────────────────────────────────
-# CHUNK 2 — Class lessons promoted from a 2-week production custom-node sprint
+# CHUNK 2 — Promoted from OTR sprint (BUG-LOCAL-001 .. -133)
 # Class lessons generalized for any ComfyUI custom-node author.
 # ─────────────────────────────────────────────────────────────
 
