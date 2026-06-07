@@ -484,14 +484,28 @@ class TestPhase07VRAM:
         from_pretrained, torch.load, load_checkpoint at module scope
         (outside a function/class) cause slow startup and VRAM leak.
         """
-        heavy_patterns = [
-            r"^from_pretrained\(",
-            r"^torch\.load\(",
-            r"^\.load_checkpoint\(",
-            r"^AutoModel\w*\.from_pretrained\(",
-            r"^AutoTokenizer\.from_pretrained\(",
-        ]
-        combined = re.compile("|".join(heavy_patterns), re.MULTILINE)
+        # BUG-07.01b (2026-06-07): detect ACTUAL heavy-loader CALLS at
+        # module scope via the AST, not a substring scan of the source.
+        # The prior substring check ("from_pretrained" in source segment)
+        # false-positived on module-scope config dicts / docstrings that
+        # merely MENTION the loader name as a string literal (e.g. an
+        # adapter's documented ``assumed_call`` text), reporting a plain
+        # data assignment as a VRAM violation. Matching real ``ast.Call``
+        # nodes to ``*.from_pretrained(...)`` / ``torch.load(...)`` keeps
+        # the exact detection scope of the old check while ignoring
+        # strings -- a strict subset, so it can never newly flag code the
+        # old substring scan would have passed.
+        def _is_heavy_loader_call(call: ast.Call) -> bool:
+            fn = call.func
+            if isinstance(fn, ast.Attribute):
+                if fn.attr == "from_pretrained":
+                    return True
+                if (fn.attr == "load" and isinstance(fn.value, ast.Name)
+                        and fn.value.id == "torch"):
+                    return True
+            elif isinstance(fn, ast.Name) and fn.id == "from_pretrained":
+                return True
+            return False
 
         violations = []
         for fpath in py_files:
@@ -500,17 +514,15 @@ class TestPhase07VRAM:
             except SyntaxError:
                 continue
 
-            # Check for calls at module scope (not inside functions/classes)
+            # Only module-scope statements (outside any function/class).
             for node in ast.iter_child_nodes(tree):
-                if isinstance(node, (ast.Expr, ast.Assign)):
-                    src_line = ast.get_source_segment(
-                        open(fpath, "r", encoding="utf-8").read(), node
+                if not isinstance(node, (ast.Expr, ast.Assign)):
+                    continue
+                if any(isinstance(sub, ast.Call) and _is_heavy_loader_call(sub)
+                       for sub in ast.walk(node)):
+                    violations.append(
+                        f"{os.path.basename(fpath)}:L{node.lineno}"
                     )
-                    if src_line and ("from_pretrained" in str(src_line) or
-                                     "torch.load" in str(src_line)):
-                        violations.append(
-                            f"{os.path.basename(fpath)}:L{node.lineno}"
-                        )
 
         assert not violations, (
             f"BUG-07.01: Module-scope model loads found:\n  "
