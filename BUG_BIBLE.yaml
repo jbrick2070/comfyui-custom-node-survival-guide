@@ -2945,3 +2945,38 @@ bugs:
     + comment cite the failure signature and date.
   tags: [model-compat, quantization, blackwell, bitsandbytes, dropdown-filter, empirical-testing]
   legacy_id: BUG-LOCAL-110
+
+- id: "07.16"
+  phase: 7
+  area: vram
+  symptom: |
+    A large GGUF video unet (e.g. LTX-2.3 22B audio-in) renders at a wild
+    6.84-or-223 s/it lottery -- one beat ~54s, the next ~30 MIN -- often
+    stalling at "0/8 Model Initializing". It is NOT an OOM; it just crawls.
+    Per-step time swings ~30x at BYTE-IDENTICAL reported VRAM ("X usable,
+    Y loaded, full load: True"); nvidia-smi shows only ~200 MiB free.
+  cause: |
+    Two compounding faults. (1) A VAE node wired to BOTH the pre-sampler
+    (i2v encode) AND the post-sampler (decode) stays pinned in VRAM through
+    the whole denoise loop, because the executor's free_after_use only
+    releases a node after its LAST consumer runs -- so ~1.4 GB is stolen
+    from the sampler. (2) On a desktop-VRAM-tight card (16 GB with ~5 GB
+    eaten by Chrome/Electron desktop apps) the unet FULL-loads to the brim
+    with ~0 activation room, so the per-step activation tensors spill to
+    system RAM (NVIDIA "sysmem fallback") and crawl ~20-30x. Same symptom
+    class as 11.07 / 07.01 / 07.03 (VRAM-pressure slowdown, no OOM), new trigger.
+  fix: |
+    (1) Split the dual-consumer VAE into two graph nodes (encode-side +
+    decode-side) so free_after_use reclaims the encode VAE BEFORE the
+    sampler. (2) Force a PARTIAL unet load by holding ~3 GB free for
+    activations: bump comfy.model_management.EXTRA_RESERVED_VRAM (the real
+    --reserve-vram global) around the graph run, restored in finally
+    (exception-safe; never lower a higher operator reserve). The GGUF unet
+    DOES honor partial load. Result: steady ~11 s/it, no spill, no lottery.
+  verify: |
+    A clean render shows the unet "loaded ... full load" with ~3 GB held
+    free (usable = free - ~3.9 GB) and a steady per-step time, never spiking
+    20x+; nvidia-smi keeps headroom through the sampler. Lower the reserve
+    for more speed / less margin.
+  tags: [vram, sysmem-fallback, activation-spill, partial-load, EXTRA_RESERVED_VRAM, free_after_use, gguf, ltx, reserve, no-oom-crawl]
+  legacy_id: ""

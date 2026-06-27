@@ -783,6 +783,9 @@ class TestPhase11LLM:
 class TestThreeFileContract:
     """BUG-12.35: Bible, README, and test file must stay in sync."""
 
+    # Static-only Bible entries (no integration test): BUG-07.16
+    # (vram sysmem-spill / partial-load EXTRA_RESERVED_VRAM reserve).
+
     def _repo_root(self):
         """Resolve the survival guide repo root (parent of tests/)."""
         return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

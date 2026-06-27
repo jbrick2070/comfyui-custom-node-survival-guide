@@ -2,7 +2,7 @@
 
 **By Jeffrey A. Brick** · April–May 2026
 
-An AI-agent QA harness for ComfyUI custom-node authoring. v2.1 — 153 bible entries + LLM round-robin consult addon.
+An AI-agent QA harness for ComfyUI custom-node authoring. v2.1 — 154 bible entries + LLM round-robin consult addon.
 
 ---
 
@@ -26,7 +26,7 @@ The "AI agent confidently shipped a broken fix" failure mode. Static analysis ca
 
 ## What's in the kit
 
-1. **`BUG_BIBLE.yaml` + `tests/bug_bible_regression.py`** — a 153-entry, machine-readable bug bible plus an automated pytest suite that turns the bible's `verify` fields into executable assertions. Point the suite at any custom-node pack and get a pass/fail report in under 2 seconds. No ComfyUI runtime, no model downloads, no manual grepping.
+1. **`BUG_BIBLE.yaml` + `tests/bug_bible_regression.py`** — a 154-entry, machine-readable bug bible plus an automated pytest suite that turns the bible's `verify` fields into executable assertions. Point the suite at any custom-node pack and get a pass/fail report in under 2 seconds. No ComfyUI runtime, no model downloads, no manual grepping.
 
 2. **`llm_round_robin/`** — a drop-in addon that lets your AI agent call ChatGPT, Gemini, and NVIDIA NIM for second opinions, with probe-first ladder pruning, endpoint-aware dispatch, and capability-tag routing so the agent never silently lands on a stale fallback model. See [`docs/llm_round_robin_explainer.md`](./docs/llm_round_robin_explainer.md).
 
@@ -185,7 +185,7 @@ entries. Exits non-zero on issues so it's easy to wire into a pre-commit hook.
 
 ## What the regression suite checks
 
-153 Bible entries across 12 phases; the pytest suite encodes the static-
+154 Bible entries across 12 phases; the pytest suite encodes the static-
 analysis-checkable subset as executable assertions.
 
 | Phase | Coverage | Sample bug IDs |
@@ -263,6 +263,10 @@ a Claude (Opus class) normalization pass, prepares a question for the
 round-robin addon, and ships a comparison script that diffs the three
 versions. Nothing in there is authoritative — see the folder's README for
 context. Skip it if you're just here to use the bible + addon.
+
+## Sibling Project
+
+Some of these patterns generalize beyond ComfyUI to any long-form LLM pipeline — multi-pass revision, arc scoring, token budgets matching reality. Hoisted out into a separate repo for the people who'd never search "comfyui" but need the same patterns: **[long-form-llm-survival-guide](https://github.com/jbrick2070/long-form-llm-survival-guide)**. Same voice, same Three-File Contract discipline, same MIT terms.
 
 ## License
 
