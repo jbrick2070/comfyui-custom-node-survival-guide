@@ -2980,3 +2980,37 @@ bugs:
     for more speed / less margin.
   tags: [vram, sysmem-fallback, activation-spill, partial-load, EXTRA_RESERVED_VRAM, free_after_use, gguf, ltx, reserve, no-oom-crawl]
   legacy_id: ""
+
+- id: "12.47"
+  phase: 12
+  area: harness
+  symptom: |
+    A headless soak/probe leg renders on the WRONG engine (or with wrong
+    feature flags) even though the submitted workflow/profile is correct:
+    the server log shows LOUD env-override lines (e.g. an engine force-map)
+    that nobody in the current run set. Recurs across sessions -- a past
+    cleanup note says "deleted so future boots are clean", then it happens
+    again.
+  cause: |
+    The server launch script sources an OPTIONAL per-leg env hook file
+    (extra "set X=Y" lines a playlist runner writes and is supposed to
+    delete after its leg). A crashed/interrupted leg ORPHANS the hook, and
+    the launcher then silently injects the stale env (engine force-maps,
+    opt-in flags) into EVERY subsequent headless boot -- poisoning
+    unrelated runs for days. File-based env leaks also survive User/
+    Machine env-var audits, so the usual "check setx" diagnosis misses it.
+  fix: |
+    CONSUME-ONCE semantics in the launcher: when the hook exists, ECHO its
+    contents LOUDLY into the server log, call it, then DELETE it -- one
+    hook = one boot. Writers re-create the hook per leg, so the per-leg
+    contract is preserved and a crash can no longer poison later boots.
+    Generic rule: any "sourced side-file" a launcher honors must be
+    consumed (or TTL-stamped) by the consumer, never left to accumulate
+    on the writer's promise to clean up.
+  verify: |
+    The next boot's log shows either no hook line or the loud
+    "consuming ... hook" block with the hook contents; the hook file is
+    absent after any boot; a forced-engine probe leg's render histogram
+    matches the engine the RUN configured (not the orphan's).
+  tags: [harness, env-leak, headless-boot, launcher, orphan-file, consume-once, force-map, soak]
+  legacy_id: BUG-LOCAL-415

@@ -784,7 +784,9 @@ class TestThreeFileContract:
     """BUG-12.35: Bible, README, and test file must stay in sync."""
 
     # Static-only Bible entries (no integration test): BUG-07.16
-    # (vram sysmem-spill / partial-load EXTRA_RESERVED_VRAM reserve).
+    # (vram sysmem-spill / partial-load EXTRA_RESERVED_VRAM reserve),
+    # BUG-12.47 (launcher env-hook orphan -> consume-once; harness
+    # lifecycle, no node-pack surface to integration-test).
 
     def _repo_root(self):
         """Resolve the survival guide repo root (parent of tests/)."""
