@@ -3045,7 +3045,15 @@ bugs:
     to a directive that says COPY exact contiguous phrases and re-shows
     the source text. Generic rule: every "must quote the source verbatim"
     validator needs (a) whitespace-tolerant matching and (b) a
-    deterministic subset-repair before any LLM re-roll.
+    deterministic subset-repair before any LLM re-roll. Two follow-on
+    laws from the same live-smoke night: (c) a grounded quote proves the
+    LINE EXISTS, not that it belongs to the CLASS -- for closed-
+    vocabulary judge classes (a weapon must be NAMED to be heard on
+    radio) the lexicon is the only kill authority and the confirm-quote
+    path is reserved for open-phrasing classes; (d) any judge claim
+    with a deterministically checkable core ("the closing line is
+    absent") must be verified in code before it may kill -- the judge
+    twice claimed a non-empty line it had just been shown was missing.
   verify: |
     A term that wraps across a line break in the source corpus grounds
     cleanly; a response with one paraphrased term among >= 2 verbatim
