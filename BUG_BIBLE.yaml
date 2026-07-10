@@ -2978,7 +2978,7 @@ bugs:
     free (usable = free - ~3.9 GB) and a steady per-step time, never spiking
     20x+; nvidia-smi keeps headroom through the sampler. Lower the reserve
     for more speed / less margin.
-  tags: [vram, sysmem-fallback, activation-spill, partial-load, EXTRA_RESERVED_VRAM, free_after_use, gguf, ltx, reserve, no-oom-crawl]
+  tags: [vram, sysmem-fallback, activation-spill, partial-load, extra-reserved-vram, free-after-use, gguf, ltx, reserve, no-oom-crawl]
   legacy_id: ""
 
 - id: "12.47"
@@ -3014,3 +3014,46 @@ bugs:
     matches the engine the RUN configured (not the orphan's).
   tags: [harness, env-leak, headless-boot, launcher, orphan-file, consume-once, force-map, soak]
   legacy_id: BUG-LOCAL-415
+
+- id: "11.26"
+  phase: 11
+  area: llm-output
+  symptom: |
+    A structured-call pass whose post-validator demands VERBATIM substrings
+    of an earlier pass's text (e.g. key_terms copied from a concept) kills
+    the whole pipeline loudly even when the model's answer is right in
+    spirit: the model paraphrases ('grieving mother' for 'a mother,
+    grieving'), or the copied phrase spans a line wrap in the source
+    corpus. The generic repair turn re-paraphrases, the bounded retry
+    ladder exhausts, and a production render dies in its first LLM stage.
+  cause: |
+    Two compounding faults. (1) The grounding check compared raw lowered
+    strings, so a phrase that wraps across a newline (the corpus joins
+    model fields with "\n") can NEVER match a single-line term -- a
+    verbatim copy gets rejected. (2) Copy-exact is the one instruction
+    small local models reliably fumble inside JSON emission, and the
+    generic "fix the field" repair prompt neither names the verbatim
+    contract nor offers a deterministic way out, so the repair attempt
+    fails the same way and burns the ladder.
+  fix: |
+    (1) Whitespace-normalize BOTH sides of the verbatim test (collapse
+    every whitespace run to one space, lowercase) -- still exact words in
+    exact order, just wrap-proof. (2) Route the failure class to a TYPED
+    repair: a deterministic call-site callback runs first (prune the
+    ungrounded terms when enough verbatim survivors remain -- pure text
+    filtering, no LLM spend, re-validated by the full gate), falling back
+    to a directive that says COPY exact contiguous phrases and re-shows
+    the source text. Generic rule: every "must quote the source verbatim"
+    validator needs (a) whitespace-tolerant matching and (b) a
+    deterministic subset-repair before any LLM re-roll.
+  verify: |
+    A term that wraps across a line break in the source corpus grounds
+    cleanly; a response with one paraphrased term among >= 2 verbatim
+    terms finishes with NO second LLM call and the paraphrase pruned; a
+    response with < 2 grounded terms takes the typed verbatim-copy repair
+    turn and, if the model repeats itself, still fails loud after the
+    bounded ladder. Statically: any file carrying an "anchor A2" style
+    verbatim-grounding gate also carries a whitespace-collapse
+    normalizer used on both sides of the substring test.
+  tags: [llm-output, structured-call, post-validator, verbatim-grounding, whitespace-normalization, deterministic-repair, retry-ladder, repair-prompt]
+  legacy_id: ""

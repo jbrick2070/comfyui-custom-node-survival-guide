@@ -708,6 +708,32 @@ class TestPhase12Regression:
 class TestPhase11LLM:
     """Verify LLM safety patterns."""
 
+    def test_verbatim_grounding_normalizes_whitespace(self, py_files):
+        """BUG-11.26: A verbatim-grounding gate (a post-validator that
+        substring-tests LLM-emitted terms against a source corpus, e.g.
+        the original_radio "anchor A2" key_term gate) must whitespace-
+        normalize BOTH sides of the test, or a phrase that wraps across
+        a line break in the corpus can never match and the bounded
+        retry ladder exhausts on output that was copied correctly.
+
+        Static tripwire: any file that builds a "not grounded in the
+        concept" rejection must also carry a whitespace-collapse
+        normalizer (a str.join over str.split) somewhere in the file.
+        """
+        issues = []
+        for fpath in py_files:
+            with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+            if "not grounded in the concept" not in content:
+                continue
+            has_normalizer = ".join(" in content and ".split())" in content
+            if not has_normalizer:
+                issues.append(os.path.basename(fpath))
+        assert not issues, (
+            "BUG-11.26: verbatim-grounding gate without whitespace "
+            "normalization in: " + ", ".join(issues)
+        )
+
     def test_generate_calls_have_length_guard(self, py_files):
         """BUG-12.33: Files that call model.generate() should have
         prompt length checking/truncation nearby.
