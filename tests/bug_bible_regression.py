@@ -971,6 +971,73 @@ class TestSummary:
 #   PowerShell instead of from sandboxed Bash (avoids lock timeouts). This is
 #   a best-practice note for AI workflow, not a checkable property of the
 #   custom node pack itself. Documented in BUG_BIBLE.yaml for reference.
+#
+# ─── OTR PROD_BUG_LOG fan-out (2026-07-11), 23 entries ────────────────────
+# All 23 entries below originate from live/prod runs of one specific
+# downstream project (ComfyUI-OldTimeRadio) and reference internal module
+# functions, live soak/smoke telemetry, or LLM-output runtime behavior that
+# cannot be checked by static analysis against an arbitrary --pack-dir.
+# Each is documented in BUG_BIBLE.yaml with symptom/cause/fix/verify
+# generalized for any custom-node author; none is faked into a no-op assert.
+#
+# BUG-02.15 (cp1252 headless boot crash): Requires a real detached-process
+#   boot with an inherited console codec to reproduce; not checkable from a
+#   pack directory's source alone.
+# BUG-07.17 (LTX-AV VRAM soak, disproven offload): Requires a live VRAM soak
+#   measurement; the "verify" is a soak re-run, not a static property.
+# BUG-11.27 (remote model KeyError, exact-match dict lookup): The verify
+#   step requires invoking the live registry lookup with a non-curated
+#   model handle; runtime behavior, not a static pattern generic to any pack.
+# BUG-07.18 (visualizer soak 4-bug cluster): Requires a live visualizer
+#   soak forcing 0-frame/silent/idle-scope beats; runtime integration test.
+# BUG-08.07 (bars overlay read silent source): Requires a live render and
+#   an amplitude-correlation check against the rendered artifact.
+# BUG-05.10 (UnboundLocalError from shadowed import): Requires exercising
+#   the specific heavy node's meta-stamp code path at runtime; the static
+#   half (grep for shadowing local imports) is pack-specific enough that a
+#   generic pattern would over- or under-match arbitrary custom-node code.
+# BUG-07.19 (announcer role-coercion naming trap): Requires a live episode
+#   render with the announcer keyed as an ordinary cast id; runtime check.
+# BUG-07.20 (stage-direction-only line crash): Requires forcing a
+#   degenerate dialogue row through the live TTS pipeline.
+# BUG-09.05 (cloud API 422 duration floor): Requires a live cloud API call
+#   at a sub-minimum duration; network-dependent, not static.
+# BUG-09.06 (cloud node dict-vs-string contract): Requires a live call to
+#   the specific cloud node; the dict-shape contract is per-node/per-vendor
+#   and not inferable from a generic pack scan.
+# BUG-07.21 (voice-id asset collision): Requires resolving N voice ids
+#   live under allow_voice_reuse=False and hashing the resulting WAVs.
+# BUG-11.28 (silent n_ctx downgrade truncation): Requires a live loader
+#   call above a quant's actual capacity; runtime VRAM/context behavior.
+# BUG-11.29 (jinja consecutive-user-message TemplateError): Requires
+#   constructing a live reroll and feeding it through the actual chat
+#   template; template object is project-specific.
+# BUG-11.30 (token-budget truncation-then-salvage): Requires a live
+#   near-ceiling structured call; token-budget behavior is model-specific.
+# BUG-11.31 (word-band proportional-band-too-narrow): The underlying
+#   `_word_band`-style function is project-internal; without its module
+#   path in this repo, a generic unit test would be testing a
+#   reimplementation, not the real code. Flagged for a project-local test
+#   once the function's path is confirmed.
+# BUG-11.32 (announcer silent mutation, ROOT CAUSE OPEN): Explicitly
+#   non-testable per its own verify field — the root mutator is
+#   unidentified; the obligation is a runtime trace, not a static check.
+# BUG-11.33 (fictional character leak into real-news read): Requires a
+#   live fixture through the read-pass gate.
+# BUG-11.34 (CODA terminal punctuation false-kill): Requires a live
+#   fixture through the pre-lex normalization and parser.
+# BUG-11.35 (source-span mismatch validator halt): Requires a live
+#   offset-span fixture through the repair ladder.
+# BUG-11.36 (evidence-ID zero-padding drift): Requires a live fixture
+#   returning unpadded IDs through the repair contract.
+# BUG-11.37 (span-integrity offset repair): Requires a live offset-shifted
+#   exact-quote fixture through the metadata-only repair module.
+# BUG-11.38 (legacy Markdown/score-shape drift): Requires capturing a live
+#   typed-pass prompt per lane and inspecting it for the required schema
+#   keys.
+# BUG-12.48 (refine-loop save race vs freeze cascade): Requires running
+#   the refine loop repeatedly under load; a concurrency/timing property,
+#   not a static one.
 
 
 class TestPhase02BugBible0214:

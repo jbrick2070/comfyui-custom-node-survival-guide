@@ -3065,3 +3065,571 @@ bugs:
     normalizer used on both sides of the substring test.
   tags: [llm-output, structured-call, post-validator, verbatim-grounding, whitespace-normalization, deterministic-repair, retry-ladder, repair-prompt]
   legacy_id: ""
+
+
+# ─────────────────────────────────────────────────────────────
+# CHUNK 3 — Bulk fan-out from OTR PROD_BUG_LOG (2026-07-10/11)
+# 23 entries promoted from live/prod-run bug staging under the
+# Three-File Contract. legacy_id carries the originating PBUG id.
+# ─────────────────────────────────────────────────────────────
+
+- id: "02.15"
+  phase: 2
+  area: encoding
+  symptom: |
+    Detached headless boot (soak/API server launch) dies ~13 seconds in
+    with exit code 1 and "SERVER DID NOT COME UP" in the log, even though
+    the exact same launch works fine from an interactive terminal.
+  cause: |
+    A detached process (started via cmd.exe /c or Start-Process without an
+    explicit encoding) inherits Windows' legacy cp1252 console codec, not
+    UTF-8. Any print() in a startup-time script (prestartup_script.py, a
+    custom node's module-level code, etc.) that emits a non-ASCII
+    character -- most commonly a status emoji like a checkmark or
+    cross-mark -- raises UnicodeEncodeError the instant it executes,
+    killing the boot before the server ever binds its port.
+  fix: |
+    Set PYTHONUTF8=1 and PYTHONIOENCODING=utf-8 in the environment of
+    every detached/headless launch path (launcher .cmd/.ps1), not just
+    the interactive one. Any new boot path (soak harness, CI runner,
+    scheduled task) must set both vars before invoking python.exe.
+  verify: |
+    Boot the server via the detached launcher and confirm PYTHONUTF8/
+    PYTHONIOENCODING are present in its environment; the boot log shows
+    no UnicodeEncodeError and the server reaches a listening state within
+    the normal ~20s window. Grep every launcher script for PYTHONUTF8=1.
+  tags: [windows, encoding, cp1252, headless, boot, launcher, unicode]
+  legacy_id: PBUG-20260612-01
+
+- id: "07.17"
+  phase: 7
+  area: vram
+  symptom: |
+    A full-episode VRAM soak measures a peak of 15.8GB against a 14.5GB
+    ceiling, on both device modes, in a pipeline stage (LTX-AV) that
+    combines a text encoder with a video generation pass.
+  cause: |
+    The text encoder (Gemma) stayed GPU-resident through the entire video
+    pass instead of being released once its output was consumed, holding
+    VRAM the video stage then had to compete for.
+  fix: |
+    Move the text encoder to CPU after its output is captured (attempted).
+    A later re-measured soak PROVED this offload had NO effect on the
+    measured peak, and the change was reverted. Record the disproof
+    explicitly so the same offload isn't re-attempted blind on a future
+    VRAM-ceiling rip -- re-derive the actual peak-VRAM contributor before
+    trying an "obvious" fix.
+  verify: |
+    Full-episode soak reports peak VRAM; assert the measured peak matches
+    the currently-accepted (reverted) architecture, not the offloaded one.
+    Before proposing an encoder-offload fix for a similar VRAM-ceiling
+    breach, re-soak once with the offload OFF to confirm it's still the
+    right baseline.
+  tags: [vram, soak, offload, text-encoder, ltx-av, disproven-fix]
+  legacy_id: PBUG-20260616-01
+
+- id: "11.27"
+  phase: 11
+  area: model-registry
+  symptom: |
+    Selecting a remote/cloud model slot (e.g. "openrouter:slot-a") crashes
+    the episode at line-compose with a KeyError, even though the same code
+    path works fine for every LOCALLY-curated model.
+  cause: |
+    The lookup did an exact-match dict access (rows[repo_id]) against a
+    dict that was only ever populated from a CURATED, LOCAL model list.
+    Remote/cloud model handles are never curated members of that dict, so
+    the exact-match access always raises for them.
+  fix: |
+    Replace exact-match dict access with rows.get(repo_id) plus an
+    explicit default (a generic/modern prompt profile) for any handle
+    absent from the curated table, instead of assuming every valid model
+    id is a member.
+  verify: |
+    Run with a remote/cloud model handle that is deliberately absent from
+    the curated dict; assert the lookup falls back to the default profile
+    and completes instead of raising KeyError. Grep any `dict[key]`
+    lookup keyed by a user-selectable model handle and confirm it uses
+    `.get()` with a documented default.
+  tags: [llm-output, model-registry, keyerror, dict-lookup, remote-model, exact-match]
+  legacy_id: PBUG-20260618-01
+
+- id: "07.18"
+  phase: 7
+  area: audio
+  symptom: |
+    A dedicated visualizer/render soak forcing edge-case beats (0-frame
+    beats, fully silent beats) surfaces a cluster of four distinct
+    crashes/misbehaviors in one soak run: no floor on 0-frame beats, no
+    handling for an idle scope on a silent beat, an audio_ref check that
+    over-gates valid input, and a master-audio slice that is never fed to
+    a downstream consumer.
+  cause: |
+    Four separate missing guards, each independent: (1) no minimum-frame
+    floor before a beat reaches frame-dependent logic, (2) no explicit
+    handling path for an "idle" beat scope, (3) assert_usable() gated
+    audio_ref too aggressively, rejecting legitimate input, (4) the b000
+    master-audio slice was computed but never actually passed to the node
+    that needed it.
+  fix: |
+    Add an explicit 0-frame floor before any frame-dependent computation;
+    add an idle-scope branch that handles a silent beat without erroring;
+    loosen the audio_ref gate in assert_usable to accept the valid case;
+    wire the b000 master-audio slice through to its consumer.
+  verify: |
+    Run the visualizer soak forcing 0-frame beats, silent beats, and the
+    audio_ref/master-slice edge cases together; every beat reaches
+    status=success with none of the four original failure signatures.
+  tags: [audio, video, visualizer, soak, 0-frame, idle-scope, audio-ref, master-audio]
+  legacy_id: PBUG-20260618-02
+
+- id: "08.07"
+  phase: 8
+  area: io
+  symptom: |
+    A PUBLISHED episode's bottom bars overlay renders flat/static or a
+    solid color instead of tracking the audio -- the defect shipped all
+    the way to a final published artifact, not just a dev render.
+  cause: |
+    The bars-overlay node read amplitude from the silent intermediate
+    blend source used earlier in the compositing chain instead of the
+    final master WAV that actually carries the mixed audio.
+  fix: |
+    Point the bars-overlay amplitude read at the master WAV, not the
+    silent blend-stage source.
+  verify: |
+    Run the obs-final render pipeline; assert the bars overlay's
+    amplitude trace correlates with the master WAV's amplitude envelope,
+    not a flat/silent signal.
+  tags: [io, audio-reactive, overlay, obs-final, published-artifact, silent-source]
+  legacy_id: PBUG-20260620-01
+
+- id: "05.10"
+  phase: 5
+  area: python-scoping
+  symptom: |
+    Every episode crashes at execution with UnboundLocalError, but only in
+    a specific heavy node the unit-test suite never actually exercises.
+  cause: |
+    A local `import os` statement anywhere inside a function body makes
+    `os` a LOCAL name for the ENTIRE function, even on lines executed
+    before that import line runs. A meta-stamp line earlier in the same
+    function referenced os.environ, and Python resolved `os` as the
+    (not-yet-assigned) local rather than the module-level import, raising
+    UnboundLocalError.
+  fix: |
+    Move the local import to the top of the function (or remove it in
+    favor of the existing module-level import) so no name inside the
+    function is ambiguous between local and global scope.
+  verify: |
+    An end-to-end test exercises the meta-stamp code path in the heavy
+    node specifically (not just the light nodes the suite already
+    covers). Lint/grep for any function containing both a
+    module-level-shadowing `import X` and a reference to `X` earlier in
+    the same function body.
+  tags: [python, scoping, unboundlocalerror, shadowed-import, execution-model]
+  legacy_id: PBUG-20260622-01
+
+- id: "07.19"
+  phase: 7
+  area: audio
+  symptom: |
+    A pre-freeze sweep re-roles an ANNOUNCER-named cast row to an
+    ordinary character role, sending it to a voice engine that cannot
+    handle it and crashing with EngineUnusable.
+  cause: |
+    The cast-role-coercion function had no naming-convention exemption
+    for a row whose cast id/name IS the announcer -- it treated every row
+    as an ordinary candidate for role coercion.
+  fix: |
+    Exclude ANNOUNCER-named rows from role coercion explicitly, by
+    name/id, before the coercion logic runs.
+  verify: |
+    Run an episode with the announcer keyed as an ordinary cast id (the
+    trigger condition) and confirm it renders clean, without being
+    re-roled or reaching the character voice engine.
+  tags: [audio, casting, announcer, role-coercion, naming-convention]
+  legacy_id: PBUG-20260622-02
+
+- id: "07.20"
+  phase: 7
+  area: audio
+  symptom: |
+    A dialogue row whose content is PURE stage direction (zero spoken
+    words) reaches the voice engine and crashes the render.
+  cause: |
+    No handling existed for a dialogue row that is degenerate -- all
+    stage direction, no actual speech -- before it was handed to TTS.
+  fix: |
+    Recompose the row into real dialogue at the source (root fix) when
+    possible; where recomposition isn't available, fall back to a
+    silence backstop rather than crashing (flagged: a fail-soft backstop
+    conflicts with a stricter no-fallback law adopted later -- re-evaluate
+    against current policy before reusing this backstop).
+  verify: |
+    Force a stage-direction-only line through the pipeline; assert
+    either the recompose path fires (real dialogue) or a controlled
+    silence backstop, and in neither case does the render crash.
+  tags: [audio, tts, stage-direction, degenerate-content, silence-backstop]
+  legacy_id: PBUG-20260622-03
+
+- id: "09.05"
+  phase: 9
+  area: cloud-api
+  symptom: |
+    A cloud music-generation API call is rejected with HTTP 422
+    provider_rejected on short-duration requests.
+  cause: |
+    The requested clip duration was under the provider's documented
+    minimum, and no floor was applied before sending the request.
+  fix: |
+    Apply a minimum-duration floor (request at least the provider
+    minimum) and trim the result back down to the originally intended
+    duration after generation.
+  verify: |
+    Request a duration below the provider's documented minimum; assert
+    the outbound request is floored to the minimum and the call
+    completes without a 422.
+  tags: [cloud-api, network, contract, http-422, duration-floor]
+  legacy_id: PBUG-20260704-01
+
+- id: "09.06"
+  phase: 9
+  area: cloud-api
+  symptom: |
+    A cloud image-generation node call crashes with "TypeError: string
+    indices must be integers".
+  cause: |
+    The node's Python-side model parameter expects a structured
+    DYNAMICCOMBO-style dict, but the caller sent a bare model-name string
+    -- the contract for what shape the model parameter must take varies
+    PER cloud node even within the same provider family, so a pattern
+    that works for one sibling node (a bare string) fails for another.
+  fix: |
+    Send the model parameter as the expected dict shape for this
+    specific node rather than assuming the bare-string contract from a
+    sibling node.
+  verify: |
+    Call the affected cloud node live; assert it completes instead of
+    raising TypeError. Before reusing a call pattern across cloud nodes
+    from the same provider, confirm each node's actual expected shape
+    rather than assuming uniformity.
+  tags: [cloud-api, contract, dict-vs-string, typeerror, provider-variance]
+  legacy_id: PBUG-20260704-02
+
+- id: "07.21"
+  phase: 7
+  area: audio
+  symptom: |
+    Two logically distinct voice ids resolve to the same underlying WAV
+    file even when the caller explicitly disallows voice reuse.
+  cause: |
+    No check existed for the case where two different ids collide on the
+    same underlying asset/provider identity -- the no-reuse gate only
+    checked the requested id, not the resolved asset behind it.
+  fix: |
+    Add a same-asset/same-provider collision check that fires whenever
+    allow_voice_reuse=False, independent of whether the requested ids
+    differ.
+  verify: |
+    Resolve N voice ids under allow_voice_reuse=False; assert all N
+    resolved WAV file hashes are distinct.
+  tags: [audio, tts, voice-reuse, collision, asset-identity, no-fallback]
+  legacy_id: PBUG-20260709-01
+
+- id: "11.28"
+  phase: 11
+  area: llm-output
+  symptom: |
+    A creative-slot LLM's structured JSON output is truncated mid-object,
+    causing schema failures in every downstream consumer, even though the
+    requested context window (n_ctx) should have been large enough to
+    hold the full response.
+  cause: |
+    The selected local quant (Q8 of a 4B-class model) cannot actually
+    hold the requested n_ctx (4096) within the available VRAM; the
+    loader silently downgraded to a smaller n_ctx (2048) instead of
+    raising, so the caller had no signal that its context budget had
+    been cut.
+  fix: |
+    Swap the affected slot to a model/quant combination that fits the
+    requested n_ctx (root fix for this slot); separately, make every
+    silent n_ctx downgrade in the loader RAISE instead of downgrading
+    quietly, so any future capacity mismatch fails loud immediately
+    rather than corrupting output downstream.
+  verify: |
+    Request an n_ctx above a given quant's actual capacity; assert the
+    loader raises rather than silently returning a smaller context.
+  tags: [llm-output, n_ctx, silent-downgrade, quantization, vram, truncation]
+  legacy_id: PBUG-20260710-01
+
+- id: "11.29"
+  phase: 11
+  area: llm-output
+  symptom: |
+    A structured-call reroll path (e.g. a targeted revision retry) throws
+    a jinja TemplateError mid-render.
+  cause: |
+    The reroll path emitted two consecutive user-role messages back to
+    back; the chat template enforces strict user/assistant alternation
+    and has no tolerance for two user turns in a row.
+  fix: |
+    Fold the reroll content into a SINGLE user message instead of
+    appending a second one, preserving strict role alternation.
+  verify: |
+    Construct a reroll that would previously have emitted two
+    consecutive user messages; assert the message list strictly
+    alternates roles before it is sent to the chat template.
+  tags: [llm-output, chat-template, jinja, role-alternation, reroll]
+  legacy_id: PBUG-20260710-04
+
+- id: "11.30"
+  phase: 11
+  area: llm-output
+  symptom: |
+    A structured casting-JSON call truncates at its token ceiling; the
+    salvage path extracts a partial object that then fails schema
+    validation.
+  cause: |
+    The 1000-token budget allotted to the pass was too small for the
+    full structured payload being requested, so truncation-then-salvage
+    fired on essentially every call rather than as a rare edge case.
+  fix: |
+    Raise the token budget (1000 -> 1400) for this pass, and make the
+    pre-validator tolerant of an expected wrapper shape so a
+    well-formed-but-wrapped payload doesn't need the salvage path at all.
+  verify: |
+    Run a near-ceiling casting payload through the pass; assert it
+    completes without the salvage path firing. This is the same
+    token-ceiling truncation-then-salvage class recurring across
+    multiple lanes -- check any new structured pass's token budget
+    against its actual payload size before shipping.
+  tags: [llm-output, token-budget, truncation, salvage, casting, structured-output]
+  legacy_id: PBUG-20260710-05
+
+- id: "11.31"
+  phase: 11
+  area: llm-output
+  symptom: |
+    A roll dies on WORD_BUDGET exhaustion (e.g. 54 words returned against
+    a 24-36 word acceptance band) even though the deviation is small in
+    absolute terms.
+  cause: |
+    The acceptance band was sized as a flat +/-20% of the target word
+    count. At a small target (e.g. 30 words) that proportional band is
+    only ~12 words wide -- far too narrow for normal LLM length variance
+    at small targets, even though the same +/-20% is reasonable at large
+    targets.
+  fix: |
+    Add an absolute slack floor (+/-25 words) that governs at small
+    targets; let the proportional (+/-20%) band take over only once the
+    target is large enough (>=125 words) that the proportional band is
+    wider than the floor.
+  verify: |
+    Unit test the word-band function at target=30 and confirm the
+    absolute floor (not the proportional percentage) governs the
+    accepted range. This same defect class was independently flagged,
+    unfixed, in another lane at small word targets -- generalize the fix
+    rather than patching one call site.
+  tags: [llm-output, word-budget, proportional-band, small-targets, unit-test]
+  legacy_id: PBUG-20260710-06
+
+- id: "11.32"
+  phase: 11
+  area: llm-output
+  symptom: |
+    A postamble/announcer row arrives downstream with
+    speaker_role=character, skip=True, tts_skip_reason=null, after a
+    fully green multi-pass pipeline run -- with NO compose-flag
+    breadcrumb anywhere explaining the mutation.
+  cause: |
+    UNKNOWN / UNIDENTIFIED. An unsanctioned, cast-keyed mutator somewhere
+    downstream flips the announcer row's fields without stamping a
+    reason. Root mutator was NOT found despite investigation; this entry
+    documents a mitigation, not a fix.
+  fix: |
+    Partial mitigation only: give the announcer row a sentinel char_id
+    that exempts it from cast-keyed mutation paths, so the class of bug
+    (any cast-keyed path touching the announcer) can no longer fire even
+    though the specific offending path is still unidentified.
+  verify: |
+    NON-TESTABLE by static analysis -- the obligation is to TRACE every
+    cast-keyed mutation path and assert none of them can flip the
+    announcer's role/skip/reason fields without stamping a reason; this
+    requires runtime instrumentation across the full pass sequence, not
+    a file-level check. Treat the sentinel as a stopgap and keep the
+    root-cause hunt open.
+  tags: [llm-output, silent-mutation, unidentified-root-cause, announcer, sentinel, data-corruption]
+  legacy_id: PBUG-20260710-07
+
+- id: "11.33"
+  phase: 11
+  area: llm-output
+  symptom: |
+    A model injects one of its own fictional/invented characters into a
+    pass that is supposed to be a READ-ONLY rendering of real news
+    content.
+  cause: |
+    No gate existed to catch invented cast names leaking into the
+    real-source read pass -- the model treated the read pass as
+    continuous with its fictional narrative rather than as verbatim
+    source material.
+  fix: |
+    Add a cast-name-in-read gate that checks the read-pass output
+    against the known fictional-cast roster and rejects with a teaching
+    error (repair prompt) if a fictional name appears.
+  verify: |
+    Construct a fixture where a fictional cast name appears in the read
+    output; assert the gate rejects it and issues the repair prompt
+    rather than letting it through.
+  tags: [llm-output, fiction-fact-bleed, cast-name, gate, real-news, source-fidelity]
+  legacy_id: PBUG-20260710-08
+
+- id: "11.34"
+  phase: 11
+  area: llm-output
+  symptom: |
+    An otherwise clean, passing draft gets killed solely because its
+    CODA section ends with a period instead of the required colon.
+  cause: |
+    The colon is structurally load-bearing to a downstream parser, but
+    the model treats terminal punctuation as a stylistic choice; there
+    was no normalization step before the structural check ran, so a
+    semantically-equivalent period triggered a false kill.
+  fix: |
+    Normalize the CODA's terminal punctuation (pivot a trailing period
+    to the required colon) in the shared pre-lex step before the
+    structural check runs. Flagged: this fixes the punctuation
+    false-kill, but an inner sentence-break defect in the same draft
+    class remains a separate, real issue to track.
+  verify: |
+    Construct a CODA ending in '.'; assert it normalizes to ':' before
+    parsing and does not trigger a false kill.
+  tags: [llm-output, structural-punctuation, false-kill, normalization, parser-contract]
+  legacy_id: PBUG-20260710-09
+
+- id: "11.35"
+  phase: 11
+  area: llm-output
+  symptom: |
+    A structured pass returns a fact whose cited source_spans quote does
+    not match the actual payload slice at the given offsets; the
+    validator halts the lane before any downstream dialogue/media spend.
+  cause: |
+    The repair prompt was not explicit that the field/start:end slice
+    must be an exact, literal identity against the payload -- the
+    model's typed repair attempt reproduced the same mismatch because
+    the contract wasn't spelled out concretely enough to fix it.
+  fix: |
+    Harden the repair prompt to show the required
+    payload[field][start:end] identity explicitly, plus slice-mismatch
+    diagnostics, applied uniformly across every lane sharing this
+    contract shape (a cross-lane audit found the same gap in multiple
+    independent lanes).
+  verify: |
+    Construct an offset-span mismatch fixture; assert it converges to a
+    correct span within the bounded repair-ladder budget. This is the
+    first member of a P0 evidence-contract defect class -- check any
+    new lane sharing the source_spans contract for the same gap.
+  tags: [llm-output, source-spans, evidence-contract, repair-prompt, validator, cross-lane]
+  legacy_id: PBUG-20260710-10
+
+- id: "11.36"
+  phase: 11
+  area: llm-output
+  symptom: |
+    A model returns evidence IDs in an unpadded shape (F0, F1, F2) where
+    the schema contract requires zero-padded IDs (F01, F02, F03); the
+    validator halts the lane on the shape mismatch.
+  cause: |
+    The typed-repair contract didn't give the model explicit lexical ID
+    mappings, so the zero-padding requirement was only implicit and the
+    model reproduced its own unpadded convention.
+  fix: |
+    Tighten the repair contract with explicit lexical ID mappings plus a
+    recompute-quotes-from-payload-slice instruction, applied uniformly
+    across every lane sharing the contract, while leaving dialogue
+    content untouched (only the deterministic metadata repair is
+    affected).
+  verify: |
+    Construct a fixture returning unpadded IDs; assert the repair
+    converges to the correctly zero-padded shape within the
+    repair-ladder budget. Pin the required pad width directly in schema
+    tests so a future contract change can't silently drop it.
+  tags: [llm-output, evidence-id, zero-padding, schema-contract, repair-ladder]
+  legacy_id: PBUG-20260711-01
+
+- id: "11.37"
+  phase: 11
+  area: llm-output
+  symptom: |
+    After an evidence-ID repair converges to the correct shape, the SAME
+    quote is repeated with WRONG start/end offsets -- a separate,
+    span-integrity P0 failure the validator correctly halts on.
+  cause: |
+    The repair contract fixed the ID-shape defect but did not force
+    offsets to be recomputed against the actual payload slice, so a
+    structurally-correct ID could still carry a stale/wrong offset pair.
+  fix: |
+    Ship a fail-closed, METADATA-ONLY repair module that may reindex an
+    EXACT quote already present in the source and normalize IDs, but may
+    NOT invent or rewrite any dialogue content. Dialogue-level rewrites
+    are reserved for a separate, later, context-aware creative pass --
+    never a blind mechanical patch or a context-free LLM retry that
+    could break story continuity.
+  verify: |
+    Construct an offset-shifted but EXACT-quote fixture; assert it
+    reindexes deterministically. Assert the ID normalizer maps F0 -> F01
+    (not F00 -- an actual off-by-one defect was caught validating this
+    fix). Assert the dialogue field is byte-identical before and after
+    the repair.
+  tags: [llm-output, span-integrity, offset-repair, metadata-only, fail-closed, dialogue-preservation]
+  legacy_id: PBUG-20260711-02
+
+- id: "11.38"
+  phase: 11
+  area: llm-output
+  symptom: |
+    A typed structured-output pass returns legacy Markdown prose on its
+    first attempts, then a legacy-shaped score object missing required
+    schema keys (with extra unrelated keys) on the typed repair attempt;
+    the strict validation ladder halts before any dialogue/media spend.
+  cause: |
+    The prompt/seam said "JSON only" but never named the exact current
+    schema's required top-level keys, so the model copied the shape of
+    its OWN input (a different, legacy structure) instead of the
+    requested typed artifact.
+  fix: |
+    Append the exact required top-level schema keys to every typed pass
+    and repair seam across all lanes sharing the contract, and
+    explicitly forbid Markdown/prose output, while preserving full story
+    context.
+  verify: |
+    Capture a typed-pass prompt for each affected lane; assert the exact
+    required top-level schema keys are named in the prompt text. Live
+    smoke must reach the next pass without legacy-key drift.
+  tags: [llm-output, structured-output, schema-drift, legacy-shape, markdown, repair-seam]
+  legacy_id: PBUG-20260711-03
+
+- id: "12.48"
+  phase: 12
+  area: concurrency
+  symptom: |
+    Intermittent save failures occur during a refine loop, specifically
+    racing against a concurrent freeze cascade.
+  cause: |
+    A loser-directory cleanup step (removing the losing revision's
+    working directory after a refine pass) raced against the freeze
+    cascade, which could be reading/finalizing that same directory at
+    the same time.
+  fix: |
+    Ship the LAST revision as the winner and drop the racing cleanup
+    step entirely rather than trying to synchronize it against the
+    freeze cascade.
+  verify: |
+    Run the refine loop repeatedly under load; assert zero save failures
+    and that the freeze lands cleanly every time. This is a race class
+    -- any future cleanup code added near the freeze cascade should be
+    checked for the same race before shipping.
+  tags: [concurrency, race-condition, refine-loop, freeze-cascade, cleanup]
+  legacy_id: PBUG-20260623-01
