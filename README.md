@@ -2,7 +2,7 @@
 
 **By Jeffrey A. Brick** · April–May 2026
 
-An AI-agent QA harness for ComfyUI custom-node authoring. v2.1 — 179 bible entries + LLM round-robin consult addon.
+An AI-agent QA harness for ComfyUI custom-node authoring. v2.1 — 188 bible entries + LLM round-robin consult addon.
 
 ---
 
@@ -26,7 +26,7 @@ The "AI agent confidently shipped a broken fix" failure mode. Static analysis ca
 
 ## What's in the kit
 
-1. **`BUG_BIBLE.yaml` + `tests/bug_bible_regression.py`** — a 179-entry, machine-readable bug bible plus an automated pytest suite that turns the bible's `verify` fields into executable assertions. Point the suite at any custom-node pack and get a pass/fail report in under 2 seconds. No ComfyUI runtime, no model downloads, no manual grepping.
+1. **`BUG_BIBLE.yaml` + `tests/bug_bible_regression.py`** — a 188-entry, machine-readable bug bible plus an automated pytest suite that turns the bible's `verify` fields into executable assertions. Point the suite at any custom-node pack and get a pass/fail report in under 2 seconds. No ComfyUI runtime, no model downloads, no manual grepping.
 
 2. **`llm_round_robin/`** — a drop-in addon that lets your AI agent call ChatGPT, Gemini, and NVIDIA NIM for second opinions, with probe-first ladder pruning, endpoint-aware dispatch, and capability-tag routing so the agent never silently lands on a stale fallback model. See [`docs/llm_round_robin_explainer.md`](./docs/llm_round_robin_explainer.md).
 
@@ -49,6 +49,9 @@ against the ComfyUI Custom Node Survival Guide
 (https://github.com/jbrick2070/comfyui-custom-node-survival-guide).
 
 PHASE 0 - SETUP (run this first, before any other work):
+
+0. Open `BUG_BIBLE.yaml` now. Keep the relevant `symptom:`, `fix:`, and
+   `verify:` rules in context before proposing or changing code.
 
 1. Confirm you can run shell commands on my machine:
    - Cowork: workspace bash or Desktop Commander is already available - good.
@@ -94,12 +97,15 @@ PHASE 2 - STUCK ON A DESIGN CALL?
 
 PHASE 3 - FOUND A NEW CLASS OF BUG?
 
-8. If you fix a class of bug not yet in the bible, add a YAML entry
-   following the schema (id, phase, area, symptom, cause, fix, verify,
-   tags). Cause/fix must be a CLASS LESSON generalisable to any
-   custom-node author, not project-narrative form. Update README.md's
-   entry count and add a regression test in tests/bug_bible_regression.py
-   if the verify step is static-analysis-checkable. Run
+8. Add a new Bible entry only after the bug has failed in a real production,
+   headless, smoke, soak, or published-artifact run. A review finding or
+   invented fixture may verify that known incident, but must never create a
+   synthetic Bible entry. Record the live incident first, then add a YAML entry
+   following the schema (id, phase, area, symptom, cause, fix, verify, tags).
+   Cause/fix must be a CLASS LESSON generalisable to any custom-node author,
+   not project-narrative form. Update README.md's entry count and add a
+   regression test in tests/bug_bible_regression.py if the verify step is
+   static-analysis-checkable. Run
        python <survival-guide-path>/tools/reload_bug_bible.py
    to validate the schema before committing.
 
@@ -185,7 +191,7 @@ entries. Exits non-zero on issues so it's easy to wire into a pre-commit hook.
 
 ## What the regression suite checks
 
-156 bible entries across 12 phases; the pytest suite encodes the static-
+188 bible entries across 12 phases; the pytest suite encodes the static-
 analysis-checkable subset as executable assertions.
 
 | Phase | Coverage | Sample bug IDs |

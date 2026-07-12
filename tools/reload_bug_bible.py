@@ -43,7 +43,9 @@ REQUIRED_KEYS = (
 
 ID_RE = re.compile(r'^- id:\s+"([\d.]+)"\s*$')
 KEY_RE = re.compile(r"^  ([a-z_][a-z0-9_]*):")
-LEGACY_OK_RE = re.compile(r"^(BUG-LOCAL-\d{3}|\d+(\.\d+)?|NEW)?$")
+LEGACY_OK_RE = re.compile(
+    r"^(BUG-LOCAL-\d{3}|PBUG-\d{8}-\d{2}|\d+(\.\d+)?|NEW)?$"
+)
 # Tag style: lowercase letters/digits separated by `-` or `_`. The bible
 # mixes both: `widget-default` (kebab-case for natural-language phrases)
 # and `output_node` / `is_changed` / `validate_inputs` (snake_case for

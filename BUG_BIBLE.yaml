@@ -3633,3 +3633,220 @@ bugs:
     checked for the same race before shipping.
   tags: [concurrency, race-condition, refine-loop, freeze-cascade, cleanup]
   legacy_id: PBUG-20260623-01
+
+- id: "11.39"
+  phase: 11
+  area: llm-output
+  symptom: |
+    A source-derived creative lane produces a structurally valid story that
+    abandons its supplied source constraints, for example by turning ordinary
+    objects into speculative artifacts or replacing the promised resolution
+    with a genre invention.
+  cause: |
+    Source provenance was represented as opaque IDs or broad prose rather than
+    as an immutable, literal grounding contract carried through every authored
+    artifact and its audit boundaries.
+  fix: |
+    Derive a small immutable grounding contract containing the source's exact
+    object, mechanism, and resolution anchors. Require those anchors at their
+    owned score and spoken-script locations, validate them after every retake,
+    and keep visual-style instructions on a separate channel that cannot alter
+    any story message.
+  verify: |
+    Remove one required source literal from an otherwise valid artifact and
+    assert the exact owning coordinate fails before publication. Switch only a
+    visual-style setting and assert captured story messages remain byte-identical.
+  tags: [llm-output, source-grounding, provenance, literal-anchor, channel-isolation, fail-closed]
+  legacy_id: PBUG-20260712-04
+
+- id: "11.45"
+  phase: 11
+  area: llm-output
+  symptom: |
+    A structured response uses a plausible but non-canonical ownership shape:
+    it packs several owned values into suffixed fields, nests a declared
+    top-level collection inside a caller row, or puts a complete child
+    collection under a parent that does not own it.
+  cause: |
+    Row schemas validated local fields but not canonical collection placement
+    and exact ownership. A model could therefore return syntactically useful
+    data in the wrong depth or cardinality, and a typed retry could repeat it.
+  fix: |
+    Define exact collection ownership and canonical depth at every nested row
+    boundary. At the accepted typed-object boundary, lift or project only
+    provably authoritative declared data into its canonical location, reject
+    ambiguous, suffixed, or unknown shapes, and re-run the complete graph
+    validator after projection.
+  verify: |
+    Test suffixed owned fields, a complete top-level collection nested in a
+    caller row, and a complete child collection nested under the wrong parent.
+    Assert the deterministic repair preserves authoritative values, produces
+    the canonical shape for base and typed-repair responses, and fails closed
+    for ambiguous or graph-invalid input.
+  tags: [llm-output, schema-ownership, collection-placement, canonical-shape, typed-repair, fail-closed]
+  legacy_id: PBUG-20260712-01
+
+- id: "11.40"
+  phase: 11
+  area: llm-output
+  symptom: |
+    A deterministic schema or ownership repair works on an initial model
+    response but is skipped on a typed-repair response, allowing forbidden
+    metadata, malformed collection placement, or duplicate ownership to reach
+    the accepted artifact boundary.
+  cause: |
+    The repair was attached to one response factory or early parse branch
+    instead of the single canonical boundary that validates every raw and
+    repaired representation before acceptance.
+  fix: |
+    Put each proven-safe projection at the typed accepted-object boundary.
+    Apply it to base and repair responses before the complete validator runs;
+    preserve all non-owned authored fields, and reject an unknown or ambiguous
+    shape rather than broadening a mechanical repair into content rewriting.
+  verify: |
+    Feed the same eligible defect through both the base and typed-repair
+    response paths. Assert both converge through the projection, authored
+    fields remain unchanged, and an out-of-scope shape still fails closed.
+  tags: [llm-output, acceptance-boundary, deterministic-projection, typed-repair, ownership, fail-closed]
+  legacy_id: PBUG-20260712-06
+
+- id: "11.41"
+  phase: 11
+  area: llm-output
+  symptom: |
+    An artifact contains two independent mechanical defects, but each safe
+    normalizer refuses to run until the other defect is already absent, so the
+    global validator can never see the jointly repaired artifact.
+  cause: |
+    Each projection was coupled to full-artifact validity instead of exposing
+    a narrow, independently safe transform that can compose with other
+    declared transforms before final validation.
+  fix: |
+    Factor each safe normalizer into a bounded projector and a full-validation
+    wrapper. Apply only declared disjoint projectors in deterministic order,
+    preserve authored content and chronology, then run the complete validator
+    once over their shared result.
+  verify: |
+    Construct a fixture with both eligible defects in base and typed-repair
+    responses. Assert the composed projection changes only owned fields,
+    maintains deterministic order, and leaves an unrelated invalid condition
+    rejected by the complete validator.
+  tags: [llm-output, projection-composition, deterministic-order, canonical-validation, preservation]
+  legacy_id: PBUG-20260712-11
+
+- id: "11.42"
+  phase: 11
+  area: llm-output
+  symptom: |
+    A full score or script is regenerated to correct one localized semantic
+    omission, causing context-window overflow or repeating the omission while
+    needlessly risking already-valid structure and prose.
+  cause: |
+    The repair ladder treats a missing fact in one explicitly owned leaf as a
+    whole-document failure instead of distinguishing local semantic repair
+    from structural or global-contract repair.
+  fix: |
+    Derive a minimal typed patch plan from immutable contract evidence. Allow
+    the model to replace only the named leaf fields; require exact one-for-one
+    target coverage, required literal anchors, no out-of-scope edits, and a
+    complete merged-artifact validation. Unknown or broader defects remain
+    fail-closed on the normal ladder.
+  verify: |
+    Remove one immutable literal from an otherwise valid score and script.
+    Assert a small typed patch repairs only its planned target, rejects missing
+    or unplanned targets, leaves every other field byte-identical, and clears
+    the complete artifact validator.
+  tags: [llm-output, bounded-patch, typed-schema, localized-repair, context-window, fail-closed]
+  legacy_id: PBUG-20260712-12
+
+- id: "11.43"
+  phase: 11
+  area: llm-output
+  symptom: |
+    A narrow patch adds the newly missing literal but erases another immutable
+    literal that was already valid in the same replaced field.
+  cause: |
+    The patch plan captured only the triggering omission and its validator
+    checked patch-local coverage rather than the merged canonical artifact.
+  fix: |
+    Include every immutable invariant already present in each selected target,
+    as well as newly missing requirements. Merge in memory and validate the
+    complete canonical artifact at the structured-call boundary; return the
+    precise merged-contract failure to the bounded retry ladder.
+  verify: |
+    Make a selected field contain one valid immutable literal and omit another.
+    Assert the plan demands both, reject a patch that preserves only the new
+    literal, and reject any patch whose merged artifact breaks graph, safety,
+    grounding, or authorship validation.
+  tags: [llm-output, bounded-patch, invariant-preservation, merged-validation, grounding, safety]
+  legacy_id: PBUG-20260712-13
+
+- id: "11.44"
+  phase: 11
+  area: llm-output
+  symptom: |
+    An initial authoring pass has a guarded local-repair boundary, but a blind
+    listener, optional polish, or final-audit retake bypasses it and reintroduces
+    the same localized contract failure.
+  cause: |
+    The guarantee was attached to one call site rather than to the artifact's
+    shared acceptance boundary, leaving later reauthoring routes with a weaker
+    contract.
+  fix: |
+    Factor one guarded authoring helper for every route that returns the same
+    artifact. It must accept structural/safety-valid output, invoke the bounded
+    patch only for eligible local contract failures, validate the merged result,
+    and expose the seam plus pass-specific receipt in the pipeline registry.
+  verify: |
+    Force a retake route to omit the same immutable literal repaired during
+    initial authoring. Assert it invokes the shared small patch, records a
+    pass-specific journal ID, reruns the downstream audit, and that every
+    pipeline route advertises the repair seam.
+  tags: [llm-output, shared-boundary, retake, bounded-patch, pipeline-contract, audit-receipt]
+  legacy_id: PBUG-20260712-15
+
+- id: "12.49"
+  phase: 12
+  area: metadata-provenance
+  symptom: |
+    A custom production lane writes a title, source label, or other provenance
+    field that belongs to a different lane because shared defaults are stamped
+    after the lane has made its own authoritative decision.
+  cause: |
+    Metadata ownership was implicit and a generic post-processing path
+    overwrote a content-owned field instead of respecting the producing lane's
+    explicit receipt.
+  fix: |
+    Assign one authoritative producer for each provenance field. Stamp the
+    producer's receipt at the ownership boundary, preserve it through shared
+    orchestration, and validate that published metadata agrees with the
+    accepted artifact and selected source bank.
+  verify: |
+    Run two custom lanes with distinct title/source receipts through shared
+    orchestration. Assert each published ledger preserves its own authoritative
+    values and a conflicting generic default is rejected or ignored.
+  tags: [metadata, provenance, ownership, ledger, source-bank, publication]
+  legacy_id: PBUG-20260712-05
+
+- id: "12.50"
+  phase: 12
+  area: test-orchestration
+  symptom: |
+    A detached smoke supervisor reports failure from a blank child exit code
+    even though the canonical runner emitted explicit success and the required
+    published asset and ledger exist.
+  cause: |
+    The supervisor treated an unavailable process-property read as a terminal
+    failure without reconciling the runner's authoritative completion record.
+  fix: |
+    Define an ordered terminal-evidence contract: a real nonzero child exit or
+    missing canonical success remains failure; a blank exit code may be treated
+    as success only when the authoritative runner result and required durable
+    output checks both pass. Record the reconciled verdict and evidence.
+  verify: |
+    Exercise a detached successful run whose child exit property is blank and
+    assert the supervisor records PASS only with canonical success plus output
+    checks. Repeat without the success marker or required asset and assert it
+    remains a failure.
+  tags: [test-orchestration, detached-process, exit-code, false-negative, durable-output, smoke-test]
+  legacy_id: PBUG-20260712-16

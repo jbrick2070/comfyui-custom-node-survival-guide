@@ -1040,6 +1040,108 @@ class TestSummary:
 #   not a static one.
 
 
+class TestPhase11BoundedRepairContracts:
+    """OTR-local executable guard for BUG-11.39 through BUG-11.45.
+
+    The portable Bible rules apply to any typed creative pipeline. This check
+    activates only when the known OTR lane is present, where it verifies the
+    concrete code + prompt-pack + pipeline wiring needed for the project-local
+    regression tests to exercise those rules.
+    """
+
+    def test_otr_localized_repairs_are_typed_wired_and_covered(self, pack_dir):
+        lane_path = os.path.join(pack_dir, "nodes", "_otr_original_codex56sol.py")
+        if not os.path.isfile(lane_path):
+            pytest.skip("BUG-11.39..11.44 guard is OTR-local")
+
+        with open(lane_path, "r", encoding="utf-8") as f:
+            lane_source = f.read()
+        lane_tree = ast.parse(lane_source)
+        class_names = {
+            node.name for node in ast.walk(lane_tree)
+            if isinstance(node, ast.ClassDef)
+        }
+        function_names = {
+            node.name for node in ast.walk(lane_tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+        assert {"ScoreIntentPatch", "ScriptLinePatch"} <= class_names, (
+            "BUG-11.42: OTR must keep typed score and script patch schemas"
+        )
+        assert "_call_grounded_script" in function_names, (
+            "BUG-11.44: complete-script reauthoring must use one guarded boundary"
+        )
+
+        guarded_passes = set()
+        for node in ast.walk(lane_tree):
+            if not isinstance(node, ast.Call):
+                continue
+            if not isinstance(node.func, ast.Name) or node.func.id != "_call_grounded_script":
+                continue
+            for keyword in node.keywords:
+                if (
+                    keyword.arg == "pass_id"
+                    and isinstance(keyword.value, ast.Constant)
+                    and isinstance(keyword.value.value, str)
+                ):
+                    guarded_passes.add(keyword.value.value)
+        assert {"P6", "P8", "P8_optional", "P9_retake"} <= guarded_passes, (
+            "BUG-11.44: every OTR complete-script reauthoring route must cross "
+            "the guarded boundary"
+        )
+
+        prompt_path = os.path.join(
+            pack_dir, "nodes", "story_packs", "original_codex56sol",
+            "original_codex56sol_v1.json",
+        )
+        pipeline_path = os.path.join(pack_dir, "nodes", "story_packs", "pipelines.json")
+        with open(prompt_path, "r", encoding="utf-8") as f:
+            prompt_pack = json.load(f)
+        with open(pipeline_path, "r", encoding="utf-8") as f:
+            pipelines = json.load(f)
+        stages = prompt_pack["prompt_stages"]
+        assert "Return ScoreIntentPatch JSON only" in stages["codex56_score_anchor_patch"]
+        assert "targets is authoritative" in stages["codex56_score_anchor_patch"]
+        assert "no other beat IDs" in stages["codex56_score_anchor_patch"]
+        assert "Return ScriptLinePatch JSON only" in stages["codex56_script_anchor_patch"]
+        assert "targets is authoritative" in stages["codex56_script_anchor_patch"]
+        assert "no other line IDs" in stages["codex56_script_anchor_patch"]
+
+        pipeline = next(
+            row for row in pipelines["pipelines"]
+            if row["story_pipeline_id"] == "acoustic_puzzle_v1"
+        )
+        seams_by_pass = {
+            row["pass_id"]: set(row["seam_refs"])
+            for row in pipeline["passes"]
+        }
+        assert "codex56_score_anchor_patch" in seams_by_pass["P5_broadcast_score"]
+        for pass_id in ("P6_performance_script", "P8_broadcast_retake", "P9_retake"):
+            assert "codex56_script_anchor_patch" in seams_by_pass[pass_id], (
+                f"BUG-11.44: {pass_id} must declare its shared script patch seam"
+            )
+
+        runner_tests = os.path.join(
+            pack_dir, "tests", "test_original_codex56sol_runner.py",
+        )
+        with open(runner_tests, "r", encoding="utf-8") as f:
+            runner_test_source = f.read()
+        for test_name in (
+            "test_p5_missing_grounding_anchor_uses_small_intent_patch",
+            "test_p5_intent_patch_preserves_anchor_already_valid_on_target",
+            "test_p6_missing_grounding_anchor_uses_small_line_patch",
+            "test_p8_retake_missing_anchor_uses_the_same_small_line_patch",
+            "test_p6_line_patch_preserves_anchor_already_valid_on_target",
+            "test_p3_repair_keeps_authoritative_top_level_and_removes_nested_extras",
+            "test_p3_repair_lifts_missing_top_level_collection_verbatim",
+            "test_p3_repair_fails_closed_on_unknown_or_graph_invalid_shapes",
+            "test_p5_repair_keeps_authoritative_top_level_and_removes_nested_extras",
+        ):
+            assert f"def {test_name}(" in runner_test_source, (
+                f"BUG-11.39..11.45: missing OTR behavior regression {test_name}"
+            )
+
+
 class TestPhase02BugBible0214:
     """BUG-02.14 / BUG-LOCAL-043: SD 1.5 .ckpt offline/Windows four-layer fix.
 
