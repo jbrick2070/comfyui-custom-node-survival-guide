@@ -171,7 +171,9 @@ class TestPhase01Paths:
         """BUG-01.02: Nodes that write output files should use
         folder_paths.get_output_directory(), not hand-rolled paths.
 
-        Checks files containing OUTPUT_NODE = True.
+        Checks files containing OUTPUT_NODE = True. Also the static
+        half of BUG-08.06 (an OUTPUT_NODE must write a real artifact
+        via a sanctioned path helper).
         """
         warnings = []
         for fpath in py_files:
@@ -328,7 +330,8 @@ class TestPhase03Registration:
     def test_namespaced_node_ids(self, node_modules_dict):
         """BUG-03.03: Node IDs should be namespaced to avoid collisions.
 
-        At least 80% of node IDs should have a prefix (e.g., OTR_).
+        At least 50% of node IDs should have a prefix (e.g., OTR_),
+        matching the ratio asserted below.
         """
         if not node_modules_dict:
             pytest.skip("No node registrations found")
@@ -400,10 +403,12 @@ class TestPhase04Widgets:
 
     def test_workflow_widget_counts(self, workflow_jsons, node_modules_dict,
                                     pack_dir):
-        """BUG-04.01/04.02: Verify widgets_values length matches
-        the number of optional widgets in each node's INPUT_TYPES.
+        """BUG-04.01/04.02: structural half of the widget contract.
 
-        Skips nodes where INPUT_TYPES can't be statically analyzed.
+        The full positional widgets_values-vs-INPUT_TYPES count audit
+        needs live node imports and runs in OTR_WorkflowValidator at
+        workflow load. Statically, this verifies the workflow JSONs
+        parse and node structures are well-formed.
         """
         if not workflow_jsons:
             pytest.skip("No workflow JSONs found")
@@ -479,7 +484,7 @@ class TestPhase07VRAM:
     """Verify VRAM discipline."""
 
     def test_no_module_scope_model_loads(self, py_files):
-        """BUG-07.01/03.02: No heavy model loads at module scope.
+        """BUG-07.01/BUG-03.02: No heavy model loads at module scope.
 
         from_pretrained, torch.load, load_checkpoint at module scope
         (outside a function/class) cause slow startup and VRAM leak.
@@ -617,7 +622,7 @@ class TestPhase09Subprocess:
 # PHASE 12 — REGRESSION, GIT, HANDOFF
 # BUG-12.06: Workflow JSON duplicate node IDs
 # BUG-12.07: Workflow link cross-reference integrity
-# BUG-12.05: Multi-layer parameter sync
+# BUG-12.05: Multi-layer parameter sync (runtime-only; see exclusion note)
 # ─────────────────────────────────────────────────────────────────
 
 class TestPhase12Regression:
@@ -680,6 +685,52 @@ class TestPhase12Regression:
                     f"max link ID ({max_link}) in "
                     f"{os.path.basename(wf_path)}"
                 )
+
+    def test_workflow_json_three_way_link_integrity(self, workflow_jsons):
+        """BUG-12.07: every link must agree in all three places --
+        the links[] row, the source node outputs[slot].links list,
+        and the target node inputs[slot].link value. A mismatch
+        silently drops the wire on load.
+        """
+        if not workflow_jsons:
+            pytest.skip("No workflow JSONs found")
+
+        for wf_path in workflow_jsons:
+            with open(wf_path, "r", encoding="utf-8") as f:
+                wf = json.load(f)
+            if "links" not in wf or "nodes" not in wf:
+                continue
+            nodes = {n.get("id"): n for n in wf["nodes"]}
+            problems = []
+            for row in wf["links"]:
+                if not isinstance(row, (list, tuple)) or len(row) < 6:
+                    continue
+                link_id, src_id, src_slot = row[0], row[1], row[2]
+                dst_id, dst_slot = row[3], row[4]
+                src = nodes.get(src_id)
+                dst = nodes.get(dst_id)
+                if src is None or dst is None:
+                    problems.append(
+                        "link %s: missing node %s" % (
+                            link_id, src_id if src is None else dst_id))
+                    continue
+                outs = src.get("outputs") or []
+                if (not isinstance(src_slot, int)
+                        or not (0 <= src_slot < len(outs))
+                        or link_id not in (outs[src_slot].get("links") or [])):
+                    problems.append(
+                        "link %s: absent from source %s outputs[%s].links"
+                        % (link_id, src_id, src_slot))
+                ins = dst.get("inputs") or []
+                if (not isinstance(dst_slot, int)
+                        or not (0 <= dst_slot < len(ins))
+                        or ins[dst_slot].get("link") != link_id):
+                    problems.append(
+                        "link %s: target %s inputs[%s].link mismatch"
+                        % (link_id, dst_id, dst_slot))
+            assert not problems, (
+                "BUG-12.07: link cross-reference breaks in %s:\n  %s"
+                % (os.path.basename(wf_path), "\n  ".join(problems)))
 
     def test_no_stale_v2_imports(self, py_files, pack_dir):
         """Custom check: No leftover .v2. import paths after
@@ -812,7 +863,9 @@ class TestThreeFileContract:
     # Static-only Bible entries (no integration test): BUG-07.16
     # (vram sysmem-spill / partial-load EXTRA_RESERVED_VRAM reserve),
     # BUG-12.47 (launcher env-hook orphan -> consume-once; harness
-    # lifecycle, no node-pack surface to integration-test).
+    # lifecycle; same BUG-LOCAL-415 incident as BUG-12.52, whose
+    # consume-once assert IS statically tested in the phase-07-to-12
+    # production regression catalog below).
 
     def _repo_root(self):
         """Resolve the survival guide repo root (parent of tests/)."""
@@ -1038,10 +1091,19 @@ class TestSummary:
 # BUG-12.48 (refine-loop save race vs freeze cascade): Requires running
 #   the refine loop repeatedly under load; a concurrency/timing property,
 #   not a static one.
+# BUG-12.49 (provenance-field ownership in shared orchestration): Requires
+#   the live writer tail; producer-boundary ownership is runtime wiring,
+#   not a static single-file property.
+# BUG-12.50 (harness receipt lifecycle): Requires a live soak/smoke harness
+#   run; receipt stamping order is runtime behavior.
+# BUG-12.05 (multi-layer parameter sync): Requires live workflow reload
+#   round-trips across UI/JSON/backend layers; no static property to
+#   assert from a pack directory.
 
 
 class TestPhase11BoundedRepairContracts:
-    """OTR-local executable guard for BUG-11.39 through BUG-11.45.
+    """OTR-local executable guard for BUG-11.39, BUG-11.40, BUG-11.41,
+    BUG-11.42, BUG-11.43, BUG-11.44, BUG-11.45.
 
     The portable Bible rules apply to any typed creative pipeline. This check
     activates only when the known OTR lane is present, where it verifies the
@@ -1143,7 +1205,8 @@ class TestPhase11BoundedRepairContracts:
 
 
 class TestPhase07To12ProductionRegressionCatalog:
-    """OTR-local guard for live-only BUG-07.22, 08.08, 11.46..11.50, 12.51..12.52.
+    """OTR-local guard for live-only BUG-07.22, BUG-08.08, BUG-11.46,
+    BUG-11.47, BUG-11.48, BUG-11.49, BUG-11.50, BUG-12.51, BUG-12.52.
 
     These rules were admitted from dated smokes, published artifacts, or GPU
     runs. The project tests named below exercise their concrete behavior; this

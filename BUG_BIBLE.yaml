@@ -128,7 +128,7 @@ bugs:
   cause: HuggingFace symlinks require Developer Mode or admin on Windows. Without them, files are duplicated.
   fix: Enable Developer Mode (Settings > Developer settings), OR set HF_HOME=D:\hf_cache to a short path on a large drive. Enable Win32 long paths.
   verify: New downloads create symlinks not copies; check folder size.
-  tags: [hf, windows, symlink, max_path]
+  tags: [hf, windows, symlink, max_path, huggingface]
   legacy_id: "31"
 
 - id: "02.05"
@@ -292,7 +292,7 @@ bugs:
   cause: widgets_values is positional, not named. Adding/removing/reordering INPUT_TYPES optional widgets shifts every position after the change.
   fix: Every time you add, remove, or reorder an optional widget, manually update widgets_values in EVERY saved workflow JSON. Prefer append-only changes. Commit code + workflow JSONs in the same atomic commit.
   verify: For every node, count INPUT_TYPES optional widgets and compare to len(widgets_values). They must match.
-  tags: [widgets, json, silent]
+  tags: [widgets, json, silent, workflow-json]
   legacy_id: "2"
 
 - id: "04.02"
@@ -302,7 +302,7 @@ bugs:
   cause: widgets_values is positional. Removal shifts subsequent positions.
   fix: Manually delete the corresponding positional entry from widgets_values in EVERY saved workflow JSON. Prefer append-only INPUT_TYPES changes. Commit code + JSON together.
   verify: Audit script loads each workflow and checks widget count vs array length.
-  tags: [widgets, json, removal]
+  tags: [widgets, json, removal, workflow-json]
   legacy_id: "51"
 
 - id: "04.03"
@@ -742,7 +742,7 @@ bugs:
   cause: Voice preset table classified only 2 of 10 as female. CAST_GENDER_POOL_EXHAUSTED on N-female episodes silently reused presets.
   fix: Reclassify androgynous slots to fill underserved subsets. Or expand pool. Or accept duplication with loud POOL_EXHAUSTED log.
   verify: Audit per-subset count vs max demand for every filter.
-  tags: [tts, generation, pool]
+  tags: [tts, generation, pool, xref-10.04]
   legacy_id: "65"
 
 - id: "10.07"
@@ -825,7 +825,7 @@ bugs:
     "Flash Attention 2 NOT AVAILABLE - no prebuilt wheel exists for torch <ver> + CUDA <ver> + <arch> on <os>. SageAttention + SDPA active. Performance unaffected. Do not attempt install."
     The "Do not attempt install" line is the critical part - it stops the next contributor from chasing the wrong wheel.
   verify: Log message is unambiguous; next session does not attempt FA2 install.
-  tags: [attention, flash-attention, logging, clarity]
+  tags: [attention, flash-attention, logging, clarity, xref-02.03, xphase-02]
   legacy_id: ""
 - id: "11.06"
   phase: 11
@@ -899,7 +899,7 @@ bugs:
     (2) before truncation-repair brace closure.
     (3) in last-resort brace-scan path. Run before trailing-comma stripping so `value, // comment\n}` collapses cleanly.
   verify: Next run shows `[LLMDirector] Plan: N voices, N SFX cues, N music cues` instead of FATAL. Runs with clean JSON (no comments) hit first `json.loads()` and skip stripper entirely — zero perf cost on clean path.
-  tags: [director, json-parse, llm-output, comments, mistral, truncation]
+  tags: [director, json-parse, llm-output, comments, mistral, truncation, llm]
   legacy_id: BUG-LOCAL-040
 
 # ─────────────────────────────────────────────────────────────
@@ -989,7 +989,7 @@ bugs:
   cause: last_node_id was lower than an actual node ID after manual JSON edit; UI assigned colliding ID.
   fix: Always set last_node_id = max(node IDs) + 1 after manual edits. Same for last_link_id.
   verify: All node IDs unique; counters >= max.
-  tags: [json, counter, collision]
+  tags: [json, counter, collision, workflow-json]
   legacy_id: "18"
 
 - id: "12.07"
@@ -999,7 +999,7 @@ bugs:
   cause: Link cross-references must agree in 3 places, links[] array, source node's outputs[slot].links, target node's inputs[slot].link. Any mismatch silently drops the connection.
   fix: Maintain all three references when editing JSON. Use a builder pattern.
   verify: validate_links() script checks all three places.
-  tags: [json, links, integrity]
+  tags: [json, links, integrity, workflow-json]
   legacy_id: "18.3"
 
 - id: "12.08"
@@ -1009,7 +1009,7 @@ bugs:
   cause: Compounded edits.
   fix: Nuclear option, rebuild from blank canvas in the UI, save fresh, diff against broken version.
   verify: Fresh JSON loads cleanly.
-  tags: [json, recovery]
+  tags: [json, recovery, workflow-json]
   legacy_id: "19.4"
 
 - id: "12.09"
@@ -1029,7 +1029,7 @@ bugs:
   cause: Global LFS filter (process=git-lfs filter-process) launches git-lfs.exe for every git op even on non-LFS repos. Compounded by Windows Defender locking child processes.
   fix: Strip [filter "lfs"] block from ~/.gitconfig. Add Defender exclusion for C:\Program Files\Git from an admin PowerShell window.
   verify: git --version returns instantly.
-  tags: [git, lfs, defender, hang]
+  tags: [git, lfs, defender, hang, xref-12.09]
   legacy_id: "54"
 
 - id: "12.11"
@@ -1152,7 +1152,7 @@ bugs:
     `del new_tokens_cpu, output, inputs, streamer; torch.cuda.empty_cache()` before
     returning. Log `torch.cuda.memory_allocated()/1e9` after unload as telemetry.
   verify: Post-unload telemetry reads ~0.03 GiB allocated. Next model load does not OOM.
-  tags: [vram, transformers, threadpoolexecutor, timeout, llm, leak]
+  tags: [vram, transformers, threadpoolexecutor, timeout, llm, leak, xphase-07]
   legacy_id: ""
 
 - id: "12.20"
@@ -1176,7 +1176,7 @@ bugs:
   verify: |
     Force a timeout in the pass. The final script contains no fallback text and no
     sentinel markers - either a clean retry/default or a cleanly omitted section.
-  tags: [llm, timeout, fallback, sentinel, script-corruption]
+  tags: [llm, timeout, fallback, sentinel, script-corruption, xphase-11]
   legacy_id: ""
 
 - id: "12.21"
@@ -1198,7 +1198,7 @@ bugs:
   verify: |
     Windows System Performance settings show 100,000 MB paging file.
     a 20B+ model loader completes weight deserialization without OS crash.
-  tags: [vram, paging-file, windows, llm-26b, oom]
+  tags: [vram, paging-file, windows, llm-26b, oom, xphase-02]
   legacy_id: ""
 
 - id: "12.22"
@@ -1219,7 +1219,7 @@ bugs:
   verify: |
     Remove the offload flag. Re-run with E4B-it. Generations complete without
     TypeError.
-  tags: [vram, cpu-offload, params4bit, windows, bitsandbytes, pytorch]
+  tags: [vram, cpu-offload, params4bit, windows, bitsandbytes, pytorch, xphase-02]
   legacy_id: ""
 
 - id: "12.23"
@@ -1241,7 +1241,7 @@ bugs:
   verify: |
     "All N nodes loaded successfully" appears in the console with
     0 skips.
-  tags: [infrastructure, boot-fail, registration, refactor]
+  tags: [infrastructure, boot-fail, registration, refactor, xphase-03]
   legacy_id: ""
 
 - id: "12.24"
@@ -1320,7 +1320,7 @@ bugs:
     Add a log line: `log.info("cache_dir resolved to: %s", cache_dir_path)`.
     Confirm it shows `ComfyUI/models/huggingface/hub`, NOT `custom_nodes/models/...`.
     Confirm "loaded from cache (no HTTP checks)" appears in logs with zero "Fetching" lines.
-  tags: [cache_dir, dirname, paths, huggingface, from_pretrained, windows]
+  tags: [cache_dir, dirname, paths, huggingface, from_pretrained, windows, xphase-02]
   legacy_id: ""
 
 - id: "12.27"
@@ -1354,7 +1354,7 @@ bugs:
       target = os.readlink(filepath)
       resolved = os.path.join(os.path.dirname(filepath), target)
       assert os.path.exists(resolved), f"Broken: {filepath} -> {target}"
-  tags: [windows, symlink, huggingface, cache, blobs, slashes]
+  tags: [windows, symlink, huggingface, cache, blobs, slashes, xphase-02]
   legacy_id: ""
 
 - id: "12.28"
@@ -1386,7 +1386,7 @@ bugs:
     After a full pipeline run, check:
       `Get-ChildItem ~/.cache/huggingface/hub -Directory | Measure-Object`
     Count should be 0. All models load from the project's HF_HOME/hub/ only.
-  tags: [huggingface, cache, disk, duplication, cleanup, windows]
+  tags: [huggingface, cache, disk, duplication, cleanup, windows, xphase-02]
   legacy_id: ""
 
 - id: "12.29"
@@ -1412,7 +1412,7 @@ bugs:
   verify: |
     an audio synthesis model outputs at 32 kHz. Main bus is 48 kHz. Resampled audio plays at
     correct speed and pitch. Log shows "Resampled 32000Hz -> 48000Hz".
-  tags: [audio, resample, sample-rate, silent, audio-model, assembler]
+  tags: [audio, resample, sample-rate, silent, audio-model, assembler, xphase-07]
   legacy_id: ""
 
 - id: "12.30"
@@ -1437,7 +1437,7 @@ bugs:
   verify: |
     `pip show the_complex_lib` returns "not installed". an audio synthesis model generation works
     via transformers API. No MSVC or spacy required.
-  tags: [dependencies, audio-model, windows, av, spacy, python312]
+  tags: [dependencies, audio-model, windows, av, spacy, python312, xphase-02]
   legacy_id: ""
 
 - id: "12.31"
@@ -1460,7 +1460,7 @@ bugs:
   verify: |
     Restart ComfyUI and run a generation. The text console remains clean with zero
     deprecation warnings.
-  tags: [tts, huggingface, deprecation, warnings, repo_id, clean-boot]
+  tags: [tts, huggingface, deprecation, warnings, repo_id, clean-boot, xphase-02]
   legacy_id: ""
 
 - id: "12.32"
@@ -1489,7 +1489,6 @@ bugs:
   tags: [telemetry, vram, case-sensitive, cuda, health-check, bottleneck]
   legacy_id: ""
 
-# End of bible.
 
 - id: "12.33"
   phase: 12
@@ -1527,7 +1526,7 @@ bugs:
     Token throughput immediately hits 13+ tok/s (no pre-fill stall).
     Peak VRAM stays within the sovereignty buffer (e.g. < 9 GB for NeMo 12B 4-bit).
     VRAM_CEILING_EXCEEDED no longer appears in logs.
-  tags: [vram, llm, prompt-length, context-cap, prefill, stall, nemo, bitsandbytes, warmup]
+  tags: [vram, llm, prompt-length, context-cap, prefill, stall, nemo, bitsandbytes, warmup, xphase-11]
   legacy_id: ""
 
 - id: "12.34"
@@ -2034,7 +2033,7 @@ bugs:
     mode` followed by per-chunk progress and `Chunked complete`.
     Total wall time scales linearly with chunk count, not
     quadratically.
-  tags: [llm, chunked-generation, polish, normalizer, timeout, scaling]
+  tags: [llm, chunked-generation, polish, normalizer, timeout, scaling, xref-11.13]
   legacy_id: BUG-LOCAL-023
 
 - id: "11.16"
@@ -2060,7 +2059,7 @@ bugs:
     Feed a ghost run (dialogue only, no CAST, no scenes) through
     the heuristic. It must NOT skip; the runtime log must record
     `missing: scenes cast` (or whichever signals are absent).
-  tags: [llm, normalizer, skip-heuristic, ghost-run, defense-in-depth]
+  tags: [llm, normalizer, skip-heuristic, ghost-run, defense-in-depth, xref-11.09]
   legacy_id: BUG-LOCAL-024
 
 - id: "12.37"
@@ -2739,7 +2738,7 @@ bugs:
     Across N phase-boundary transitions with identical inputs,
     the cache-mismatch log line never appears. Wall-clock from
     one phase to the next drops from ~17s to <1s.
-  tags: [llm, cache-thrash, quantized-param-iter, device-check, opaque-log, bitsandbytes]
+  tags: [llm, cache-thrash, quantized-param-iter, device-check, opaque-log, bitsandbytes, xphase-06]
   legacy_id: BUG-LOCAL-065
 
 - id: "12.41"
@@ -2831,7 +2830,7 @@ bugs:
   verify: |
     Regression test that exercises the merge with realistic mixed-
     form inputs. Result: one row, both fields populated.
-  tags: [name-namespace, normaliser, merge-key, silent-duplicate, canonical-form]
+  tags: [name-namespace, normaliser, merge-key, silent-duplicate, canonical-form, normalizer]
   legacy_id: BUG-LOCAL-068
 
 - id: "12.44"
@@ -2916,7 +2915,7 @@ bugs:
     Force a timeout. Post-unload telemetry reads ~0.03 GiB
     allocated. Next phase loads cleanly. No
     cudaErrorIllegalAddress.
-  tags: [vram, threadpoolexecutor, timeout, orphan-thread, cuda-synchronize, model-unload]
+  tags: [vram, threadpoolexecutor, timeout, orphan-thread, cuda-synchronize, model-unload, xref-12.19, xphase-07]
   legacy_id: BUG-LOCAL-111
 
 - id: "06.06"
@@ -2943,7 +2942,7 @@ bugs:
   verify: |
     Dropdown does not list the incompatible model. CONSTANTS block
     + comment cite the failure signature and date.
-  tags: [model-compat, quantization, blackwell, bitsandbytes, dropdown-filter, empirical-testing]
+  tags: [model-compat, quantization, blackwell, bitsandbytes, dropdown-filter, empirical-testing, xphase-07]
   legacy_id: BUG-LOCAL-110
 
 - id: "07.16"
@@ -3063,7 +3062,7 @@ bugs:
     bounded ladder. Statically: any file carrying an "anchor A2" style
     verbatim-grounding gate also carries a whitespace-collapse
     normalizer used on both sides of the substring test.
-  tags: [llm-output, structured-call, post-validator, verbatim-grounding, whitespace-normalization, deterministic-repair, retry-ladder, repair-prompt]
+  tags: [llm-output, structured-call, post-validator, verbatim-grounding, whitespace-normalization, deterministic-repair, retry-ladder, repair-prompt, llm]
   legacy_id: ""
 
 
@@ -3151,7 +3150,7 @@ bugs:
     and completes instead of raising KeyError. Grep any `dict[key]`
     lookup keyed by a user-selectable model handle and confirm it uses
     `.get()` with a documented default.
-  tags: [llm-output, model-registry, keyerror, dict-lookup, remote-model, exact-match]
+  tags: [llm-output, model-registry, keyerror, dict-lookup, remote-model, exact-match, llm]
   legacy_id: PBUG-20260618-01
 
 - id: "07.18"
@@ -3360,7 +3359,7 @@ bugs:
   verify: |
     Request an n_ctx above a given quant's actual capacity; assert the
     loader raises rather than silently returning a smaller context.
-  tags: [llm-output, n_ctx, silent-downgrade, quantization, vram, truncation]
+  tags: [llm-output, n_ctx, silent-downgrade, quantization, vram, truncation, llm]
   legacy_id: PBUG-20260710-01
 
 - id: "11.29"
@@ -3380,7 +3379,7 @@ bugs:
     Construct a reroll that would previously have emitted two
     consecutive user messages; assert the message list strictly
     alternates roles before it is sent to the chat template.
-  tags: [llm-output, chat-template, jinja, role-alternation, reroll]
+  tags: [llm-output, chat-template, jinja, role-alternation, reroll, llm]
   legacy_id: PBUG-20260710-04
 
 - id: "11.30"
@@ -3404,7 +3403,7 @@ bugs:
     token-ceiling truncation-then-salvage class recurring across
     multiple lanes -- check any new structured pass's token budget
     against its actual payload size before shipping.
-  tags: [llm-output, token-budget, truncation, salvage, casting, structured-output]
+  tags: [llm-output, token-budget, truncation, salvage, casting, structured-output, llm]
   legacy_id: PBUG-20260710-05
 
 - id: "11.31"
@@ -3431,7 +3430,7 @@ bugs:
     accepted range. This same defect class was independently flagged,
     unfixed, in another lane at small word targets -- generalize the fix
     rather than patching one call site.
-  tags: [llm-output, word-budget, proportional-band, small-targets, unit-test]
+  tags: [llm-output, word-budget, proportional-band, small-targets, unit-test, llm]
   legacy_id: PBUG-20260710-06
 
 - id: "11.32"
@@ -3459,7 +3458,7 @@ bugs:
     requires runtime instrumentation across the full pass sequence, not
     a file-level check. Treat the sentinel as a stopgap and keep the
     root-cause hunt open.
-  tags: [llm-output, silent-mutation, unidentified-root-cause, announcer, sentinel, data-corruption]
+  tags: [llm-output, silent-mutation, unidentified-root-cause, announcer, sentinel, data-corruption, llm]
   legacy_id: PBUG-20260710-07
 
 - id: "11.33"
@@ -3482,7 +3481,7 @@ bugs:
     Construct a fixture where a fictional cast name appears in the read
     output; assert the gate rejects it and issues the repair prompt
     rather than letting it through.
-  tags: [llm-output, fiction-fact-bleed, cast-name, gate, real-news, source-fidelity]
+  tags: [llm-output, fiction-fact-bleed, cast-name, gate, real-news, source-fidelity, llm]
   legacy_id: PBUG-20260710-08
 
 - id: "11.34"
@@ -3505,7 +3504,7 @@ bugs:
   verify: |
     Construct a CODA ending in '.'; assert it normalizes to ':' before
     parsing and does not trigger a false kill.
-  tags: [llm-output, structural-punctuation, false-kill, normalization, parser-contract]
+  tags: [llm-output, structural-punctuation, false-kill, normalization, parser-contract, llm]
   legacy_id: PBUG-20260710-09
 
 - id: "11.35"
@@ -3531,7 +3530,7 @@ bugs:
     correct span within the bounded repair-ladder budget. This is the
     first member of a P0 evidence-contract defect class -- check any
     new lane sharing the source_spans contract for the same gap.
-  tags: [llm-output, source-spans, evidence-contract, repair-prompt, validator, cross-lane]
+  tags: [llm-output, source-spans, evidence-contract, repair-prompt, validator, cross-lane, llm]
   legacy_id: PBUG-20260710-10
 
 - id: "11.36"
@@ -3556,7 +3555,7 @@ bugs:
     converges to the correctly zero-padded shape within the
     repair-ladder budget. Pin the required pad width directly in schema
     tests so a future contract change can't silently drop it.
-  tags: [llm-output, evidence-id, zero-padding, schema-contract, repair-ladder]
+  tags: [llm-output, evidence-id, zero-padding, schema-contract, repair-ladder, llm]
   legacy_id: PBUG-20260711-01
 
 - id: "11.37"
@@ -3583,7 +3582,7 @@ bugs:
     (not F00 -- an actual off-by-one defect was caught validating this
     fix). Assert the dialogue field is byte-identical before and after
     the repair.
-  tags: [llm-output, span-integrity, offset-repair, metadata-only, fail-closed, dialogue-preservation]
+  tags: [llm-output, span-integrity, offset-repair, metadata-only, fail-closed, dialogue-preservation, llm]
   legacy_id: PBUG-20260711-02
 
 - id: "11.38"
@@ -3608,7 +3607,7 @@ bugs:
     Capture a typed-pass prompt for each affected lane; assert the exact
     required top-level schema keys are named in the prompt text. Live
     smoke must reach the next pass without legacy-key drift.
-  tags: [llm-output, structured-output, schema-drift, legacy-shape, markdown, repair-seam]
+  tags: [llm-output, structured-output, schema-drift, legacy-shape, markdown, repair-seam, llm]
   legacy_id: PBUG-20260711-03
 
 - id: "12.48"
@@ -3656,7 +3655,7 @@ bugs:
     Remove one required source literal from an otherwise valid artifact and
     assert the exact owning coordinate fails before publication. Switch only a
     visual-style setting and assert captured story messages remain byte-identical.
-  tags: [llm-output, source-grounding, provenance, literal-anchor, channel-isolation, fail-closed]
+  tags: [llm-output, source-grounding, provenance, literal-anchor, channel-isolation, fail-closed, llm]
   legacy_id: PBUG-20260712-04
 
 - id: "11.45"
@@ -3683,7 +3682,7 @@ bugs:
     Assert the deterministic repair preserves authoritative values, produces
     the canonical shape for base and typed-repair responses, and fails closed
     for ambiguous or graph-invalid input.
-  tags: [llm-output, schema-ownership, collection-placement, canonical-shape, typed-repair, fail-closed]
+  tags: [llm-output, schema-ownership, collection-placement, canonical-shape, typed-repair, fail-closed, llm]
   legacy_id: PBUG-20260712-01
 
 - id: "11.40"
@@ -3707,7 +3706,7 @@ bugs:
     Feed the same eligible defect through both the base and typed-repair
     response paths. Assert both converge through the projection, authored
     fields remain unchanged, and an out-of-scope shape still fails closed.
-  tags: [llm-output, acceptance-boundary, deterministic-projection, typed-repair, ownership, fail-closed]
+  tags: [llm-output, acceptance-boundary, deterministic-projection, typed-repair, ownership, fail-closed, llm]
   legacy_id: PBUG-20260712-06
 
 - id: "11.41"
@@ -3731,7 +3730,7 @@ bugs:
     responses. Assert the composed projection changes only owned fields,
     maintains deterministic order, and leaves an unrelated invalid condition
     rejected by the complete validator.
-  tags: [llm-output, projection-composition, deterministic-order, canonical-validation, preservation]
+  tags: [llm-output, projection-composition, deterministic-order, canonical-validation, preservation, llm]
   legacy_id: PBUG-20260712-11
 
 - id: "11.42"
@@ -3756,7 +3755,7 @@ bugs:
     Assert a small typed patch repairs only its planned target, rejects missing
     or unplanned targets, leaves every other field byte-identical, and clears
     the complete artifact validator.
-  tags: [llm-output, bounded-patch, typed-schema, localized-repair, context-window, fail-closed]
+  tags: [llm-output, bounded-patch, typed-schema, localized-repair, context-window, fail-closed, llm]
   legacy_id: PBUG-20260712-12
 
 - id: "11.43"
@@ -3778,7 +3777,7 @@ bugs:
     Assert the plan demands both, reject a patch that preserves only the new
     literal, and reject any patch whose merged artifact breaks graph, safety,
     grounding, or authorship validation.
-  tags: [llm-output, bounded-patch, invariant-preservation, merged-validation, grounding, safety]
+  tags: [llm-output, bounded-patch, invariant-preservation, merged-validation, grounding, safety, llm]
   legacy_id: PBUG-20260712-13
 
 - id: "11.44"
@@ -3802,7 +3801,7 @@ bugs:
     initial authoring. Assert it invokes the shared small patch, records a
     pass-specific journal ID, reruns the downstream audit, and that every
     pipeline route advertises the repair seam.
-  tags: [llm-output, shared-boundary, retake, bounded-patch, pipeline-contract, audit-receipt]
+  tags: [llm-output, shared-boundary, retake, bounded-patch, pipeline-contract, audit-receipt, xref-11.40, llm]
   legacy_id: PBUG-20260712-15
 
 - id: "12.49"
@@ -3874,7 +3873,7 @@ bugs:
     found in multiple fields, and a paraphrased/unsupported claim. Assert only
     the unique literal quote is rehomed and reindexed; ambiguous or unsupported
     evidence cannot reach the accepted artifact.
-  tags: [llm-output, source-evidence, field-provenance, offset-repair, literal-grounding, fail-closed]
+  tags: [llm-output, source-evidence, field-provenance, offset-repair, literal-grounding, fail-closed, xref-11.37, llm]
   legacy_id: PBUG-20260711-04
 
 - id: "11.47"
@@ -3895,7 +3894,7 @@ bugs:
     Feed malformed outer JSON containing a valid nested child and assert a
     top-level parse failure. Feed leading prose followed by one valid root
     object and assert normal parsing still succeeds.
-  tags: [llm-output, json-parser, root-integrity, nested-object, parse-failure, fail-closed]
+  tags: [llm-output, json-parser, root-integrity, nested-object, parse-failure, fail-closed, json-parse, llm]
   legacy_id: PBUG-20260711-05
 
 - id: "11.48"
@@ -3922,7 +3921,7 @@ bugs:
     missing boundary, and a legacy metadata enum. Assert the repair contract
     names the complete required paths and authoritative mappings; deterministic
     metadata repair changes only owned fields and fails closed for bad graphs.
-  tags: [llm-output, nested-schema, typed-repair, graph-metadata, deterministic-repair, preservation]
+  tags: [llm-output, nested-schema, typed-repair, graph-metadata, deterministic-repair, preservation, llm]
   legacy_id: PBUG-20260711-06
 
 - id: "11.49"
@@ -3970,7 +3969,7 @@ bugs:
     rises. Assert the effective prompt retains every required schema path,
     envelope-root output is rejected, and an insufficient context cap fails
     before generation rather than silently truncating.
-  tags: [llm-output, token-budget, context-window, structured-output, envelope-echo, fail-loud]
+  tags: [llm-output, token-budget, context-window, structured-output, envelope-echo, fail-loud, xref-11.30, llm]
   legacy_id: PBUG-20260711-12
 
 - id: "12.51"
@@ -3997,7 +3996,7 @@ bugs:
     delivery and episode receipts exist before finalization, no replay-only key
     is fabricated, lane-owned voices are not replayed, and duplicate or invalid
     lane-owned voices still fail their safety gate.
-  tags: [metadata, producer-boundary, receipts, cast-replay, content-owned, provenance]
+  tags: [metadata, producer-boundary, receipts, cast-replay, content-owned, provenance, xref-12.49]
   legacy_id: PBUG-20260711-14
 
 - id: "07.22"
@@ -4023,7 +4022,7 @@ bugs:
     wiring. With a fake model manager, assert the scoped reserve rises during
     execution, restores after success and failure, and preserves a larger
     pre-existing reserve. GPU soak telemetry must confirm no sysmem-spill crawl.
-  tags: [vram, activation-reserve, video-vae, sysmem-spill, scoped-resource, gpu-soak]
+  tags: [vram, activation-reserve, video-vae, sysmem-spill, scoped-resource, gpu-soak, xref-07.16]
   legacy_id: BUG-LOCAL-414
 
 - id: "08.08"
@@ -4072,5 +4071,5 @@ bugs:
     Seed a stale override hook, start the canonical headless wrapper, and assert
     it removes the hook before boot. Verify the next run's engine/profile receipt
     matches its explicit configuration rather than the orphaned override.
-  tags: [test-orchestration, environment-leak, headless-boot, consume-once, stale-hook, provenance]
+  tags: [test-orchestration, environment-leak, headless-boot, consume-once, stale-hook, provenance, xref-12.47]
   legacy_id: BUG-LOCAL-415

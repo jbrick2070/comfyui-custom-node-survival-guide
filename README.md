@@ -192,6 +192,8 @@ entries. Exits non-zero on issues so it's easy to wire into a pre-commit hook.
 ## What the regression suite checks
 
 197 bible entries across 12 phases; the pytest suite encodes the static-
+
+Entries may carry additive `xref-XX.YY` tags (cross-reference to an overlapping entry) and `xphase-NN` tags (content also belongs to phase NN; ids are immutable), added by the 2026-07-12 consistency audit.
 analysis-checkable subset as executable assertions.
 
 | Phase | Coverage | Sample bug IDs |
