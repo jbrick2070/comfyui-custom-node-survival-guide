@@ -3951,24 +3951,29 @@ bugs:
   phase: 11
   area: llm-output
   symptom: |
-    A whole-artifact pass reserves output tokens from a word target or fixed
-    ceiling alone, truncates its own schema-bearing prompt or serialized
-    response, and may echo the request envelope instead of returning the
-    requested artifact root.
+    A whole-artifact pass or its typed repair reserves output tokens from a
+    word target or fixed ceiling alone, truncates its own schema-bearing prompt
+    or serialized response, and may echo the request envelope instead of
+    returning the requested artifact root.
   cause: |
-    Budgeting ignored accepted line/item count and required per-item metadata,
-    while the root contract failed to forbid input-envelope keys explicitly.
+    Budgeting ignored accepted line/item count, required per-item metadata, or
+    the failed-artifact repair context, while the root contract failed to forbid
+    input-envelope keys explicitly.
   fix: |
     Calculate output reservation from every structural size driver, including
-    accepted line or item count, after the authoritative graph is final. Record
-    the budget receipt, require the requested root literal at response start,
-    forbid request-envelope keys, and fail loud when prompt plus output cannot
-    fit the actual context window.
+    accepted line or item count, after the authoritative graph is final. Keep
+    typed repair context to the failed artifact plus only the locked facts the
+    model cannot derive; do not duplicate a copyable JSON request envelope.
+    Record the budget receipt, require the requested root literal at response
+    start, forbid request-envelope keys, and fail loud when prompt plus output
+    cannot fit the actual context window.
   verify: |
     At fixed word steer, increase accepted line count and assert the reservation
-    rises. Assert the effective prompt retains every required schema path,
-    envelope-root output is rejected, and an insufficient context cap fails
-    before generation rather than silently truncating.
+    rises. Assert a known live repair prompt fits after reservation, the repair
+    payload is not a copyable JSON request envelope, the effective prompt
+    retains every required schema path, envelope-root output is rejected, and
+    an insufficient context cap fails before generation rather than silently
+    truncating.
   tags: [llm-output, token-budget, context-window, structured-output, envelope-echo, fail-loud, xref-11.30, llm]
   legacy_id: PBUG-20260711-12
 

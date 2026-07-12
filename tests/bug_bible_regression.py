@@ -1266,6 +1266,8 @@ class TestPhase07To12ProductionRegressionCatalog:
         ),
         "tests/test_scifi_codex_lane.py": (
             "test_p3_typed_repair_receives_the_locked_score_graph_contract",
+            "test_p3_repair_context_is_not_a_copyable_json_request_envelope",
+            "test_radio_score_output_budget_preserves_the_live_p3_repair_window",
             "test_script_output_token_budget_receipts_and_bounds",
             "test_script_artifact_metadata_repair_normalizes_only_graph_metadata",
             "test_script_metadata_repair_short_circuits_the_typed_repair_model_call",
