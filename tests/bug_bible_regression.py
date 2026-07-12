@@ -1248,8 +1248,9 @@ class TestPhase11BoundedRepairContracts:
 
 
 class TestPhase07To12ProductionRegressionCatalog:
-    """OTR-local guard for live-only BUG-07.22, BUG-08.08, BUG-11.46,
-    BUG-11.47, BUG-11.48, BUG-11.49, BUG-11.50, BUG-12.51, BUG-12.52.
+    """OTR-local guard for live-only BUG-07.22, BUG-07.23, BUG-08.08,
+    BUG-11.46, BUG-11.47, BUG-11.48, BUG-11.49, BUG-11.50, BUG-12.51,
+    BUG-12.52.
 
     These rules were admitted from dated smokes, published artifacts, or GPU
     runs. The project tests named below exercise their concrete behavior; this
@@ -1290,6 +1291,18 @@ class TestPhase07To12ProductionRegressionCatalog:
         ),
         "tests/test_canonical_headless_api.py": (
             "test_headless_wrapper_clears_stale_extra_env_hook_before_boot",
+        ),
+        "tests/test_image_platform_c1.py": (
+            "test_roles_requiring_stills_needs_a_complete_resolvable_policy",
+            "test_meta_brief_all_visualizers_bypass_prompt_authoring",
+            "test_meta_brief_node_bypasses_before_writer_resolution",
+            "test_meta_brief_mixed_policy_authors_only_proven_consumer_roles",
+            "test_dispatcher_refuses_image_render_without_proven_consumer",
+            "test_dispatcher_preserves_proven_role_when_another_slot_is_unresolved",
+            "test_dispatcher_rejects_explicit_unknown_object_role",
+        ),
+        "tests/test_video_platform_aseam.py": (
+            "test_shotlock_all_visualizers_skip_writer_visual_directives",
         ),
     }
 

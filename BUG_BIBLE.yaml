@@ -4073,3 +4073,33 @@ bugs:
     matches its explicit configuration rather than the orphaned override.
   tags: [test-orchestration, environment-leak, headless-boot, consume-once, stale-hook, provenance, xref-12.47]
   legacy_id: BUG-LOCAL-415
+
+- id: "07.23"
+  phase: 7
+  area: video-policy
+  symptom: |
+    A render plan selects only procedural or audio/text-driven video engines
+    that do not consume an init image, but an upstream prompt or image-authoring
+    stage still calls a costly or fallible image model. The run can spend or
+    fail even though no downstream consumer can use the result.
+  cause: |
+    Still-consumption capability was checked only at the terminal dispatcher.
+    Upstream planning treated the presence of an image policy as a request to
+    author every role, rather than resolving each role's effective engine
+    (including overrides and redirects) and its declared init-image capability.
+  fix: |
+    Centralize a per-role effective-engine init-image-consumer decision. When a
+    complete all-false map proves no role consumes stills, emit an explicit
+    empty prompt payload and bypass all upstream visual authoring. In mixed
+    policies omit only roles proven procedural and retain unknown roles
+    conservatively upstream. Treat an absent, malformed, or unresolvable role
+    as unable to prove that role's consumer: the terminal dispatcher must refuse
+    generation for that object while still allowing other proven roles to render.
+    Re-check the capability at dispatch as defense in depth.
+  verify: |
+    Cover all-procedural zero writer/model calls, mixed-role filtering,
+    force-map and redirect resolution, and fail-safe behavior for
+    incomplete/unknown policy. A canonical all-visualizer run emits no image
+    objects and completes with its expected ledger and final output.
+  tags: [video-policy, image-generation, init-image, capability-gate, all-visualizer, effective-engine, force-map, fail-safe, upstream-bypass, prompt-authoring]
+  legacy_id: PBUG-20260712-19
