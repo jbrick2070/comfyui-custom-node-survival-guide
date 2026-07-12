@@ -3850,3 +3850,227 @@ bugs:
     remains a failure.
   tags: [test-orchestration, detached-process, exit-code, false-negative, durable-output, smoke-test]
   legacy_id: PBUG-20260712-16
+
+- id: "11.46"
+  phase: 11
+  area: llm-output
+  symptom: |
+    A source-evidence row quotes text that exists in the payload but names the
+    wrong source field or stale offsets, or it quotes a claim that does not
+    exist literally in any allowed source field.
+  cause: |
+    Evidence validation checked a model-supplied field/offset tuple without a
+    deterministic, fail-closed reconciliation against the actual source
+    payload, allowing stale metadata and unsupported claims to share a repair
+    path.
+  fix: |
+    Rehome an exact quote only when exactly one allowed source field contains
+    it, then recompute offsets from that field. Retain only rows whose evidence
+    is literal; drop unsupported facts during metadata-only repair, and fail
+    closed for absent or ambiguous evidence. Never rewrite claim prose to make
+    it appear supported.
+  verify: |
+    Test a unique exact quote with the wrong field and offsets, an exact quote
+    found in multiple fields, and a paraphrased/unsupported claim. Assert only
+    the unique literal quote is rehomed and reindexed; ambiguous or unsupported
+    evidence cannot reach the accepted artifact.
+  tags: [llm-output, source-evidence, field-provenance, offset-repair, literal-grounding, fail-closed]
+  legacy_id: PBUG-20260711-04
+
+- id: "11.47"
+  phase: 11
+  area: llm-output
+  symptom: |
+    A response begins with a malformed structured artifact containing a valid
+    nested object, and a fallback parser promotes that child to the top level,
+    hiding the outer corruption and producing misleading downstream errors.
+  cause: |
+    Best-effort brace scanning did not distinguish leading prose before one
+    valid object from a malformed attempted root object containing descendants.
+  fix: |
+    Treat an invalid leading root object as a parse failure. Permit extraction
+    only when leading non-JSON prose clearly precedes one complete top-level
+    object; never salvage a nested child from a broken outer response.
+  verify: |
+    Feed malformed outer JSON containing a valid nested child and assert a
+    top-level parse failure. Feed leading prose followed by one valid root
+    object and assert normal parsing still succeeds.
+  tags: [llm-output, json-parser, root-integrity, nested-object, parse-failure, fail-closed]
+  legacy_id: PBUG-20260711-05
+
+- id: "11.48"
+  phase: 11
+  area: llm-output
+  symptom: |
+    A structured artifact or its typed repair preserves top-level shape but
+    omits nested required fields, violates cross-object locks, repeats legacy
+    metadata enums, or leaves derived structural metadata inconsistent with an
+    already accepted upstream graph.
+  cause: |
+    The repair prompt lacked a complete machine-derived field tree, the failed
+    artifact/error context, or the authoritative upstream mappings needed to
+    preserve graph-owned metadata. The model was asked to recreate mechanical
+    structure it did not own.
+  fix: |
+    Generate required-path instructions from the current schema and include
+    the failed artifact, exact error, preservation rules, and accepted
+    cross-object mappings in typed repair. Derive eligible mechanical metadata
+    deterministically from the accepted graph; never alter authored prose, and
+    reject missing, ambiguous, or graph-inconsistent mappings.
+  verify: |
+    Force a nested required-field omission, a missing cast-locked speaker, a
+    missing boundary, and a legacy metadata enum. Assert the repair contract
+    names the complete required paths and authoritative mappings; deterministic
+    metadata repair changes only owned fields and fails closed for bad graphs.
+  tags: [llm-output, nested-schema, typed-repair, graph-metadata, deterministic-repair, preservation]
+  legacy_id: PBUG-20260711-06
+
+- id: "11.49"
+  phase: 11
+  area: source-selection
+  symptom: |
+    A canonical source selector returns a thin or low-diversity payload that
+    cannot meet the downstream lane's source contract, wasting a model slot or
+    halting after queueing work.
+  cause: |
+    Candidate ranking optimized for topic match without enforcing the same
+    minimum body-length, word-count, and lexical-diversity floor required by
+    the selected creative lane.
+  fix: |
+    Apply the lane's source-sufficiency contract during candidate selection.
+    Inspect a bounded candidate set, select only an eligible payload, and fail
+    before queueing the lane with a precise selection reason when none qualify.
+  verify: |
+    Supply a ranked candidate list containing thin and eligible bodies. Assert
+    selection skips thin candidates, returns an eligible source with its
+    receipt, and fails before model dispatch when every candidate is below the
+    declared floor.
+  tags: [source-selection, source-sufficiency, precondition, rss, fail-before-spend, payload-quality]
+  legacy_id: PBUG-20260711-11
+
+- id: "11.50"
+  phase: 11
+  area: llm-output
+  symptom: |
+    A whole-artifact pass reserves output tokens from a word target or fixed
+    ceiling alone, truncates its own schema-bearing prompt or serialized
+    response, and may echo the request envelope instead of returning the
+    requested artifact root.
+  cause: |
+    Budgeting ignored accepted line/item count and required per-item metadata,
+    while the root contract failed to forbid input-envelope keys explicitly.
+  fix: |
+    Calculate output reservation from every structural size driver, including
+    accepted line or item count, after the authoritative graph is final. Record
+    the budget receipt, require the requested root literal at response start,
+    forbid request-envelope keys, and fail loud when prompt plus output cannot
+    fit the actual context window.
+  verify: |
+    At fixed word steer, increase accepted line count and assert the reservation
+    rises. Assert the effective prompt retains every required schema path,
+    envelope-root output is rejected, and an insufficient context cap fails
+    before generation rather than silently truncating.
+  tags: [llm-output, token-budget, context-window, structured-output, envelope-echo, fail-loud]
+  legacy_id: PBUG-20260711-12
+
+- id: "12.51"
+  phase: 12
+  area: metadata-provenance
+  symptom: |
+    A content-owned lane reaches a downstream TTS, credits, or cast stage with
+    a missing producer receipt, or a generic receipt is written into a key that
+    actually asserts a stronger behavior contract and triggers an invalid
+    replay path.
+  cause: |
+    Shared orchestration assumed legacy producers owned delivery and seed
+    metadata. A field whose name looked like a generic receipt also doubled as
+    proof that a specific producer had created replayable state.
+  fix: |
+    Stamp required receipts at the one shared producer boundary after the last
+    authoritative content mutation and before finalization. Assign one precise
+    semantic purpose to each key: use a generic episode receipt for provenance,
+    and reserve replay keys exclusively for the producer that can substantiate
+    replayable state. Preserve lane-owned cast values while still running their
+    safety invariants.
+  verify: |
+    Run a content-owned lane through delivery, credits, and cast stages. Assert
+    delivery and episode receipts exist before finalization, no replay-only key
+    is fabricated, lane-owned voices are not replayed, and duplicate or invalid
+    lane-owned voices still fail their safety gate.
+  tags: [metadata, producer-boundary, receipts, cast-replay, content-owned, provenance]
+  legacy_id: PBUG-20260711-14
+
+- id: "07.22"
+  phase: 7
+  area: vram
+  symptom: |
+    An audio-conditioned video run avoids an OOM but slows from seconds to
+    minutes per iteration as sampler activations spill to system memory on a
+    desktop-VRAM-tight machine.
+  cause: |
+    A large VAE graph object was shared by both pre-sampler encode and
+    post-sampler decode, so last-consumer lifetime kept it resident through
+    denoising. Model loading also had no scoped activation reserve for desktop
+    applications already occupying VRAM.
+  fix: |
+    Split encode-side and decode-side heavy graph resources when their lifetimes
+    do not overlap, and apply a scoped minimum VRAM reserve for the model run.
+    Restore the prior reserve on both success and exception; never lower an
+    existing stricter reserve. Diagnose slow no-OOM behavior from real telemetry
+    before changing quantization or offload policy.
+  verify: |
+    Assert the graph has distinct encode and decode VAE nodes with correct
+    wiring. With a fake model manager, assert the scoped reserve rises during
+    execution, restores after success and failure, and preserves a larger
+    pre-existing reserve. GPU soak telemetry must confirm no sysmem-spill crawl.
+  tags: [vram, activation-reserve, video-vae, sysmem-spill, scoped-resource, gpu-soak]
+  legacy_id: BUG-LOCAL-414
+
+- id: "08.08"
+  phase: 8
+  area: io
+  symptom: |
+    A final post-composition render publishes successfully but silently loses
+    captions, scopes, or rolling-credit tail frames because an optional ffmpeg
+    filter branch is malformed or a shortest-input rule truncates the intended
+    long-form output.
+  cause: |
+    The successful-output path was treated as proof of visual completeness.
+    A concatenated filter duplicated a pixel-format token without its separator,
+    triggering a source-copy fallback, and a separate shortest-input policy
+    discarded the deliberately longer credits layer.
+  fix: |
+    Treat every enabled filter combination and post-roll duration as a concrete
+    output contract. Build filter tokens with explicit separators, test each
+    optional branch, and preserve the intentional longest timeline rather than
+    letting an intermediate stream clamp it. Verify required visual layers in
+    the produced command/output, not only process exit success.
+  verify: |
+    Generate the three-input filter command with each overlay state and assert
+    no concatenated format token, exactly the expected format pins, and caption
+    burn presence. Exercise a longer credits/scopes layer and assert the command
+    does not use a shortest-input clamp that cuts the tail.
+  tags: [io, ffmpeg, filter-complex, post-processing, captions, rolling-credits]
+  legacy_id: BUG-LOCAL-402
+
+- id: "12.52"
+  phase: 12
+  area: test-orchestration
+  symptom: |
+    A crashed or interrupted harness leaves a file-based one-shot environment
+    override behind, and a later unrelated headless run silently inherits it,
+    executing an auditable profile with the wrong engine or policy.
+  cause: |
+    A temporary per-leg hook was sourced whenever present but its lifecycle
+    depended on a normal post-leg cleanup that does not run after a crash.
+  fix: |
+    Treat file-based overrides as consume-once capabilities: log their use,
+    apply them only to the intended boot, and remove stale hooks before a
+    canonical run. Each producer must recreate its hook explicitly for a new
+    leg; do not allow an old override to become an invisible process default.
+  verify: |
+    Seed a stale override hook, start the canonical headless wrapper, and assert
+    it removes the hook before boot. Verify the next run's engine/profile receipt
+    matches its explicit configuration rather than the orphaned override.
+  tags: [test-orchestration, environment-leak, headless-boot, consume-once, stale-hook, provenance]
+  legacy_id: BUG-LOCAL-415

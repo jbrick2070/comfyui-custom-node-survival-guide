@@ -1142,6 +1142,77 @@ class TestPhase11BoundedRepairContracts:
             )
 
 
+class TestPhase07To12ProductionRegressionCatalog:
+    """OTR-local guard for live-only BUG-07.22, 08.08, 11.46..11.50, 12.51..12.52.
+
+    These rules were admitted from dated smokes, published artifacts, or GPU
+    runs. The project tests named below exercise their concrete behavior; this
+    catalog guard makes loss of that coverage a Bible regression as well.
+    """
+
+    EXPECTED_TESTS = {
+        "tests/test_scifi_source_repair.py": (
+            "test_repair_rehomes_exact_quote_only_when_field_label_is_wrong",
+            "test_repair_drops_unsupported_fact_but_keeps_literal_fact",
+            "test_json_parser_does_not_salvage_nested_child_from_broken_outer_object",
+            "test_schema_instruction_contains_every_required_path_for_nested_radio_score",
+        ),
+        "tests/test_scifi_codex_lane.py": (
+            "test_p3_typed_repair_receives_the_locked_score_graph_contract",
+            "test_script_output_token_budget_receipts_and_bounds",
+            "test_script_artifact_metadata_repair_normalizes_only_graph_metadata",
+            "test_script_metadata_repair_short_circuits_the_typed_repair_model_call",
+        ),
+        "tests/test_fetch_science_news_no_legacy_wrapper.py": (
+            "test_scifi_v4_source_floor_requires_length_words_and_token_diversity",
+        ),
+        "tests/test_fable2_tail_context.py": (
+            "test_content_owned_tail_stamps_delivery_before_finalizer",
+        ),
+        "tests/test_cast_lock.py": (
+            "test_content_owned_lane_preserves_its_own_voices_without_replay",
+            "test_content_owned_lane_still_fails_on_colliding_bark_voices",
+        ),
+        "tests/test_ltx_audio_in_engine.py": (
+            "test_ltx_audio_in_videovae_is_split_enc_dec",
+            "test_ltx_av_vram_reserve_bumps_then_restores",
+            "test_ltx_av_vram_reserve_restores_on_exception",
+        ),
+        "tests/test_post_upscale_procgen_blend.py": (
+            "test_build_cmd_3input_scopes_no_double_format_gbrp_bug402",
+            "test_blend_cmd_does_NOT_use_shortest_for_c7_safety",
+        ),
+        "tests/test_canonical_headless_api.py": (
+            "test_headless_wrapper_clears_stale_extra_env_hook_before_boot",
+        ),
+    }
+
+    def test_otr_live_production_regressions_remain_covered(self, pack_dir):
+        anchor = os.path.join(pack_dir, "nodes", "_otr_scifi_codex.py")
+        if not os.path.isfile(anchor):
+            pytest.skip("BUG-07.22..12.52 catalog is OTR-local")
+
+        for relative_path, test_names in self.EXPECTED_TESTS.items():
+            path = os.path.join(pack_dir, *relative_path.split("/"))
+            assert os.path.isfile(path), (
+                f"production regression module missing: {relative_path}"
+            )
+            with open(path, "r", encoding="utf-8") as f:
+                source = f.read()
+            for test_name in test_names:
+                assert f"def {test_name}(" in source, (
+                    f"production regression missing: {relative_path}::{test_name}"
+                )
+
+        headless_path = os.path.join(pack_dir, "scripts", "otr_headless_canonical.ps1")
+        with open(headless_path, "r", encoding="utf-8") as f:
+            headless_source = f.read()
+        assert "$StaleExtraEnv" in headless_source
+        assert "Remove-Item -LiteralPath $StaleExtraEnv -Force" in headless_source, (
+            "BUG-12.52: canonical headless boot must clear a stale one-shot override"
+        )
+
+
 class TestPhase02BugBible0214:
     """BUG-02.14 / BUG-LOCAL-043: SD 1.5 .ckpt offline/Windows four-layer fix.
 
