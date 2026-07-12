@@ -8,7 +8,7 @@ An AI-agent QA harness for ComfyUI custom-node authoring. v2.1 — 197 bible ent
 
 ### What this catches
 
-BOM corruption, ghost registrations, widget drift, workflow-JSON link rot, VRAM leaks (including ThreadPoolExecutor orphan-thread cases), ffmpeg pipe deadlocks, audio-contract violations, motion-onset / lip-sync drift in audio-driven video, three-tier LLM-output resilience gaps, regex sentinel-word collisions, stale LLM-API ladders silently rotating to deprecated models, and 140+ more class lessons.
+BOM corruption, ghost registrations, widget drift, workflow-JSON link rot, VRAM leaks (including ThreadPoolExecutor orphan-thread cases), ffmpeg pipe deadlocks, audio-contract violations, motion-onset / lip-sync drift in audio-driven video, three-tier LLM-output resilience gaps, regex sentinel-word collisions, stale LLM-API ladders silently rotating to deprecated models, and 180+ more class lessons.
 
 ### Who should use it
 
@@ -192,24 +192,26 @@ entries. Exits non-zero on issues so it's easy to wire into a pre-commit hook.
 ## What the regression suite checks
 
 197 bible entries across 12 phases; the pytest suite encodes the static-
-
-Entries may carry additive `xref-XX.YY` tags (cross-reference to an overlapping entry) and `xphase-NN` tags (content also belongs to phase NN; ids are immutable), added by the 2026-07-12 consistency audit.
 analysis-checkable subset as executable assertions.
+
+Entries may carry additive `xref-XX.YY` tags (cross-reference to an
+overlapping entry) and `xphase-NN` tags (content also belongs to phase NN;
+ids are immutable), added by the 2026-07-12 consistency audit.
 
 | Phase | Coverage | Sample bug IDs |
 |---|---|---|
 | 01 Bootstrap & Discovery        | Path safety, no dirname chains, folder_paths usage | 01.02, 01.03 |
-| 02 Environment & Dependencies   | UTF-8 no BOM, no mojibake, no zero-byte files; SD 1.5 .ckpt offline-load | 02.11, 02.12, 02.14 |
+| 02 Environment & Dependencies   | UTF-8 no BOM, no mojibake, no zero-byte files; boot launchers force UTF-8 stdio; SD 1.5 .ckpt offline-load | 02.11, 02.12, 02.14, 02.15 |
 | 03 Registration & Loading       | Isolated per-node loading, namespaced IDs, no ghost registrations | 03.01, 03.03, 12.23 |
 | 04 INPUT_TYPES & Widgets        | Widget positional stability; workflow JSON integrity; preserved-vs-stripped auto-sense; socket-only types | 04.01, 04.02, 04.07–04.13 |
 | 05 Execution Model              | Coordination, migration, list outputs, interrupts, completion checks; feature-flag/role-policy decoupling | 05.05, 05.06, 05.08, 05.09 |
 | 06 Caching & IS_CHANGED         | Stale outputs, signature stability, leaks; model-platform empirical compat | 06.01–06.06 |
-| 07 Tensors, Audio, Video        | VRAM, dtype, audio contracts, motion-onset pad, sample-rate, composite layer ordering | 07.01–07.15 |
-| 08 I/O & Output Nodes           | Headless API, intermediates, preview thumbnails, OUTPUT_NODE discipline | 08.01–08.06 |
-| 09 Subprocess & Network         | Pipe deadlocks, asyncio, offline fallbacks | 09.02 |
+| 07 Tensors, Audio, Video        | VRAM, dtype, audio contracts, motion-onset pad, sample-rate, composite layer ordering | 07.01–07.22 |
+| 08 I/O & Output Nodes           | Headless API, intermediates, preview thumbnails, OUTPUT_NODE discipline | 08.01–08.08 |
+| 09 Subprocess & Network         | Pipe deadlocks, asyncio, offline fallbacks, cloud-API contracts | 09.02, 09.05, 09.06 |
 | 10 Safety, Pools, RNG           | Content filters, pool sizing, RNG correctness | 10.01–10.07 |
-| 11 LLM-Specific                 | Token budgets, prompt-detector contracts, format normalisers, three-tier resilience | 11.01–11.25 |
-| 12 Regression, Git, Handoff     | Repo hygiene, AST parse, workflow JSON link integrity, dedup foreign keys, ledger write-back, stale-LLM-API ladder | 12.02, 12.06, 12.07, 12.35, 12.39 |
+| 11 LLM-Specific                 | Token budgets, prompt-detector contracts, format normalisers, three-tier resilience, typed repair ladders | 11.01–11.50 |
+| 12 Regression, Git, Handoff     | Repo hygiene, AST parse, workflow JSON link integrity, dedup foreign keys, ledger write-back, stale-LLM-API ladder | 12.02, 12.06, 12.07, 12.35, 12.39, 12.52 |
 
 ## How an AI coding agent uses this kit
 
