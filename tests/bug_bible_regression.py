@@ -1011,6 +1011,43 @@ class TestSummary:
 
 
 # ─────────────────────────────────────────────────────────────────
+class TestPhase02UtfLauncherGuard:
+    """OTR-local static guard for the launcher-grep half of BUG-02.15.
+
+    Any .cmd launcher under scripts/ that boots ComfyUI (references
+    main.py) must force UTF-8 stdio, or a detached cmd inherits the
+    cp1252 console codec and the boot dies on the first emoji print
+    (exit 1, "SERVER DID NOT COME UP"). The boot half stays in the
+    exclusion notes below.
+    """
+
+    def test_boot_launchers_force_utf8(self, pack_dir):
+        scripts_dir = os.path.join(pack_dir, "scripts")
+        if not os.path.isdir(scripts_dir):
+            pytest.skip("BUG-02.15 guard: no scripts/ dir in this pack")
+        launchers = []
+        for fn in sorted(os.listdir(scripts_dir)):
+            if not fn.lower().endswith(".cmd"):
+                continue
+            fpath = os.path.join(scripts_dir, fn)
+            with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+            if "main.py" in content:
+                launchers.append((fn, content))
+        if not launchers:
+            pytest.skip("BUG-02.15 guard: no ComfyUI boot launchers found")
+        missing = []
+        for fn, content in launchers:
+            if "PYTHONUTF8=1" not in content:
+                missing.append(fn + ": PYTHONUTF8=1")
+            if "PYTHONIOENCODING=utf-8" not in content:
+                missing.append(fn + ": PYTHONIOENCODING=utf-8")
+        assert not missing, (
+            "BUG-02.15: boot launcher(s) missing forced UTF-8 stdio "
+            "(a detached cmd inherits cp1252 and dies on the first "
+            "emoji print): " + ", ".join(missing))
+
+
 # NOTES ON NON-TESTABLE BUG BIBLE ENTRIES
 # ─────────────────────────────────────────────────────────────────
 # BUG-01.04 (Electron wrapper process name): Runtime discovery issue, not a
@@ -1033,9 +1070,10 @@ class TestSummary:
 # Each is documented in BUG_BIBLE.yaml with symptom/cause/fix/verify
 # generalized for any custom-node author; none is faked into a no-op assert.
 #
-# BUG-02.15 (cp1252 headless boot crash): Requires a real detached-process
-#   boot with an inherited console codec to reproduce; not checkable from a
-#   pack directory's source alone.
+# BUG-02.15 (cp1252 headless boot crash): The launcher-grep half is now
+#   statically guarded by TestPhase02UtfLauncherGuard above; the boot half
+#   still requires a real detached-process boot with an inherited console
+#   codec and stays runtime-only.
 # BUG-07.17 (LTX-AV VRAM soak, disproven offload): Requires a live VRAM soak
 #   measurement; the "verify" is a soak re-run, not a static property.
 # BUG-11.27 (remote model KeyError, exact-match dict lookup): The verify
@@ -1099,6 +1137,11 @@ class TestSummary:
 # BUG-12.05 (multi-layer parameter sync): Requires live workflow reload
 #   round-trips across UI/JSON/backend layers; no static property to
 #   assert from a pack directory.
+# BUG-10.05 (cast pool composition check): Correct pool classification
+#   requires the live voice registry; the named cast_pool_check.py is a
+#   pack-shipped CI artifact exercised by the pack's own suite when present.
+# BUG-10.07 (probability distribution check): The named probability_check.py
+#   runs 10,000 live trials; a statistical runtime property, not static.
 
 
 class TestPhase11BoundedRepairContracts:
