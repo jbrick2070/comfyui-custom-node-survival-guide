@@ -3954,26 +3954,33 @@ bugs:
     A whole-artifact pass or its typed repair reserves output tokens from a
     word target or fixed ceiling alone, truncates its own schema-bearing prompt
     or serialized response, and may echo the request envelope instead of
-    returning the requested artifact root.
+    returning the requested artifact root. A source-evidence artifact with
+    unbounded rows, per-row spans, or serialized strings has no defensible
+    fixed reservation even when its top-level list count looks bounded.
   cause: |
-    Budgeting ignored accepted line/item count, required per-item metadata, or
-    the failed-artifact repair context, while the root contract failed to forbid
-    input-envelope keys explicitly.
+    Budgeting ignored accepted line/item count, required per-item metadata, the
+    failed-artifact repair context, or the fact that the model-facing schema
+    itself had no finite serialized surface. The root contract also failed to
+    forbid input-envelope keys or a known scalar-vs-array repair shape explicitly.
   fix: |
-    Calculate output reservation from every structural size driver, including
-    accepted line or item count, after the authoritative graph is final. Keep
-    typed repair context to the failed artifact plus only the locked facts the
-    model cannot derive; do not duplicate a copyable JSON request envelope.
-    Record the budget receipt, require the requested root literal at response
-    start, forbid request-envelope keys, and fail loud when prompt plus output
-    cannot fit the actual context window.
+    Bound the model-facing artifact surface first: rows, nested evidence spans,
+    and every material serialized string/item length. Then calculate output
+    reservation from every remaining structural size driver, including accepted
+    line or item count, after the authoritative graph is final. Keep typed
+    repair context to the failed artifact plus only the locked facts the model
+    cannot derive; do not duplicate a copyable JSON request envelope. Record
+    the budget and surface receipt, require the requested root literal at
+    response start, explicitly require scalar fields that the model previously
+    returned as arrays, forbid request-envelope keys, and fail loud when prompt
+    plus output cannot fit the actual context window.
   verify: |
     At fixed word steer, increase accepted line count and assert the reservation
-    rises. Assert a known live repair prompt fits after reservation, the repair
-    payload is not a copyable JSON request envelope, the effective prompt
-    retains every required schema path, envelope-root output is rejected, and
-    an insufficient context cap fails before generation rather than silently
-    truncating.
+    rises. For a source-evidence artifact, reject an over-limit row/span/string
+    surface before the call. Assert a known live repair prompt fits after
+    reservation, the repair payload is not a copyable JSON request envelope,
+    the effective prompt retains every required schema path and scalar-field
+    instruction, envelope-root output is rejected, and an insufficient context
+    cap fails before generation rather than silently truncating.
   tags: [llm-output, token-budget, context-window, structured-output, envelope-echo, fail-loud, xref-11.30, llm]
   legacy_id: PBUG-20260711-12
 

@@ -1268,9 +1268,16 @@ class TestPhase07To12ProductionRegressionCatalog:
             "test_p3_typed_repair_receives_the_locked_score_graph_contract",
             "test_p3_repair_context_is_not_a_copyable_json_request_envelope",
             "test_radio_score_output_budget_preserves_the_live_p3_repair_window",
+            "test_fact_index_contract_bounds_output_surface",
+            "test_fact_index_token_budget_keeps_the_live_120_word_window",
+            "test_p0_typed_repair_is_compact_and_requires_scalar_tone",
             "test_script_output_token_budget_receipts_and_bounds",
             "test_script_artifact_metadata_repair_normalizes_only_graph_metadata",
             "test_script_metadata_repair_short_circuits_the_typed_repair_model_call",
+        ),
+        "tests/test_scifi_lane_schema_parity.py": (
+            "test_source_grounded_p0_has_a_finite_shared_output_envelope",
+            "test_sibling_p0_typed_repairs_are_compact_and_require_scalar_tone",
         ),
         "tests/test_fetch_science_news_no_legacy_wrapper.py": (
             "test_scifi_v4_source_floor_requires_length_words_and_token_diversity",
