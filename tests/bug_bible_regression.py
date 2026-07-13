@@ -1304,6 +1304,26 @@ class TestPhase11BoundedRepairContracts:
             in test_source
         )
 
+    def test_otr_cast_names_use_bounded_acronym_aware_grammar(self, pack_dir):
+        lane_path = os.path.join(pack_dir, "nodes", "_otr_scifi_codex.py")
+        test_path = os.path.join(pack_dir, "tests", "test_scifi_codex_lane.py")
+        if not os.path.isfile(lane_path) or not os.path.isfile(test_path):
+            pytest.skip("BUG-11.52 acronym-aware cast-name guard is OTR-local")
+
+        with open(lane_path, "r", encoding="utf-8") as f:
+            lane_source = f.read()
+        with open(test_path, "r", encoding="utf-8") as f:
+            test_source = f.read()
+
+        assert "_CAST_NAME_ACRONYM_RE = re.compile(r\"[A-Z]{2,3}\")" in lane_source
+        assert "acronym_count <= 1" in lane_source
+        assert "One short 2-3 letter acronym token is allowed" in lane_source
+        assert "digits and all-uppercase full labels are forbidden" in lane_source
+        assert (
+            "test_p2_repair_accepts_short_acronym_inside_title_case_character_name"
+            in test_source
+        )
+
 
 class TestPhase07To12ProductionRegressionCatalog:
     """OTR-local guard for live-only BUG-07.22, BUG-07.23, BUG-08.08,

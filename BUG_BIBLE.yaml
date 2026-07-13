@@ -4303,3 +4303,29 @@ bugs:
     evidence-derived allowlist.
   tags: [llm-output, validation, source-grounding, acronyms, spoken-text, repair-ladder, fail-closed]
   legacy_id: PBUG-20260713-07
+
+- id: "11.52"
+  phase: 11
+  area: llm-output-validation
+  symptom: |
+    A character-name repair removes a digit or other visible defect but still
+    fails because a legitimate short acronym inside the otherwise canonical
+    name is rejected by an unstated validator rule.
+  cause: |
+    The validator equates canonical names with Title-Case tokens only, while the
+    repair prompt describes the contract less precisely. Acronym-bearing role
+    names, unstructured uppercase labels, and numeric identifiers are therefore
+    not distinguished at the authoring boundary.
+  fix: |
+    Define one bounded shared grammar for validation and repair instructions:
+    require at least one normal Title-Case word, permit at most one short 2-3
+    letter acronym token, and reject digits, lowercase labels, empty tokens,
+    multiple acronyms, and all-uppercase full labels. Keep the name authored;
+    deterministic code validates but does not rewrite it.
+  verify: |
+    Accept an acronym plus Title-Case role name and an ordinary titled personal
+    name. Reject digit-bearing, lowercase, and all-uppercase label forms. Drive
+    an invalid base artifact through one authored repair and assert the repair
+    sees the same exact acronym-aware grammar enforced by the validator.
+  tags: [llm-output, validation, cast-name, acronym, title-case, typed-repair, fail-closed]
+  legacy_id: PBUG-20260713-09
