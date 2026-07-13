@@ -3799,7 +3799,9 @@ bugs:
     A lazy slot wrapper can also erase the concrete transport behavior needed
     to choose a safe bounded patch route, and generic attempt accounting can
     overwrite a direct patch's real parse/schema failure with the empty
-    factory-result classification.
+    factory-result classification. An upstream base or rewrite prompt can also
+    expose private schema caps as authoring targets and invite a broad rewrite,
+    creating more local overflows than the proven patch envelope can carry.
   fix: |
     Derive a minimal typed patch plan from immutable contract evidence. Allow
     the model to replace only the named leaf fields; require exact one-for-one
@@ -3823,6 +3825,10 @@ bugs:
     Python-clip authored text. Name source inputs as explicit transform tasks,
     not output-like fields that invite unchanged copying, and keep the patch
     contract concise rather than duplicating competing instructions.
+    Apply those conservative ceilings at base, restart, full-repair, and rewrite
+    authoring boundaries as well as the local patch. A rewrite must change only
+    prose required by its review and preserve every other prior prose leaf byte
+    for byte; do not solve broad overflow by arbitrarily widening patch capacity.
     Distinguish a model-authored replacement overflow from an invalid patch
     root in the bounded receipt without retaining rejected prose.
   verify: |
@@ -3841,7 +3847,9 @@ bugs:
     parse/schema statuses. Capture the repair request and require its authoring
     target to have safety margin below the hard cap. Inject a replacement just
     over that cap and require a prose-overflow receipt code with no rejected
-    text retained.
+    text retained. Capture base, full-repair, and rewrite instructions and prove
+    each exposes only conservative prose ceilings; require rewrite to preserve
+    non-target prose byte for byte.
   tags: [llm-output, bounded-patch, typed-schema, localized-repair, context-window, fail-closed, llm]
   legacy_id: PBUG-20260712-12
 

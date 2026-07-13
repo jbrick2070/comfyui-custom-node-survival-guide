@@ -1276,6 +1276,14 @@ class TestPhase11BoundedRepairContracts:
         assert "flattened total across every scenes[*].beats array" in lane_source
         assert "Each individual scene may contain at most" in lane_source
         assert "test_p3_base_and_repair_bind_locked_total_to_per_scene_cap" in test_source
+        assert "safe ceilings: title <=48; premise <=108; setting <=60" in lane_source
+        assert "env <=42; description <=54" in lane_source
+        assert "description <=54 and visual_prompt <=90" in lane_source
+        assert "intent <=48; arc_phase <=21" in lane_source
+        assert "description <=60; generation_prompt <=90" in lane_source
+        assert "preserve every other previous_draft prose leaf byte for byte" in lane_source
+        assert "test_p3_compact_contract_names_nested_literal_values_on_base_and_repair" in test_source
+        assert "test_p3_rewrite_rejects_structural_mutation_then_repairs_the_draft" in test_source
 
     def test_otr_spoken_hygiene_allows_only_source_grounded_acronyms(self, pack_dir):
         lane_path = os.path.join(pack_dir, "nodes", "_otr_scifi_codex.py")
