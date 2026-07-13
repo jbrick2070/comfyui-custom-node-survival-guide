@@ -3753,22 +3753,46 @@ bugs:
   symptom: |
     A full score or script is regenerated to correct one localized semantic
     omission, causing context-window overflow or repeating the omission while
-    needlessly risking already-valid structure and prose.
+    needlessly risking already-valid structure and prose. The same failure can
+    appear when a complete typed artifact has only a few author-owned strings
+    over finite schema caps: a whole-artifact typed repair reauthors valid
+    surface but repeats the local overflow.
   cause: |
     The repair ladder treats a missing fact in one explicitly owned leaf as a
     whole-document failure instead of distinguishing local semantic repair
-    from structural or global-contract repair.
+    from structural or global-contract repair. It may also classify visible
+    Pydantic string-length errors as local without proving the still-hidden
+    compiler, graph, reference, or rewrite contract is otherwise valid.
+    A lazy slot wrapper can also erase the remote provider capability that
+    selects the normal full-repair route, and generic attempt accounting can
+    overwrite a direct patch's real parse/schema failure with the empty
+    factory-result classification.
   fix: |
     Derive a minimal typed patch plan from immutable contract evidence. Allow
     the model to replace only the named leaf fields; require exact one-for-one
     target coverage, required literal anchors, no out-of-scope edits, and a
-    complete merged-artifact validation. Unknown or broader defects remain
-    fail-closed on the normal ladder.
+    complete merged-artifact validation. For author-owned over-cap prose,
+    derive exact typed validation locations and declared caps, preserve the
+    complete original selected text in a bounded request, preflight a probe
+    through the complete artifact validator before patch dispatch, and let the
+    author make one bounded shortening decision. Unknown, broader, hidden
+    structural, malformed, or still-over-cap defects remain fail-closed on the
+    normal ladder; never Python-clip author prose. Preserve explicit provider
+    capability and JSON transport through lazy slot wrappers; unknown wrappers
+    are not local-patch eligible. Let a direct patch own its bounded receipt so
+    generic completion handling cannot rewrite its parse/schema/contract truth.
   verify: |
     Remove one immutable literal from an otherwise valid score and script.
     Assert a small typed patch repairs only its planned target, rejects missing
     or unplanned targets, leaves every other field byte-identical, and clears
-    the complete artifact validator.
+    the complete artifact validator. For a live over-cap prose shape, exercise
+    every whitelisted leaf/cap, reject mixed or oversized-target errors, prove
+    hidden graph/compiler failure takes the normal repair, require exactly one
+    author patch call with a bounded receipt, and reject malformed, duplicate,
+    unknown, blank, or still-over-cap replacement rows without another reroll.
+    Exercise a scheduler-wrapped remote slot and assert it preserves same-slot
+    JSON-mode full repair, and assert malformed direct-patch receipts retain
+    their real parse/schema statuses.
   tags: [llm-output, bounded-patch, typed-schema, localized-repair, context-window, fail-closed, llm]
   legacy_id: PBUG-20260712-12
 

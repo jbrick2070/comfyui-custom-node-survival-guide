@@ -1271,6 +1271,15 @@ class TestPhase07To12ProductionRegressionCatalog:
             "test_draft_compiler_rejects_unowned_or_invalid_runtime_decisions",
             "test_p3_semantic_repair_uses_minified_draft_and_bounded_receipts",
             "test_p3_compact_contract_names_nested_literal_values_on_base_and_repair",
+            "test_p3_text_patch_gate_covers_each_author_owned_leaf",
+            "test_p3_local_text_patch_repairs_one_leaf_with_one_bounded_call",
+            "test_p3_rewrite_local_text_patch_preserves_locked_structure",
+            "test_p3_text_patch_preflight_falls_back_for_hidden_compiler_defect",
+            "test_p3_malformed_text_patch_fails_without_a_third_reroll",
+            "test_p3_text_patch_contract_rejects_missing_duplicate_unknown_blank_and_overcap_rows",
+            "test_p3_text_patch_rejects_a_resolved_artifact_wrapper_without_reroll",
+            "test_p3_openrouter_overlength_uses_same_slot_full_repair_with_json_mode",
+            "test_p3_scheduler_openrouter_stays_on_full_repair_and_forwards_json_mode",
             "test_p3_two_decode_failures_restart_only_from_trusted_draft_context",
             "test_p3_rewrite_rejects_structural_mutation_then_repairs_the_draft",
             "test_project_compile_round_trip_preserves_the_rewrite_structure",
@@ -1353,6 +1362,71 @@ class TestPhase07To12ProductionRegressionCatalog:
         assert "Remove-Item -LiteralPath $StaleExtraEnv -Force" in headless_source, (
             "BUG-12.52: canonical headless boot must clear a stale one-shot override"
         )
+
+    def test_otr_local_p3_prose_patch_is_declared_and_fail_closed(self, pack_dir):
+        """BUG-11.42 extension: bounded local prose repair stays model-owned."""
+        lane_path = os.path.join(pack_dir, "nodes", "_otr_scifi_codex.py")
+        if not os.path.isfile(lane_path):
+            pytest.skip("BUG-11.42 P3 prose patch guard is OTR-local")
+        with open(lane_path, "r", encoding="utf-8") as f:
+            source = f.read()
+        tree = ast.parse(source)
+        class_names = {
+            node.name for node in ast.walk(tree)
+            if isinstance(node, ast.ClassDef)
+        }
+        function_names = {
+            node.name for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+        assert {
+            "_RadioScoreDraftTextPatchRowV4",
+            "_RadioScoreDraftTextPatchV4",
+        } <= class_names, (
+            "BUG-11.42: P3 prose patch must have a strict typed patch root"
+        )
+        assert {
+            "_derive_p3_text_patch_targets",
+            "_p3_text_patch_preflight",
+            "_merge_p3_text_patch",
+            "_run_local_p3_text_patch",
+        } <= function_names, (
+            "BUG-11.42: P3 prose patch must retain its guarded local boundary"
+        )
+        assert "_P3_TEXT_PATCH_MAX_TARGETS = 6" in source
+        assert "_P3_TEXT_PATCH_MAX_OUTPUT_TOKENS = 512" in source
+        assert "invoke_structured_slot(" in source
+        assert "_PromptMustFitMessages(_p3_text_patch_messages" in source
+        assert "capture._otr_openrouter" in source
+        assert "_otr_p3_text_patch_local" in source
+        assert "and isinstance(error, ValidationError)" in source
+
+        writer_path = os.path.join(pack_dir, "nodes", "OTR_LedgerScriptWriter.py")
+        with open(writer_path, "r", encoding="utf-8") as f:
+            writer_source = f.read()
+        assert "def _slot_transport_markers" in writer_source
+        assert "_otr_p3_text_patch_local" in writer_source
+        assert "response_format=None" in writer_source
+
+        pack_path = os.path.join(
+            pack_dir, "nodes", "story_packs", "scifi_codex", "scifi_codex_v1.json",
+        )
+        pipeline_path = os.path.join(pack_dir, "nodes", "story_packs", "pipelines.json")
+        with open(pack_path, "r", encoding="utf-8") as f:
+            pack = json.load(f)
+        with open(pipeline_path, "r", encoding="utf-8") as f:
+            pipelines = json.load(f)
+        seam = pack["prompt_stages"]["codex_radio_score_text_patch"]
+        assert "replacements" in seam and "exactly once" in seam
+        pipeline = next(
+            row for row in pipelines["pipelines"]
+            if row["story_pipeline_id"] == "scifi_codex_circuit"
+        )
+        patch_pass = next(
+            row for row in pipeline["passes"]
+            if row["pass_id"] == "P3_authored_text_patch"
+        )
+        assert patch_pass["seam_refs"] == ["codex_radio_score_text_patch"]
 
 
 class TestPhase02BugBible0214:
