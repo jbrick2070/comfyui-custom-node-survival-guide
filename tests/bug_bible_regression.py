@@ -1261,6 +1261,8 @@ class TestPhase07To12ProductionRegressionCatalog:
         "tests/test_scifi_source_repair.py": (
             "test_repair_rehomes_exact_quote_only_when_field_label_is_wrong",
             "test_repair_drops_unsupported_fact_but_keeps_literal_fact",
+            "test_repair_bounds_an_exact_oversized_quote_without_changing_the_claim",
+            "test_repair_refuses_an_oversized_quote_that_is_not_literal_source_text",
             "test_json_parser_does_not_salvage_nested_child_from_broken_outer_object",
             "test_schema_instruction_contains_every_required_path_for_nested_radio_score",
         ),
@@ -1277,6 +1279,7 @@ class TestPhase07To12ProductionRegressionCatalog:
             "test_fact_index_contract_bounds_output_surface",
             "test_fact_index_token_budget_keeps_the_live_120_word_window",
             "test_p0_typed_repair_is_compact_and_requires_scalar_tone",
+            "test_p0_deterministic_repair_bounds_an_exact_overwide_literal_quote",
             "test_script_output_token_budget_receipts_and_bounds",
             "test_script_artifact_metadata_repair_normalizes_only_graph_metadata",
             "test_script_metadata_repair_short_circuits_the_typed_repair_model_call",
@@ -1286,6 +1289,7 @@ class TestPhase07To12ProductionRegressionCatalog:
         ),
         "tests/test_scifi_lane_schema_parity.py": (
             "test_source_grounded_p0_has_a_finite_shared_output_envelope",
+            "test_source_grounded_p0_disables_generic_string_clamping",
             "test_sibling_p0_typed_repairs_are_compact_and_require_scalar_tone",
         ),
         "tests/test_fetch_science_news_no_legacy_wrapper.py": (

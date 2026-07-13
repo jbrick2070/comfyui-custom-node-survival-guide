@@ -3960,6 +3960,10 @@ bugs:
     The same failure occurs when a nested whole-score artifact leaves scenes,
     shots, beats, line IDs, or authored prose unbounded: a low word target does
     not bound serialized planning metadata.
+    A generic string clamp can also shorten a literal provenance quote at a word
+    boundary while retaining its old coordinate end, creating a synthetic
+    source-span mismatch that a raw metadata repair cannot parse if the quote
+    still exceeds the finite schema cap.
   cause: |
     Budgeting ignored accepted line/item count, required per-item metadata, the
     failed-artifact repair context, or the fact that the model-facing schema
@@ -3967,6 +3971,9 @@ bugs:
     forbid input-envelope keys or a known scalar-vs-array repair shape explicitly.
     A generic over-length-string clamp can further hide an authored-artifact
     overflow by silently changing prose instead of advancing the repair ladder.
+    The same compatibility clamp is unsafe at a source-grounded P0 boundary:
+    quote text is deterministic metadata, but claims and tone remain authored
+    content, so one generic coercion cannot safely handle both classes.
   fix: |
     Bound the model-facing artifact surface first: rows, nested evidence spans,
     and every material serialized string/item length. Then calculate output
@@ -4004,6 +4011,12 @@ bugs:
     and scalar-field instruction, envelope-root output is rejected, and an
     insufficient context cap fails before generation rather than silently
     truncating.
+    For an exact literal source quote that alone exceeds a finite span cap,
+    repair from the raw reply only after proving the complete quote occurs in one
+    legal source field under the normal ambiguity rules. Reindex it, replace only
+    the quote with that coordinate's exact bounded source prefix, and recompute
+    the end. Disable generic string clamping for source-grounded P0 calls; never
+    use this exception to shorten a claim, tone, or nonliteral/ambiguous text.
   tags: [llm-output, token-budget, context-window, structured-output, envelope-echo, fail-loud, xref-11.30, llm]
   legacy_id: PBUG-20260711-12
 
