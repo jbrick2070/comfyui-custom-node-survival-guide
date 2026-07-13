@@ -1123,9 +1123,9 @@ class TestPhase02UtfLauncherGuard:
 #   returning unpadded IDs through the repair contract.
 # BUG-11.37 (span-integrity offset repair): Requires a live offset-shifted
 #   exact-quote fixture through the metadata-only repair module.
-# BUG-11.38 (legacy Markdown/score-shape drift): Requires capturing a live
-#   typed-pass prompt per lane and inspecting it for the required schema
-#   keys.
+# BUG-11.38's cross-lane legacy Markdown/score-shape portion still requires
+#   captured live prompts per lane. Its compact P4 literal/item-type extension
+#   has executable OTR coverage below.
 # BUG-12.48 (refine-loop save race vs freeze cascade): Requires running
 #   the refine loop repeatedly under load; a concurrency/timing property,
 #   not a static one.
@@ -1245,6 +1245,26 @@ class TestPhase11BoundedRepairContracts:
             assert f"def {test_name}(" in runner_test_source, (
                 f"BUG-11.39..11.45: missing OTR behavior regression {test_name}"
             )
+
+    def test_otr_compact_p4_repair_repeats_literal_and_item_type_contract(self, pack_dir):
+        lane_path = os.path.join(pack_dir, "nodes", "_otr_scifi_codex.py")
+        test_path = os.path.join(pack_dir, "tests", "test_scifi_codex_lane.py")
+        if not os.path.isfile(lane_path) or not os.path.isfile(test_path):
+            pytest.skip("BUG-11.38 compact P4 guard is OTR-local")
+
+        with open(lane_path, "r", encoding="utf-8") as f:
+            lane_source = f.read()
+        with open(test_path, "r", encoding="utf-8") as f:
+            test_source = f.read()
+
+        assert "_STRUCTURE_REVIEW_CONTRACT_INSTRUCTION" in lane_source
+        assert 'elif pass_id == "P4" and result_type is StructureReviewV4' in lane_source
+        assert "never return fail" in lane_source
+        assert "never objects" in lane_source
+        assert (
+            "test_p4_typed_repair_keeps_exact_review_shape_and_only_compact_failed_review"
+            in test_source
+        )
 
 
 class TestPhase07To12ProductionRegressionCatalog:

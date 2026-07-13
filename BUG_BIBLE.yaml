@@ -3597,6 +3597,9 @@ bugs:
     its literal/type semantics: the model then supplies a numeric advisory value
     where a narrative string belongs or invents a descriptive enum value, and
     the same omission survives typed repair.
+    A small review artifact can likewise begin with the correct verdict and
+    item shape but one over-cap string; an ambiguous repair then replaces a
+    valid literal and string list with diagnostic vocabulary and objects.
   cause: |
     The prompt/seam said "JSON only" but never named the exact current
     schema's required top-level keys, so the model copied the shape of
@@ -3605,6 +3608,9 @@ bugs:
     When a full schema is intentionally omitted for context fit, the compact
     replacement repeated field names but lost nested enum literals and the
     distinction between advisory numeric inputs and model-authored prose.
+    Feeding a large original input and structured validation diagnostics into
+    a small-artifact repair can also make those evidence shapes compete with
+    the output schema.
   fix: |
     Append the exact required top-level schema keys to every typed pass
     and repair seam across all lanes sharing the contract, and
@@ -3613,7 +3619,10 @@ bugs:
     load-bearing nested literal/type rule in model language (for example,
     enumerate allowed cue IDs and state that a narrative phase is a JSON string,
     never a word-band number). Feed the same compact contract to base, restart,
-    and typed-repair calls. Do not normalize author-owned choices in Python.
+    and typed-repair calls. For a small repair, supply only the failed artifact
+    plus bounded rejection evidence, preserve already-valid fields, and state
+    that diagnostic codes/messages are not an output template. Do not normalize
+    author-owned choices in Python.
   verify: |
     Capture a typed-pass prompt for each affected lane; assert the exact
     required top-level schema keys are named in the prompt text. Live
@@ -3621,6 +3630,10 @@ bugs:
     inject a numeric narrative phase and a descriptive enum name, then assert
     both the base and typed-repair prompts carry the precise nested literal/type
     rules and accept only the corrected model-authored draft.
+    Also inject a correctly shaped review with one over-cap rationale; require
+    repair to preserve its valid verdict and string-item list, shorten only the
+    rejected prose, repeat the literal/item-type contract in both prompts, and
+    omit the large original request from the repair turn.
   tags: [llm-output, structured-output, schema-drift, legacy-shape, markdown, repair-seam, nested-literals, compact-schema, llm]
   legacy_id: PBUG-20260711-03
 
