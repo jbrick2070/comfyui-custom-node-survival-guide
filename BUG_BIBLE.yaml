@@ -3763,8 +3763,8 @@ bugs:
     from structural or global-contract repair. It may also classify visible
     Pydantic string-length errors as local without proving the still-hidden
     compiler, graph, reference, or rewrite contract is otherwise valid.
-    A lazy slot wrapper can also erase the remote provider capability that
-    selects the normal full-repair route, and generic attempt accounting can
+    A lazy slot wrapper can also erase the concrete transport behavior needed
+    to choose a safe bounded patch route, and generic attempt accounting can
     overwrite a direct patch's real parse/schema failure with the empty
     factory-result classification.
   fix: |
@@ -3777,9 +3777,12 @@ bugs:
     through the complete artifact validator before patch dispatch, and let the
     author make one bounded shortening decision. Unknown, broader, hidden
     structural, malformed, or still-over-cap defects remain fail-closed on the
-    normal ladder; never Python-clip author prose. Preserve explicit provider
-    capability and JSON transport through lazy slot wrappers; unknown wrappers
-    are not local-patch eligible. Let a direct patch own its bounded receipt so
+    normal ladder; never Python-clip author prose. Admit any transport only by
+    an explicit behavioral capability: exact-tokenizer prompt-fit enforcement,
+    or complete-message delivery with terminal provider/context failure. Keep
+    output limits strict across provider-wide floor overrides. Preserve JSON
+    transport through lazy slot wrappers; unknown wrappers are not patch
+    eligible. Let a direct patch own its bounded receipt so
     generic completion handling cannot rewrite its parse/schema/contract truth.
   verify: |
     Remove one immutable literal from an otherwise valid score and script.
@@ -3790,9 +3793,11 @@ bugs:
     hidden graph/compiler failure takes the normal repair, require exactly one
     author patch call with a bounded receipt, and reject malformed, duplicate,
     unknown, blank, or still-over-cap replacement rows without another reroll.
-    Exercise a scheduler-wrapped remote slot and assert it preserves same-slot
-    JSON-mode full repair, and assert malformed direct-patch receipts retain
-    their real parse/schema statuses.
+    Exercise a scheduler-wrapped full-message remote slot and assert a captured
+    localized shape uses same-slot JSON-mode bounded repair, its strict output
+    limit survives a larger global floor, and an over-envelope shape preserves
+    full repair. Assert malformed direct-patch receipts retain their real
+    parse/schema statuses.
   tags: [llm-output, bounded-patch, typed-schema, localized-repair, context-window, fail-closed, llm]
   legacy_id: PBUG-20260712-12
 

@@ -1371,8 +1371,8 @@ class TestPhase07To12ProductionRegressionCatalog:
             "BUG-12.52: canonical headless boot must clear a stale one-shot override"
         )
 
-    def test_otr_local_p3_prose_patch_is_declared_and_fail_closed(self, pack_dir):
-        """BUG-11.42 extension: bounded local prose repair stays model-owned."""
+    def test_otr_p3_prose_patch_transports_are_declared_and_fail_closed(self, pack_dir):
+        """BUG-11.42: bounded prose repair requires a proven transport."""
         lane_path = os.path.join(pack_dir, "nodes", "_otr_scifi_codex.py")
         if not os.path.isfile(lane_path):
             pytest.skip("BUG-11.42 P3 prose patch guard is OTR-local")
@@ -1397,16 +1397,18 @@ class TestPhase07To12ProductionRegressionCatalog:
             "_derive_p3_text_patch_targets",
             "_p3_text_patch_preflight",
             "_merge_p3_text_patch",
-            "_run_local_p3_text_patch",
+            "_run_p3_text_patch",
         } <= function_names, (
-            "BUG-11.42: P3 prose patch must retain its guarded local boundary"
+            "BUG-11.42: P3 prose patch must retain its guarded boundary"
         )
-        assert "_P3_TEXT_PATCH_MAX_TARGETS = 6" in source
-        assert "_P3_TEXT_PATCH_MAX_OUTPUT_TOKENS = 512" in source
+        assert "_P3_TEXT_PATCH_MAX_TARGETS = 12" in source
+        assert "_P3_TEXT_PATCH_MAX_OUTPUT_TOKENS = 1024" in source
         assert "invoke_structured_slot(" in source
-        assert "_PromptMustFitMessages(_p3_text_patch_messages" in source
+        assert "_P3TextPatchMessages(_p3_text_patch_messages" in source
+        assert "_otr_strict_remote_output_budget = True" in source
         assert "capture._otr_openrouter" in source
-        assert "_otr_p3_text_patch_local" in source
+        assert "_otr_p3_text_patch_transport" in source
+        assert '"full_message_remote"' in source
         assert "and isinstance(error, ValidationError)" in source
 
         writer_path = os.path.join(pack_dir, "nodes", "OTR_LedgerScriptWriter.py")
@@ -1414,7 +1416,14 @@ class TestPhase07To12ProductionRegressionCatalog:
             writer_source = f.read()
         assert "def _slot_transport_markers" in writer_source
         assert "_otr_p3_text_patch_local" in writer_source
+        assert "_otr_p3_text_patch_transport" in writer_source
+        assert '"full_message_remote"' in writer_source
         assert "response_format=None" in writer_source
+
+        backend_path = os.path.join(pack_dir, "nodes", "_otr_openrouter_backend.py")
+        with open(backend_path, "r", encoding="utf-8") as f:
+            backend_source = f.read()
+        assert "_otr_strict_remote_output_budget" in backend_source
 
         pack_path = os.path.join(
             pack_dir, "nodes", "story_packs", "scifi_codex", "scifi_codex_v1.json",
