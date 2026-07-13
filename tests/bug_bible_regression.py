@@ -1297,6 +1297,7 @@ class TestPhase07To12ProductionRegressionCatalog:
             "test_p3_text_patch_preflight_falls_back_for_hidden_compiler_defect",
             "test_p3_malformed_text_patch_fails_without_a_third_reroll",
             "test_p3_text_patch_contract_rejects_missing_duplicate_unknown_blank_and_overcap_rows",
+            "test_p3_text_patch_receipt_distinguishes_model_prose_over_schema_cap",
             "test_p3_text_patch_rejects_a_resolved_artifact_wrapper_without_reroll",
             "test_p3_openrouter_overlength_uses_same_slot_full_repair_with_json_mode",
             "test_p3_scheduler_openrouter_stays_on_full_repair_and_forwards_json_mode",
@@ -1423,6 +1424,10 @@ class TestPhase07To12ProductionRegressionCatalog:
         )
         assert "_P3_TEXT_PATCH_MAX_TARGETS = 12" in source
         assert "_P3_TEXT_PATCH_MAX_OUTPUT_TOKENS = 1024" in source
+        assert "(target.max_chars * 3) // 4" in source
+        assert '"rewrite_tasks"' in source
+        assert '"source_to_shorten"' in source
+        assert '"replacement_over_schema_cap"' in source
         assert "invoke_structured_slot(" in source
         assert "_P3TextPatchMessages(_p3_text_patch_messages" in source
         assert "_otr_strict_remote_output_budget = True" in source

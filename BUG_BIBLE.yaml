@@ -3797,6 +3797,14 @@ bugs:
     transport through lazy slot wrappers; unknown wrappers are not patch
     eligible. Let a direct patch own its bounded receipt so
     generic completion handling cannot rewrite its parse/schema/contract truth.
+    Because models approximate character counts, expose only a conservative
+    authoring ceiling below each immutable schema cap; keep the larger hard
+    rejection edge private so the model cannot anchor on it, and never
+    Python-clip authored text. Name source inputs as explicit transform tasks,
+    not output-like fields that invite unchanged copying, and keep the patch
+    contract concise rather than duplicating competing instructions.
+    Distinguish a model-authored replacement overflow from an invalid patch
+    root in the bounded receipt without retaining rejected prose.
   verify: |
     Remove one immutable literal from an otherwise valid score and script.
     Assert a small typed patch repairs only its planned target, rejects missing
@@ -3810,7 +3818,10 @@ bugs:
     localized shape uses same-slot JSON-mode bounded repair, its strict output
     limit survives a larger global floor, and an over-envelope shape preserves
     full repair. Assert malformed direct-patch receipts retain their real
-    parse/schema statuses.
+    parse/schema statuses. Capture the repair request and require its authoring
+    target to have safety margin below the hard cap. Inject a replacement just
+    over that cap and require a prose-overflow receipt code with no rejected
+    text retained.
   tags: [llm-output, bounded-patch, typed-schema, localized-repair, context-window, fail-closed, llm]
   legacy_id: PBUG-20260712-12
 
