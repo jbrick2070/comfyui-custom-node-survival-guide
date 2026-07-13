@@ -3603,6 +3603,9 @@ bugs:
     A tiny authored artifact can also have one over-cap string copied unchanged
     by repair when its exact per-field limits are present only in machine schema
     and a much larger original request competes with the failed object.
+    A compact nested artifact can satisfy a locked global item count by placing
+    every item into one local collection, crossing that collection's independent
+    cap, when the prompt states the two constraints without relating them.
   cause: |
     The prompt/seam said "JSON only" but never named the exact current
     schema's required top-level keys, so the model copied the shape of
@@ -3629,6 +3632,9 @@ bugs:
     per-field caps in plain model language. For a rejected authored string,
     require a real rewrite rather than an unchanged copy or mechanical clipping,
     and give the writer a conservative target below the hard rejection edge.
+    When a locked global count is distributed across bounded nested collections,
+    state the exact required flattened total, each local maximum, and the derived
+    minimum collection count together at base and repair boundaries.
   verify: |
     Capture a typed-pass prompt for each affected lane; assert the exact
     required top-level schema keys are named in the prompt text. Live
@@ -3644,6 +3650,10 @@ bugs:
     the repair prompt to state all hard caps plus a lower rewrite target, carry
     only the failed artifact and rejection, preserve valid fields byte for byte,
     and accept only a model-authored bounded replacement.
+    For nested topology, inject an artifact with too few total items and require
+    the repair to meet the locked flattened total without crossing any local cap;
+    assert base and repair prompts both name the exact total, local maximum, and
+    derived minimum number of collections.
   tags: [llm-output, structured-output, schema-drift, legacy-shape, markdown, repair-seam, nested-literals, compact-schema, llm]
   legacy_id: PBUG-20260711-03
 

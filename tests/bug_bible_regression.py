@@ -1272,6 +1272,10 @@ class TestPhase11BoundedRepairContracts:
             "test_p1_typed_repair_uses_compact_exact_contract_and_safe_rewrite_margin"
             in test_source
         )
+        assert "_radio_score_draft_topology_instruction" in lane_source
+        assert "flattened total across every scenes[*].beats array" in lane_source
+        assert "Each individual scene may contain at most" in lane_source
+        assert "test_p3_base_and_repair_bind_locked_total_to_per_scene_cap" in test_source
 
 
 class TestPhase07To12ProductionRegressionCatalog:
