@@ -1270,6 +1270,7 @@ class TestPhase07To12ProductionRegressionCatalog:
             "test_draft_compiler_derives_only_mechanical_score_metadata",
             "test_draft_compiler_rejects_unowned_or_invalid_runtime_decisions",
             "test_p3_semantic_repair_uses_minified_draft_and_bounded_receipts",
+            "test_p3_compact_contract_names_nested_literal_values_on_base_and_repair",
             "test_p3_two_decode_failures_restart_only_from_trusted_draft_context",
             "test_p3_rewrite_rejects_structural_mutation_then_repairs_the_draft",
             "test_project_compile_round_trip_preserves_the_rewrite_structure",
