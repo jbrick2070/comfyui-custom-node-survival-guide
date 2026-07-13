@@ -3957,11 +3957,16 @@ bugs:
     returning the requested artifact root. A source-evidence artifact with
     unbounded rows, per-row spans, or serialized strings has no defensible
     fixed reservation even when its top-level list count looks bounded.
+    The same failure occurs when a nested whole-score artifact leaves scenes,
+    shots, beats, line IDs, or authored prose unbounded: a low word target does
+    not bound serialized planning metadata.
   cause: |
     Budgeting ignored accepted line/item count, required per-item metadata, the
     failed-artifact repair context, or the fact that the model-facing schema
     itself had no finite serialized surface. The root contract also failed to
     forbid input-envelope keys or a known scalar-vs-array repair shape explicitly.
+    A generic over-length-string clamp can further hide an authored-artifact
+    overflow by silently changing prose instead of advancing the repair ladder.
   fix: |
     Bound the model-facing artifact surface first: rows, nested evidence spans,
     and every material serialized string/item length. Then calculate output
@@ -3972,13 +3977,22 @@ bugs:
     the budget and surface receipt, require the requested root literal at
     response start, explicitly require scalar fields that the model previously
     returned as arrays, forbid request-envelope keys, and fail loud when prompt
-    plus output cannot fit the actual context window.
+    plus output cannot fit the actual context window. For a directly emitted
+    nested score, local maxima are sufficient when they make every global
+    scene/shot/beat/line bound finite; do not introduce a second draft/compiler
+    representation merely to obtain those bounds. Disable generic string
+    clamping at authored-artifact boundaries so over-limit prose reaches typed
+    repair or fails closed.
   verify: |
-    At fixed word steer, increase accepted line count and assert the reservation
-    rises. For a source-evidence artifact, reject an over-limit row/span/string
-    surface before the call. Assert a known live repair prompt fits after
-    reservation, the repair payload is not a copyable JSON request envelope,
-    the effective prompt retains every required schema path and scalar-field
+    At fixed word steer, increase accepted graph width and assert either the
+    reservation rises or the finite schema rejects the over-limit surface. For
+    a source-evidence artifact, reject an over-limit row/span/string surface
+    before the call. For a nested score, reject over-limit local collections,
+    IDs, and prose, then measure a representative maximum base and repair
+    prompt against the real tokenizer/context reservation. Assert authored
+    over-length prose is not silently clamped, the repair payload is not a
+    copyable JSON request envelope or a duplicate accepted artifact, the
+    effective prompt retains every required schema path and scalar-field
     instruction, envelope-root output is rejected, and an insufficient context
     cap fails before generation rather than silently truncating.
   tags: [llm-output, token-budget, context-window, structured-output, envelope-echo, fail-loud, xref-11.30, llm]

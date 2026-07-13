@@ -1267,6 +1267,8 @@ class TestPhase07To12ProductionRegressionCatalog:
         "tests/test_scifi_codex_lane.py": (
             "test_p3_typed_repair_receives_the_locked_score_graph_contract",
             "test_p3_repair_context_is_not_a_copyable_json_request_envelope",
+            "test_p3_rewrite_repair_does_not_duplicate_the_accepted_score_context",
+            "test_radio_score_surface_is_finite_before_p3_reserves_output_capacity",
             "test_radio_score_output_budget_preserves_the_live_p3_repair_window",
             "test_fact_index_contract_bounds_output_surface",
             "test_fact_index_token_budget_keeps_the_live_120_word_window",
@@ -1274,6 +1276,9 @@ class TestPhase07To12ProductionRegressionCatalog:
             "test_script_output_token_budget_receipts_and_bounds",
             "test_script_artifact_metadata_repair_normalizes_only_graph_metadata",
             "test_script_metadata_repair_short_circuits_the_typed_repair_model_call",
+        ),
+        "tests/test_structured_call_clamp.py": (
+            "test_authored_artifact_can_disable_the_overlong_string_clamp",
         ),
         "tests/test_scifi_lane_schema_parity.py": (
             "test_source_grounded_p0_has_a_finite_shared_output_envelope",
