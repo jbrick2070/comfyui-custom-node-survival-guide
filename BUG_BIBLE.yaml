@@ -3600,6 +3600,9 @@ bugs:
     A small review artifact can likewise begin with the correct verdict and
     item shape but one over-cap string; an ambiguous repair then replaces a
     valid literal and string list with diagnostic vocabulary and objects.
+    A tiny authored artifact can also have one over-cap string copied unchanged
+    by repair when its exact per-field limits are present only in machine schema
+    and a much larger original request competes with the failed object.
   cause: |
     The prompt/seam said "JSON only" but never named the exact current
     schema's required top-level keys, so the model copied the shape of
@@ -3622,7 +3625,10 @@ bugs:
     and typed-repair calls. For a small repair, supply only the failed artifact
     plus bounded rejection evidence, preserve already-valid fields, and state
     that diagnostic codes/messages are not an output template. Do not normalize
-    author-owned choices in Python.
+    author-owned choices in Python. Repeat the small artifact's exact keys and
+    per-field caps in plain model language. For a rejected authored string,
+    require a real rewrite rather than an unchanged copy or mechanical clipping,
+    and give the writer a conservative target below the hard rejection edge.
   verify: |
     Capture a typed-pass prompt for each affected lane; assert the exact
     required top-level schema keys are named in the prompt text. Live
@@ -3634,6 +3640,10 @@ bugs:
     repair to preserve its valid verdict and string-item list, shorten only the
     rejected prose, repeat the literal/item-type contract in both prompts, and
     omit the large original request from the repair turn.
+    For a three-field authored artifact, inject one over-cap value and require
+    the repair prompt to state all hard caps plus a lower rewrite target, carry
+    only the failed artifact and rejection, preserve valid fields byte for byte,
+    and accept only a model-authored bounded replacement.
   tags: [llm-output, structured-output, schema-drift, legacy-shape, markdown, repair-seam, nested-literals, compact-schema, llm]
   legacy_id: PBUG-20260711-03
 

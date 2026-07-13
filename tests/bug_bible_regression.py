@@ -1124,8 +1124,8 @@ class TestPhase02UtfLauncherGuard:
 # BUG-11.37 (span-integrity offset repair): Requires a live offset-shifted
 #   exact-quote fixture through the metadata-only repair module.
 # BUG-11.38's cross-lane legacy Markdown/score-shape portion still requires
-#   captured live prompts per lane. Its compact P4 literal/item-type extension
-#   has executable OTR coverage below.
+#   captured live prompts per lane. Its compact P4 literal/item-type and P1
+#   bounded-authoring extensions have executable OTR coverage below.
 # BUG-12.48 (refine-loop save race vs freeze cascade): Requires running
 #   the refine loop repeatedly under load; a concurrency/timing property,
 #   not a static one.
@@ -1246,7 +1246,7 @@ class TestPhase11BoundedRepairContracts:
                 f"BUG-11.39..11.45: missing OTR behavior regression {test_name}"
             )
 
-    def test_otr_compact_p4_repair_repeats_literal_and_item_type_contract(self, pack_dir):
+    def test_otr_compact_repairs_repeat_exact_small_artifact_contracts(self, pack_dir):
         lane_path = os.path.join(pack_dir, "nodes", "_otr_scifi_codex.py")
         test_path = os.path.join(pack_dir, "tests", "test_scifi_codex_lane.py")
         if not os.path.isfile(lane_path) or not os.path.isfile(test_path):
@@ -1263,6 +1263,13 @@ class TestPhase11BoundedRepairContracts:
         assert "never objects" in lane_source
         assert (
             "test_p4_typed_repair_keeps_exact_review_shape_and_only_compact_failed_review"
+            in test_source
+        )
+        assert 'elif pass_id == "P1" and result_type is DramaticQuestionV4' in lane_source
+        assert "ending_direction at or below 90 characters" in lane_source
+        assert "never copy it unchanged" in lane_source
+        assert (
+            "test_p1_typed_repair_uses_compact_exact_contract_and_safe_rewrite_margin"
             in test_source
         )
 
