@@ -4270,3 +4270,28 @@ bugs:
     mandatory flag is retained.
   tags: [remote-llm, capability-negotiation, reasoning, catalog-cache, stale-cache, http-400, same-model-retry, fail-closed]
   legacy_id: PBUG-20260713-01
+
+- id: "11.51"
+  phase: 11
+  area: llm-output-validation
+  symptom: |
+    Source-grounded dialogue containing a legitimate acronym is rejected as
+    all-caps shouting. A repair can move the same acronym between lines without
+    satisfying the validator, exhausting the authored-artifact ladder.
+  cause: |
+    Lexical hygiene applies a blanket uppercase-token ban without consulting
+    the accepted evidence boundary, so grounded acronyms and ungrounded shouted
+    words are indistinguishable.
+  fix: |
+    Derive an exact immutable allowlist of uppercase lexical tokens only from
+    already accepted literal source spans and pass it through every script
+    validation boundary. Permit only exact grounded tokens; reject any other
+    all-caps lexical word. Do not lowercase, clip, or rewrite authored dialogue
+    in deterministic code.
+  verify: |
+    Build accepted evidence containing one acronym, use it successfully in
+    dialogue, and reject an ungrounded all-caps word in the same line. Assert
+    that base, retake, audit-rewrite, and final validators all receive the same
+    evidence-derived allowlist.
+  tags: [llm-output, validation, source-grounding, acronyms, spoken-text, repair-ladder, fail-closed]
+  legacy_id: PBUG-20260713-07

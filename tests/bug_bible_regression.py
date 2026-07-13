@@ -1277,6 +1277,25 @@ class TestPhase11BoundedRepairContracts:
         assert "Each individual scene may contain at most" in lane_source
         assert "test_p3_base_and_repair_bind_locked_total_to_per_scene_cap" in test_source
 
+    def test_otr_spoken_hygiene_allows_only_source_grounded_acronyms(self, pack_dir):
+        lane_path = os.path.join(pack_dir, "nodes", "_otr_scifi_codex.py")
+        test_path = os.path.join(pack_dir, "tests", "test_scifi_codex_lane.py")
+        if not os.path.isfile(lane_path) or not os.path.isfile(test_path):
+            pytest.skip("BUG-11.51 source-grounded acronym guard is OTR-local")
+
+        with open(lane_path, "r", encoding="utf-8") as f:
+            lane_source = f.read()
+        with open(test_path, "r", encoding="utf-8") as f:
+            test_source = f.read()
+
+        assert "def _source_grounded_all_caps" in lane_source
+        assert "_source_grounded_all_caps(p0)" in lane_source
+        assert "allowed_all_caps" in lane_source
+        assert (
+            "test_spoken_validator_allows_only_acronyms_grounded_in_accepted_fact_index"
+            in test_source
+        )
+
 
 class TestPhase07To12ProductionRegressionCatalog:
     """OTR-local guard for live-only BUG-07.22, BUG-07.23, BUG-08.08,
