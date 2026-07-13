@@ -1269,6 +1269,7 @@ class TestPhase07To12ProductionRegressionCatalog:
             "test_p3_repair_context_is_not_a_copyable_json_request_envelope",
             "test_p3_rewrite_repair_does_not_duplicate_the_accepted_score_context",
             "test_radio_score_surface_is_finite_before_p3_reserves_output_capacity",
+            "test_max_width_p3_and_rewrite_envelopes_fit_the_local_gemma_context",
             "test_radio_score_output_budget_preserves_the_live_p3_repair_window",
             "test_fact_index_contract_bounds_output_surface",
             "test_fact_index_token_budget_keeps_the_live_120_word_window",
