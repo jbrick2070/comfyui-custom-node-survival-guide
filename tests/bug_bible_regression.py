@@ -1297,7 +1297,7 @@ class TestPhase11BoundedRepairContracts:
             test_source = f.read()
 
         assert "def _source_grounded_all_caps" in lane_source
-        assert "_source_grounded_all_caps(p0)" in lane_source
+        assert "_allowed_spoken_all_caps(p0, p2)" in lane_source
         assert "allowed_all_caps" in lane_source
         assert (
             "test_spoken_validator_allows_only_acronyms_grounded_in_accepted_fact_index"
@@ -1315,7 +1315,7 @@ class TestPhase11BoundedRepairContracts:
         with open(test_path, "r", encoding="utf-8") as f:
             test_source = f.read()
 
-        assert "_CAST_NAME_ACRONYM_RE = re.compile(r\"[A-Z]{2,3}\")" in lane_source
+        assert "_CAST_NAME_ACRONYM_RE = re.compile(r\"(?<![A-Za-z0-9])[A-Z]{2,3}(?![A-Za-z0-9])\")" in lane_source
         assert "acronym_count <= 1" in lane_source
         assert "One short 2-3 letter acronym token is allowed" in lane_source
         assert "digits and all-uppercase full labels are forbidden" in lane_source
@@ -1323,6 +1323,18 @@ class TestPhase11BoundedRepairContracts:
             "test_p2_repair_accepts_short_acronym_inside_title_case_character_name"
             in test_source
         )
+
+    def test_otr_role_acronyms_flow_through_every_script_validation_boundary(self, pack_dir):
+        lane_path = os.path.join(pack_dir, "nodes", "_otr_scifi_codex.py")
+        test_path = os.path.join(pack_dir, "tests", "test_scifi_codex_lane.py")
+        if not os.path.isfile(lane_path) or not os.path.isfile(test_path):
+            pytest.skip("BUG-11.53 role acronym guard is OTR-local")
+        lane_source = open(lane_path, encoding="utf-8").read()
+        test_source = open(test_path, encoding="utf-8").read()
+        assert "def _allowed_spoken_all_caps" in lane_source
+        assert "_allowed_spoken_all_caps(fact_index, cast)" in lane_source
+        assert "_allowed_spoken_all_caps(p0, p2)" in lane_source
+        assert "test_allowed_spoken_acronyms_include_only_bounded_short_cast_role_tokens" in test_source
 
 
 class TestPhase07To12ProductionRegressionCatalog:

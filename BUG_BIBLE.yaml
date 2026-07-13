@@ -4329,3 +4329,51 @@ bugs:
     sees the same exact acronym-aware grammar enforced by the validator.
   tags: [llm-output, validation, cast-name, acronym, title-case, typed-repair, fail-closed]
   legacy_id: PBUG-20260713-09
+
+- id: "11.53"
+  phase: 11
+  area: llm-output-validation
+  symptom: |
+    P5 rejects a legitimate short all-caps term that is explicitly part of an
+    accepted cast role, even though source-grounded acronyms remain allowed.
+  cause: |
+    The validator receives only the source-span acronym allowlist at the P5,
+    P7, P9, and final direct validation boundaries. Cast role metadata is an
+    accepted contract but was not carried into that shared allowlist, and the
+    acronym extractor could match uppercase substrings without token bounds.
+  fix: |
+    Use one helper that unions source-span acronyms with complete 2-3-letter
+    acronym tokens from accepted cast.role_in_conflict values. Use it in every
+    script validation path, including fact_index=None, and enforce explicit
+    alphanumeric lookarounds on both acronym regexes. Do not mine free-form
+    prose or rewrite dialogue.
+  verify: |
+    Build a cast whose role contains CEO and STOP, assert only CEO is admitted,
+    reject an unlisted RUN token, and assert the helper is wired through both
+    post-validation and final direct calls. Reproduce the dated canonical smoke
+    that failed at P5, then require RESULT SUCCESS, obs_publish OK, and a
+    canonical episode/OBS asset.
+  tags: [llm-output, validation, spoken-text, cast-role, acronyms, boundaries, repair-ladder, fail-closed]
+  legacy_id: PBUG-20260713-10
+
+- id: "11.54"
+  phase: 11
+  area: llm-output-validation
+  symptom: |
+    A reasoning model repeats an overlong P1 question or consequence during its
+    typed repair, exhausting the repair ladder before downstream passes.
+  cause: |
+    Length instructions alone do not guarantee that a model will rewrite a
+    rejected authored field; the schema rejects the repeated value again.
+  fix: |
+    When question or consequence exceeds its cap, parse the complete object and
+    apply a minimal word-boundary shortening deterministically. Preserve the
+    existing semantic repair turn for ending-only overflow and fail closed on
+    malformed roots.
+  verify: |
+    Feed an overlong P1 object and assert all three fields validate within caps,
+    the shortened text ends on a word boundary, and ending-only overflow still
+    reaches the model-facing repair contract. Prove the canonical 120-word smoke
+    reaches P5 and publishes its OBS artifact.
+  tags: [llm-output, validation, p1, bounded-repair, word-boundary, fail-closed]
+  legacy_id: PBUG-20260713-10
