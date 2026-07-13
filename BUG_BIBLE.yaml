@@ -4189,3 +4189,35 @@ bugs:
     objects and completes with its expected ledger and final output.
   tags: [video-policy, image-generation, init-image, capability-gate, all-visualizer, effective-engine, force-map, fail-safe, upstream-bypass, prompt-authoring]
   legacy_id: PBUG-20260712-19
+
+- id: "12.53"
+  phase: 12
+  area: remote-llm-capability
+  symptom: |
+    A saved remote LLM works in earlier smoke legs but a later call fails with
+    HTTP 400 before generation because a process-wide parameter disables a
+    capability that the selected endpoint now marks mandatory.
+  cause: |
+    The client treats one global reasoning/tool/format preference as valid for
+    every model and discards per-model capability metadata from its cached
+    catalog. A stale or cold cache then has no way to prevent an incompatible
+    request or learn from the provider's precise capability rejection.
+  fix: |
+    Preserve the provider's per-model capability contract in the explicit
+    catalog cache and resolve global preferences against the selected model at
+    call time. A mandatory capability overrides only the incompatible value for
+    that model, using the least enabled supported setting. For a stale/cold
+    cache, recognize only the provider's exact capability-specific 400, retry
+    the same model once with a compatible setting, and remember that capability
+    for subsequent calls in the process. Do not turn generic 400s into retries,
+    substitute another model, or consume the transient retry budget.
+  verify: |
+    Cache a model with a mandatory capability and assert an incompatible global
+    setting is replaced before the first request while ordinary models retain
+    it. With an empty/stale cache and zero transient retries, return the exact
+    mandatory-capability 400, assert one same-model corrected call succeeds,
+    and assert the next call starts compatible. A different 400 must still fail
+    immediately. Refresh the live catalog and verify the selected model's
+    mandatory flag is retained.
+  tags: [remote-llm, capability-negotiation, reasoning, catalog-cache, stale-cache, http-400, same-model-retry, fail-closed]
+  legacy_id: PBUG-20260713-01

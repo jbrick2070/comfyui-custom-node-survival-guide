@@ -1333,6 +1333,14 @@ class TestPhase07To12ProductionRegressionCatalog:
             "test_dispatcher_preserves_proven_role_when_another_slot_is_unresolved",
             "test_dispatcher_rejects_explicit_unknown_object_role",
         ),
+        "tests/test_openrouter_backend.py": (
+            "test_generate_uses_lowest_catalog_effort_when_reasoning_is_mandatory",
+            "test_stale_cache_learns_mandatory_reasoning_from_exact_400",
+            "test_non_retryable_status_aborts_immediately",
+        ),
+        "tests/test_openrouter_catalog_rows.py": (
+            "test_slim_model_preserves_reasoning_capability_contract",
+        ),
         "tests/test_video_platform_aseam.py": (
             "test_shotlock_all_visualizers_skip_writer_visual_directives",
         ),
