@@ -1691,30 +1691,42 @@ class TestPhase11BugBible1156:
     ):
         hygiene_path = os.path.join(pack_dir, "nodes", "_otr_line_hygiene.py")
         composer_path = os.path.join(pack_dir, "nodes", "_otr_line_composer.py")
+        codex_path = os.path.join(pack_dir, "nodes", "_otr_scifi_codex.py")
         freeze_path = os.path.join(pack_dir, "nodes", "_otr_freeze_cascade.py")
         tests_dir = os.path.join(pack_dir, "tests")
 
         if not os.path.isfile(hygiene_path):
             pytest.skip("BUG-11.56 spoken-hygiene cascade is OTR-local")
-        for path in (composer_path, freeze_path, tests_dir):
+        for path in (composer_path, codex_path, freeze_path, tests_dir):
             assert os.path.exists(path), f"BUG-11.56 required artifact missing: {path}"
 
         with open(hygiene_path, encoding="utf-8") as handle:
             hygiene_source = handle.read()
         with open(composer_path, encoding="utf-8") as handle:
             composer_source = handle.read()
+        with open(codex_path, encoding="utf-8") as handle:
+            codex_source = handle.read()
         with open(freeze_path, encoding="utf-8") as handle:
             freeze_source = handle.read()
 
         assert "def deterministic_hygiene_floor(" in hygiene_source
         assert "def repair_existing_spoken_line(" in composer_source
         for rung in (
+            "repair_a",
             "repair_b_same_slot",
             "repair_c_alternate_slot",
             "deterministic_floor",
             "hygiene_repaired_after_reroll",
         ):
             assert rung in composer_source, f"BUG-11.56 rung/receipt missing: {rung}"
+
+        for proof in (
+            "repair_a_same_slot",
+            "shared_artifact_repair_bypassed",
+            "_validate_script_roster_contract",
+            "whole-artifact repair",
+        ):
+            assert proof in codex_source, f"BUG-11.56 Codex boundary missing: {proof}"
 
         terminal_match = re.search(
             r"FREEZE_TERMINAL_FAILURE_VERDICTS[^=]*=\s*frozenset\(\{(.*?)\}\)",
@@ -1746,10 +1758,15 @@ class TestPhase11BugBible1156:
         for proof_name in (
             "test_floor_resolves_every_named_craft_gate_and_is_idempotent",
             "test_bare_production_cues_become_spoken_words_after_exhaustion",
+            "test_own_name_action_narration_is_scoured_and_floored_as_dialogue",
+            "test_delivery_backstop_uses_cast_name_for_own_action_narration",
+            "test_one_breath_floor_keeps_complete_sentences_never_token_fragments",
             "test_content_owned_projection_repairs_exact_normalized_tts_surface",
             "test_each_inline_bank_repairs_bare_cue_after_reroll_exhaustion",
             "test_all_six_runnable_banks_resolve_the_correct_delivery_mode",
             "test_p5_hygiene_exhaustion_uses_alternate_slot_then_floor",
+            "test_p5_craft_reject_bypasses_whole_artifact_repair_a_ships_and_stamps",
+            "test_p5_structural_and_craft_reject_stays_on_fail_closed_artifact_path",
             "test_fable_content_owned_projection_repairs_and_reseals_tts_surface",
             "test_p5_empty_mechanical_row_is_skipped_locally_not_filled_with_canned_speech",
             "test_quality_edit_exhaustion_runs_phase_10_and_ships",

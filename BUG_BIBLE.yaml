@@ -4460,6 +4460,10 @@ bugs:
     structurally invalid graph, and validation may inspect authored text instead
     of the exact speech-adapter projection. A bounded LLM retry has no total
     deterministic final rung, so model noncompliance controls workflow liveness.
+    A mixed structural/craft post-validator can also send one dirty line through
+    a full-artifact typed repair, exposing the complete JSON document to output
+    truncation. A raw word-count floor can then manufacture a punctuated fragment
+    instead of a grammatical utterance.
   fix: |
     Classify defects before disposition. For craft/quality only, run the
     ordinary authored repair, a lower-temperature gate-specific repair, an
@@ -4467,7 +4471,10 @@ bugs:
     floor. Validate the exact delivery projection, stamp the gate and resolving
     rung, and continue freeze/readiness. If the floor yields empty text, isolate
     only that row. Keep content safety and genuinely ambiguous structural
-    contracts fail-closed.
+    contracts fail-closed. Intercept a schema/graph/roster-valid craft rejection
+    before any whole-artifact repair and patch only named line IDs. Give action-
+    narration detectors the locked speaker name, and shorten long dialogue only
+    at complete sentence boundaries (or use a clean deterministic utterance).
   verify: |
     Force every craft detector and whole-line stage cue to survive all model
     rungs, then require a non-empty clean deterministic result, an exact
@@ -4475,6 +4482,10 @@ bugs:
     producer, including content-owned lanes whose delivery normalization changes
     the spoken surface. Assert quality exhaustion is absent from the terminal
     verdict set, a true empty row is isolated locally, and the SFW gate still
-    refuses an unsafe episode. Complete a real canonical run through publication.
+    refuses an unsafe episode. Prove a craft-only structured artifact invokes no
+    second whole-artifact generation, while a structural-plus-craft artifact
+    remains fail-closed. Cover own-name action narration and require one-breath
+    floors to retain only complete sentences. Complete a real canonical run
+    through publication.
   tags: [llm-output, spoken-text, quality-gate, repair-ladder, deterministic-floor, delivery-projection, observability, workflow-liveness, row-local-failure, sfw, fail-closed, xref-11-54]
   legacy_id: PBUG-20260720-03
