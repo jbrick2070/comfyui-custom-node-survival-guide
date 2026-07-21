@@ -4377,3 +4377,72 @@ bugs:
     reaches P5 and publishes its OBS artifact.
   tags: [llm-output, validation, p1, bounded-repair, word-boundary, fail-closed]
   legacy_id: PBUG-20260713-10
+
+- id: "02.16"
+  phase: 2
+  area: transformers
+  symptom: |
+    A locally cached model is selectable but fails before loading with an
+    unrecognized model_type or architecture error. Alternatively, the loader
+    selects the newest snapshot directory and reports missing weights or tries
+    the network even though an older local revision contains the complete
+    checkpoint. Remapping the checkpoint to an older model class may load but
+    emit degenerate text or invalid structured output.
+  cause: |
+    Catalog admission checked model identity, cache presence, and VRAM fit but
+    not whether the installed Transformers release natively supports the
+    checkpoint architecture. The cache resolver also assumed the newest local
+    revision was complete, while Hugging Face caches may split a complete
+    weighted revision from a newer metadata-only revision.
+  fix: |
+    Declare the minimum Transformers release that natively supports the
+    architecture and capability-gate it before cache, download, or model-load
+    work. Resolve the newest complete weighted snapshot by requiring a model
+    weight file or weight index. Resolve optional local metadata such as
+    chat_template.jinja independently when it exists only in another revision,
+    but never treat a metadata-only snapshot as the model root. Load tokenizer,
+    config, and model with local_files_only=True. Do not remap model_type to a
+    predecessor architecture or silently substitute a network, Ollama,
+    llama.cpp, or sidecar lane. Admit the catalog row only after a real loader
+    smoke proves coherent text and schema-constrained parseable JSON.
+  verify: |
+    Unit-test that an unsupported Transformers version fails actionably before
+    download; a newer metadata-only revision is rejected as the model root; an
+    older weighted revision is selected; newer local chat-template metadata is
+    composed without HTTP; and a complete cache never calls snapshot_download.
+    Then run the actual quantized model on the target GPU and require the
+    official model class, coherent prose, expected VRAM, and LM-format-enforced
+    JSON that validates against the requested schema, with no external server.
+  tags: [transformers, huggingface, model-architecture, catalog-admission, offline, split-revision, weighted-snapshot, local-files-only, structured-json, llm, xphase-11]
+  legacy_id: BUG-LOCAL-306
+
+- id: "11.55"
+  phase: 11
+  area: llm
+  symptom: |
+    A schema-constrained local LLM begins a valid JSON object but is cut off at
+    the same nested-object prefix on every retry. LM Format Enforcer logs an
+    internal parser exception such as `AttributeError: 'bool' object has no
+    attribute 'anyOf'`; downstream parsing then misleadingly reports a
+    character-zero JSONDecodeError because no complete top-level object exists.
+  cause: |
+    A model field such as `list[dict[str, Any]]` compiled to an open JSON Schema
+    object with boolean `additionalProperties: true`. The installed grammar
+    compiler accepted the schema initially but treated that boolean wildcard as
+    a schema object only when generation reached the first arbitrary key, then
+    terminated enforcement mid-object.
+  fix: |
+    Replace open-ended structured-output dictionaries with explicit, closed,
+    typed models that express the real output contract. Inspect every schema
+    bound to constrained generation for boolean wildcard subschemas. Do not
+    disable the prefix constraint or fall back to unconstrained sampling: make
+    the schema grammar-compatible while preserving downstream validation.
+  verify: |
+    Generate the exact production Pydantic schema and assert the formerly open
+    object has named required properties and `additionalProperties: false`.
+    Feed a complete representative artifact through the installed
+    JsonSchemaParser one character at a time, require every character to be
+    allowed, and require `can_end()` at completion. Then run the real local
+    workflow through the affected pass and confirm it publishes successfully.
+  tags: [llm, structured-json, lm-format-enforcer, json-schema, pydantic, grammar, hard-constraint, local-model, fail-closed]
+  legacy_id: PBUG-20260720-02

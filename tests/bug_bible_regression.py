@@ -1583,3 +1583,101 @@ class TestPhase02BugBible0214:
                "BUG-02.14 layer 4a: disable_progress_bar missing"
         assert "set_progress_bar_config" in src, \
                "BUG-02.14 layer 4b: pipe.set_progress_bar_config missing"
+
+
+class TestPhase02BugBible0216:
+    """BUG-02.16: capability-gated architecture and split-revision HF cache."""
+
+    def test_otr_gemma4_unified_admission_contract(self, pack_dir):
+        loader_path = os.path.join(pack_dir, "nodes", "_otr_model_loader.py")
+        env_path = os.path.join(pack_dir, "nodes", "_otr_hf_env.py")
+        requirements_path = os.path.join(pack_dir, "requirements.txt")
+        tests_path = os.path.join(pack_dir, "tests", "test_hf_env_offline.py")
+        doctor_path = os.path.join(pack_dir, "scripts", "otr_gemma4_doctor.py")
+
+        if not os.path.isfile(loader_path):
+            pytest.skip("BUG-02.16 Gemma4Unified admission guard is OTR-local")
+        for path in (env_path, requirements_path, tests_path, doctor_path):
+            assert os.path.isfile(path), f"BUG-02.16 required artifact missing: {path}"
+
+        with open(loader_path, encoding="utf-8") as handle:
+            loader_source = handle.read()
+        with open(env_path, encoding="utf-8") as handle:
+            env_source = handle.read()
+        with open(requirements_path, encoding="utf-8") as handle:
+            requirements = handle.read()
+        with open(tests_path, encoding="utf-8") as handle:
+            test_source = handle.read()
+        with open(doctor_path, encoding="utf-8") as handle:
+            doctor_source = handle.read()
+
+        assert re.search(
+            r"(?m)^transformers>=5\.10\.4,<6\.0\s*$", requirements
+        )
+        assert '_GEMMA4_UNIFIED_MIN_TRANSFORMERS = "5.10.4"' in loader_source
+        gate = loader_source.index(
+            "_require_transformers_model_support(normalized)"
+        )
+        download = loader_source.index(
+            "_otr_catalog.auto_download_if_missing("
+        )
+        assert gate < download
+
+        assert "def _snapshot_has_weights(" in env_source
+        assert "if _snapshot_has_weights(p)" in env_source
+        assert "def resolve_snapshot_file(" in env_source
+        assert '"chat_template.jinja"' in loader_source
+        assert "local_files_only=True" in loader_source
+
+        for test_name in (
+            "test_snapshot_resolver_prefers_weights_and_composes_newer_metadata",
+            "test_snapshot_resolver_rejects_metadata_only_cache",
+            "test_gemma_version_guard_is_early_and_actionable",
+            "test_request_slot_uses_complete_canonical_cache_without_download",
+        ):
+            assert f"def {test_name}(" in test_source
+
+        assert "get_cached_transformers_schema_constraint" in doctor_source
+        assert "local_files_only=True" in doctor_source
+        assert (
+            "RESULT=PASS (official Transformers + NF4 + LMFE, fully offline)"
+            in doctor_source
+        )
+
+
+class TestPhase11BugBible1155:
+    """BUG-11.55: constrained schemas must be compiler-safe, not open wildcards."""
+
+    def test_otr_script_artifact_uses_a_closed_scene_schema(self, pack_dir):
+        lane_path = os.path.join(pack_dir, "nodes", "_otr_scifi_codex.py")
+        tests_path = os.path.join(pack_dir, "tests", "test_scifi_codex_lane.py")
+
+        if not os.path.isfile(lane_path):
+            pytest.skip("BUG-11.55 ScriptArtifactV4 contract is OTR-local")
+        assert os.path.isfile(tests_path), (
+            f"BUG-11.55 executable regression missing: {tests_path}"
+        )
+
+        with open(lane_path, encoding="utf-8") as handle:
+            lane_source = handle.read()
+        with open(tests_path, encoding="utf-8") as handle:
+            test_source = handle.read()
+
+        assert "class ScriptSceneV4(_Strict):" in lane_source
+        assert "scenes: list[ScriptSceneV4]" in lane_source
+        assert (
+            "    scenes: list[dict[str, Any]] = Field(min_length=1)"
+            not in lane_source
+        )
+        assert (
+            "def test_script_artifact_scene_schema_is_closed_for_lm_format_enforcer("
+            in test_source
+        )
+        for proof in (
+            "JsonSchemaParser(schema)",
+            "parser.get_allowed_characters()",
+            "parser.add_character(character)",
+            "parser.can_end()",
+            'scene_schema["additionalProperties"] is False',
+        ):
+            assert proof in test_source, f"BUG-11.55 proof missing: {proof}"
