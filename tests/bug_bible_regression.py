@@ -1681,3 +1681,80 @@ class TestPhase11BugBible1155:
             'scene_schema["additionalProperties"] is False',
         ):
             assert proof in test_source, f"BUG-11.55 proof missing: {proof}"
+
+
+class TestPhase11BugBible1156:
+    """BUG-11.56: craft exhaustion repairs and ships; safety stays closed."""
+
+    def test_otr_spoken_quality_has_a_total_nonterminal_repair_floor(
+        self, pack_dir,
+    ):
+        hygiene_path = os.path.join(pack_dir, "nodes", "_otr_line_hygiene.py")
+        composer_path = os.path.join(pack_dir, "nodes", "_otr_line_composer.py")
+        freeze_path = os.path.join(pack_dir, "nodes", "_otr_freeze_cascade.py")
+        tests_dir = os.path.join(pack_dir, "tests")
+
+        if not os.path.isfile(hygiene_path):
+            pytest.skip("BUG-11.56 spoken-hygiene cascade is OTR-local")
+        for path in (composer_path, freeze_path, tests_dir):
+            assert os.path.exists(path), f"BUG-11.56 required artifact missing: {path}"
+
+        with open(hygiene_path, encoding="utf-8") as handle:
+            hygiene_source = handle.read()
+        with open(composer_path, encoding="utf-8") as handle:
+            composer_source = handle.read()
+        with open(freeze_path, encoding="utf-8") as handle:
+            freeze_source = handle.read()
+
+        assert "def deterministic_hygiene_floor(" in hygiene_source
+        assert "def repair_existing_spoken_line(" in composer_source
+        for rung in (
+            "repair_b_same_slot",
+            "repair_c_alternate_slot",
+            "deterministic_floor",
+            "hygiene_repaired_after_reroll",
+        ):
+            assert rung in composer_source, f"BUG-11.56 rung/receipt missing: {rung}"
+
+        terminal_match = re.search(
+            r"FREEZE_TERMINAL_FAILURE_VERDICTS[^=]*=\s*frozenset\(\{(.*?)\}\)",
+            freeze_source,
+            re.DOTALL,
+        )
+        assert terminal_match, "BUG-11.56 terminal verdict set is not inspectable"
+        terminal_body = terminal_match.group(1)
+        assert '"needs_full_rerun"' in terminal_body
+        assert '"too_many_edits"' not in terminal_body
+
+        regression_files = (
+            "test_spoken_hygiene_repair_cascade.py",
+            "test_text_delivery.py",
+            "test_scifi_codex_lane.py",
+            "test_fable2_assembly.py",
+            "test_lfc_freeze_cascade_orchestrator.py",
+            "test_g9_sfw_ship_stop.py",
+        )
+        regression_source = ""
+        for filename in regression_files:
+            path = os.path.join(tests_dir, filename)
+            assert os.path.isfile(path), (
+                f"BUG-11.56 executable regression missing: {path}"
+            )
+            with open(path, encoding="utf-8") as handle:
+                regression_source += handle.read()
+
+        for proof_name in (
+            "test_floor_resolves_every_named_craft_gate_and_is_idempotent",
+            "test_bare_production_cues_become_spoken_words_after_exhaustion",
+            "test_content_owned_projection_repairs_exact_normalized_tts_surface",
+            "test_each_inline_bank_repairs_bare_cue_after_reroll_exhaustion",
+            "test_all_six_runnable_banks_resolve_the_correct_delivery_mode",
+            "test_p5_hygiene_exhaustion_uses_alternate_slot_then_floor",
+            "test_fable_content_owned_projection_repairs_and_reseals_tts_surface",
+            "test_p5_empty_mechanical_row_is_skipped_locally_not_filled_with_canned_speech",
+            "test_quality_edit_exhaustion_runs_phase_10_and_ships",
+            "test_phase_10_refuses_to_freeze_a_profane_episode",
+        ):
+            assert f"def {proof_name}(" in regression_source, (
+                f"BUG-11.56 proof missing: {proof_name}"
+            )

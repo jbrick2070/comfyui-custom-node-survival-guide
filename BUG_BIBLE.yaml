@@ -4446,3 +4446,35 @@ bugs:
     workflow through the affected pass and confirm it publishes successfully.
   tags: [llm, structured-json, lm-format-enforcer, json-schema, pydantic, grammar, hard-constraint, local-model, fail-closed]
   legacy_id: PBUG-20260720-02
+
+- id: "11.56"
+  phase: 11
+  area: llm-output-validation
+  symptom: |
+    One voiced line repeatedly fails a non-safety craft or delivery-hygiene
+    gate. Retry exhaustion terminates the complete artifact or workflow, so no
+    frozen ledger or downstream audio/video is produced even though the line
+    can be made non-empty and speakable.
+  cause: |
+    Quality-budget exhaustion is given the same liveness disposition as a
+    structurally invalid graph, and validation may inspect authored text instead
+    of the exact speech-adapter projection. A bounded LLM retry has no total
+    deterministic final rung, so model noncompliance controls workflow liveness.
+  fix: |
+    Classify defects before disposition. For craft/quality only, run the
+    ordinary authored repair, a lower-temperature gate-specific repair, an
+    alternate writer slot, then an idempotent deterministic SFW spoken-surface
+    floor. Validate the exact delivery projection, stamp the gate and resolving
+    rung, and continue freeze/readiness. If the floor yields empty text, isolate
+    only that row. Keep content safety and genuinely ambiguous structural
+    contracts fail-closed.
+  verify: |
+    Force every craft detector and whole-line stage cue to survive all model
+    rungs, then require a non-empty clean deterministic result, an exact
+    gate/rung receipt, and normal freeze/readiness. Cover every runnable
+    producer, including content-owned lanes whose delivery normalization changes
+    the spoken surface. Assert quality exhaustion is absent from the terminal
+    verdict set, a true empty row is isolated locally, and the SFW gate still
+    refuses an unsafe episode. Complete a real canonical run through publication.
+  tags: [llm-output, spoken-text, quality-gate, repair-ladder, deterministic-floor, delivery-projection, observability, workflow-liveness, row-local-failure, sfw, fail-closed, xref-11-54]
+  legacy_id: PBUG-20260720-03
