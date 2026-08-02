@@ -4079,8 +4079,12 @@ bugs:
     the budget and surface receipt, require the requested root literal at
     response start, explicitly require scalar fields that the model previously
     returned as arrays, forbid request-envelope keys, and fail loud when prompt
-    plus output cannot fit the actual context window. For a directly emitted
-    nested score, local maxima are sufficient when they make every global
+    plus output cannot fit the actual context window. That refusal is the
+    PRE-CALL capacity phase and it is correctly terminal, because the arithmetic
+    that produced it is deterministic. Do not generalize it into "every capacity
+    failure is terminal": a call that RAN and used its whole output allowance is
+    a different phase and must advance the retry ladder (see 12.68).
+    For a directly emitted nested score, local maxima are sufficient when they make every global
     scene/shot/beat/line bound finite; do not introduce a second draft/compiler
     representation merely to obtain those bounds. If a live model still
     exhausts a bounded direct score because it must re-emit deterministic graph
@@ -4377,3 +4381,716 @@ bugs:
     reaches P5 and publishes its OBS artifact.
   tags: [llm-output, validation, p1, bounded-repair, word-boundary, fail-closed]
   legacy_id: PBUG-20260713-10
+
+- id: "05.11"
+  phase: 5
+  area: state-sync
+  symptom: |
+    A repair or reroll writes meaningful text into a previously skipped row,
+    but the stale skip flag remains. The deterministic readiness audit then
+    rejects the ledger because the row simultaneously says "omit this line"
+    and carries authored text.
+  cause: |
+    The write seam updated only the partner field and derived counts. Paired
+    state was treated as independent metadata, so a replacement text mutation
+    did not clear the editorial skip state created for the prior empty text.
+  fix: |
+    The mutator that writes meaningful replacement text must clear the paired
+    skip metadata (`skip` and its skip reasons) in the same mutation. Preserve
+    skip state when the replacement remains empty or whitespace. Keep the
+    deterministic validator fail-closed; do not hide the inconsistent state
+    with a tolerance or bypass.
+  verify: |
+    Unit-test both transitions: meaningful replacement clears skip metadata,
+    while empty replacement preserves it. Then run the real canonical repair
+    or reroll path and require its deterministic readiness audit to pass,
+    RESULT SUCCESS, obs_publish OK, and a non-zero final asset.
+  tags: [state-sync, paired-state, mutation-seam, reroll, skip-state, ledger, fail-closed]
+  legacy_id: PBUG-20260713-19
+
+- id: "12.54"
+  phase: 12
+  area: metadata-provenance
+  symptom: |
+    A dynamically selected source renders successfully, but the final ledger
+    has a blank or stale source reference because it records the optional
+    request coordinate rather than the item the fetcher actually selected.
+  cause: |
+    The fetch boundary returns content without a typed provenance sidecar, and
+    shared orchestration treats a request parameter as resolved-source truth.
+    A blank or ignored request cannot identify a feed item chosen at runtime.
+  fix: |
+    Let the resolver/fetcher own selected-source identity. Preserve the content
+    payload contract, return resolved URL/label/date metadata beside it, and
+    derive the canonical ledger reference in owner order: selected sidecar,
+    selected payload link, then request only as a last resort. Retain a
+    differing request separately and keep unknown rights explicitly unknown;
+    never infer a license from successful retrieval.
+  verify: |
+    Make a dynamic fetcher select an item different from the supplied request.
+    Assert every canonical source field names the selected item, the request is
+    retained only as request provenance, and no license/commercial claim is
+    invented. Keep manifest-resolved and legacy raw-payload paths compatible.
+  tags: [metadata, provenance, source-selection, resolved-identity, rss, ledger, rights, xref-12.49]
+  legacy_id: PBUG-20260721-01
+
+- id: "12.55"
+  phase: 12
+  area: asset-identity
+  symptom: |
+    A frozen master asset exists and downstream work succeeds, but caches and
+    the final ledger have no durable full-byte identity. Replacing bytes at the
+    same path can therefore reuse stale derived artifacts.
+  cause: |
+    The authoritative producer records only a partial diagnostic hash or path,
+    while consumers expect a full content digest that no owner stamps. A later
+    generic ledger save can also drop the producer-owned identity section.
+  fix: |
+    After the producer closes/finalizes the asset, compute a streaming full-file
+    digest and stamp it at the producer boundary. Preserve that owned section
+    through every merge, bind derived-cache keys to the digest, and let the
+    terminal publisher record the re-resolved final asset path. A digest-receipt
+    failure may degrade loudly when the asset remains usable; do not erase the
+    good asset or fabricate identity.
+  verify: |
+    Hash a closed asset over multiple chunks, survive a later generic ledger
+    merge, and assert a byte change at the same path changes every derived cache
+    key. Require the final pointer to exist. Simulate digest failure and assert
+    the usable asset path remains intact while the missing receipt is visible.
+  tags: [asset-identity, sha256, cache-invalidation, producer-boundary, ledger-merge, streaming-io, final-path]
+  legacy_id: PBUG-20260721-02
+
+- id: "12.56"
+  phase: 12
+  area: terminal-path-ownership
+  symptom: |
+    Publication succeeds and the exact final asset exists, but a later ledger
+    save replaces one official path surface with a planned shorter filename
+    that does not exist. Consumers see conflicting terminal pointers.
+  cause: |
+    A generic metadata rebuilder treats a pre-publication naming plan as more
+    authoritative than the terminal publisher's observed path, or downstream
+    code reconstructs identity from an open-ended filename suffix grammar.
+  fix: |
+    The terminal publisher owns exact final paths. At the shared owner layer,
+    accept a published path only when it exists, belongs to the current artifact
+    identity, has the expected type, and is inside an authorized output root;
+    then synchronize every official alias in one save. Before publication keep
+    a plan explicitly nonterminal. Downstream enrichments must consume ledger
+    directory authority rather than reverse-engineer identity from suffixes.
+  verify: |
+    Publish an enriched filename and require all terminal path surfaces to name
+    existing assets after repeated saves. Reject missing, wrong-identity,
+    wrong-extension, and out-of-root candidates. Add an unknown future suffix
+    and prove the artifact remains inside the ledger-owned directory.
+  tags: [terminal-path, publication, ledger, path-validation, alias-sync, output-root, artifact-authority]
+  legacy_id: PBUG-20260721-03
+
+- id: "12.57"
+  phase: 12
+  area: cross-boundary-state-sync
+  symptom: |
+    A producer finalizes and hashes an asset in the durable ledger, but a
+    downstream wire consumer receives an older pre-production ledger snapshot.
+    Rendering can still succeed while cache identity, gates, or transition
+    receipts are silently absent.
+  cause: |
+    The graph join copies only selected row-local fields, skips the join when
+    any early timing hint is already populated, or discovers durable state by
+    newest mtime without proving artifact identity. Correct execution ordering
+    alone cannot synchronize two independently evolving ledger representations.
+  fix: |
+    At the first dependency-gated consumer, resolve the active durable owner and
+    prove same-run identity with an immutable receipt that survives legitimate
+    renames; fall back only to exact non-empty artifact identity for older
+    records. Reject mismatches loudly. Copy complete producer-owned sections
+    even over stale wire values, while retaining missing-only semantics for
+    writer-owned metadata and row fields. Preserve the merged object through
+    every later serialization boundary.
+  verify: |
+    Give the join a pre-production wire snapshot with populated timing and a
+    renamed durable record sharing the immutable run receipt. Require the full
+    producer hash and owned sections to replace stale wire state and survive the
+    next consumer's JSON serialization. Change the receipt to a sibling run and
+    require every candidate field to be rejected unchanged with a loud warning.
+  tags: [state-sync, ledger, producer-ownership, immutable-identity, rename, cache-key, serialization, fail-loud]
+  legacy_id: PBUG-20260721-04
+
+- id: "12.58"
+  phase: 12
+  area: hierarchical-identity
+  symptom: |
+    Splitting one authored dialogue unit creates renderable child rows, but the
+    final ledger reports that every child references a beat absent from the
+    accepted outline. Parent collections may also remain empty or retain stale
+    membership after cut, merge, and split operations.
+  cause: |
+    A structural editor collapses two namespaces: unique mutable line identity
+    and stable accepted beat identity. It mints the same synthetic suffix in
+    both fields, while the producer never materializes or resynchronizes the
+    durable parent-to-child collection.
+  fix: |
+    Mint a unique line id for each structural child while retaining the exact
+    accepted parent beat id. Materialize the accepted beat collection at the
+    producer boundary, then rebuild only each retained beat's line membership
+    after structural edits. Keep an accepted but fully cut beat with an empty
+    child list. Allocate child suffixes against the complete current line-id
+    namespace so repeated repair passes cannot collide. Downstream
+    render/caching identity must remain keyed by the unique line id so siblings
+    sharing a parent never collapse.
+  verify: |
+    Split one accepted line and cut another. Assert unique child line ids share
+    the first accepted beat id, the cut beat remains with an empty line list,
+    the outline-to-ledger consistency guard is clean, and line-keyed consumers
+    still receive distinct identities. Split the parent again and require a new
+    collision-free child id. Initialize from an outline and require parent
+    membership to exist before later timing stages.
+  tags: [ledger, hierarchy, line-id, beat-id, structural-edit, parent-child, referential-integrity, render-identity]
+  legacy_id: PBUG-20260721-05
+
+- id: "12.59"
+  phase: 12
+  area: budget-authority
+  symptom: |
+    A short story already inside its requested word band is rewritten toward a
+    larger legacy default, or a plan passes because an LLM claims an in-range
+    projection even though applying its edits produces an out-of-range result.
+    A row-local quality repair may also be blocked by advisory episode drift.
+  cause: |
+    A downstream editor hard-codes a historical target, counts a different
+    surface than the producer receipt, trusts model arithmetic instead of the
+    deterministic edit result, and reuses a global length gate for local craft
+    repair.
+  fix: |
+    Treat a valid producer-stamped target and ratio band as the single live
+    authority; use a historical fallback only when the receipt is absent, and
+    skip mutation loudly when a present receipt is malformed. Count the exact
+    receipt-owned surface, but retain safety caps on every spoken row. Validate
+    a plan by applying it to a deep copy and recounting the actual result while
+    preserving the model projection as forensic evidence. Disable only the
+    advisory global band check for scoped local repair.
+  verify: |
+    Build a requested short episode whose character body is in band while
+    announcer overhead raises the all-spoken total, and require normalization
+    to skip. Still trigger on an over-cap announcer row. Accept a good simulated
+    result despite a false projection, reject a bad result despite a good
+    projection, permit scoped repair during advisory drift, and prove a
+    malformed present receipt calls no model and mutates nothing.
+  tags: [ledger, word-budget, authority, llm-validation, deterministic-simulation, advisory-drift, scoped-repair, fail-soft]
+  legacy_id: PBUG-20260721-06
+
+- id: "12.60"
+  phase: 12
+  area: assembled-surface-validation
+  symptom: |
+    A generated fragment passes its local spoken-quality gate, but the exact
+    row delivered to speech fails after a protected deterministic suffix is
+    appended. Failure telemetry may report a count without identifying the
+    row or defect.
+  cause: |
+    The authoring or repair seam validates only the model-owned fragment and
+    treats protected factual text as exempt from final-surface validation.
+    Character truncation can also turn factual prose into a misleading
+    fragment, while a receipt builder derives failures from the successful
+    repair list instead of the failure records.
+  fix: |
+    Protect facts from model rewriting, not from validation. Assemble the exact
+    final row, project it through the same deterministic normalization used by
+    delivery, and run the authoritative spoken-row scorer on that complete
+    surface. Preserve the full source fact in owned metadata; if speech must be
+    shortened, select only an exact complete-sentence prefix or use a truthful
+    pointer to a durable credits/source surface. Never character-cut factual
+    prose. Guard content-owned pipelines inside the shared mutator itself, and
+    carry explicit row-local failure records into phase receipts.
+  verify: |
+    Replay a protected suffix whose fragment is clean but assembled delivery is
+    over the breath and anchor caps. Require the final spoken row to pass after
+    delivery projection without exposing the fact to an LLM. Test
+    multi-sentence, initials/version, and single-sentence facts and assert that
+    only whole exact sentences or a truthful deferral are emitted. Prove
+    content-owned direct calls are byte-identical and a forced row failure is
+    present in the phase receipt.
+  tags: [spoken-surface, protected-suffix, factual-integrity, delivery-projection, row-local-failure, credits, content-ownership, ledger]
+  legacy_id: PBUG-20260721-07
+
+- id: "12.61"
+  phase: 12
+  area: identity-classification
+  symptom: |
+    A generic cast role such as THE TRAVELER is rejected as a forbidden named
+    character when an anonymous visual brief truthfully uses the role noun.
+    An ordinary article from the cast label may also be anonymized as if it
+    were a person. Repair repeats the same legitimate wording, exhausts, and
+    leaves downstream brief metadata empty.
+  cause: |
+    One lexical splitter treats every component of every cast label as both an
+    input-substitution alias and a forbidden output name. It does not classify
+    generic roles separately from personal identities, and its broad public
+    error code gives typed repair no exact offending surface.
+  fix: |
+    Classify labels once with a bounded shared role grammar, then derive two
+    complementary projections. For generic roles, map the full input label and
+    meaningful role noun to one stable identity while allowing those forms in
+    output. For personal labels, protect the full surface and meaningful name
+    components. Never promote articles, ordinals, or honorifics to standalone
+    identities. Keep the public reason code stable, carry the exact matched
+    surface privately into typed repair, and retain an observable failed
+    sentinel plus deterministic non-authoring consumer defaults for genuine
+    exhaustion.
+  verify: |
+    Replay THE TRAVELER with a brief containing traveler and require first-pass
+    acceptance. Cover First Witch, article-bearing and multiword roles, plus
+    Unicode, hyphenated, apostrophe, honorific-bearing, and representative
+    all-bank personal names. Assert that ordinary the survives input
+    substitution, role aliases retain one identity, real personal components
+    remain forbidden, private repair identifies the exact surface while the
+    public code remains stable, and genuine failure still yields a valid
+    non-authoring downstream prompt.
+  tags: [identity, cast, role-label, anonymization, story-brief, typed-repair, all-bank, ledger, fail-observable]
+  legacy_id: PBUG-20260721-08
+
+- id: "12.62"
+  phase: 12
+  area: quality-context-capacity
+  symptom: |
+    An advisory quality loop spends repeated long generations on the same
+    unchanged valid story, but every requested replacement is guaranteed to
+    truncate because prompt plus required output exceeds the model context.
+    No ledger rows or assets are produced even though the pre-quality artifact
+    was renderable.
+  cause: |
+    A row-local finding reuses a complete-artifact schema and retry ladder.
+    Shared token fitting treats its requested output as a reducible ceiling,
+    provider wrappers hide the capacity cause, and the caller restores the
+    unchanged prior artifact before immediately rejudging it. Message-list
+    normalization or provider output caps can also erase or defeat an ad hoc
+    complete-output intention.
+  fix: |
+    Give bounded artifacts an explicit full-output-capacity marker, capture it
+    before message normalization, and enforce it against both the real context
+    window and provider output cap before any generation or network I/O.
+    Replace whole-script quality retakes with typed line-text patches over a
+    closed target set; merge only the owned field and run the full artifact
+    validator. Rejudge every successful merge. After the creative and alternate
+    writer slots both fail, keep the best already-valid artifact and stop the
+    loop without rejudging unchanged input. Build hashes, seals, ledger state,
+    and consumer pointers only after that final artifact is chosen.
+  verify: |
+    Reproduce prompt plus requested-output arithmetic that exceeds an 8K
+    context and assert zero local/provider calls for a marked patch while an
+    unmarked request still clamps. Cover every local and remote transport plus
+    provider caps and pre-normalization marker capture. Assert exact target
+    coverage, non-target immutability, full post-merge validation, alternate
+    slot rotation, fresh judgment after success, and no repeated judgment after
+    two failed patch slots.
+  tags: [quality-loop, context-window, output-capacity, typed-patch, no-call-preflight, fail-soft, ledger-liveness, cross-backend]
+  legacy_id: PBUG-20260721-09
+
+- id: "12.63"
+  phase: 12
+  area: constrained-schema-compatibility
+  symptom: |
+    A compact structured repair fails before generation because the grammar
+    enforcer rejects its JSON Schema. A later call through the same cached
+    token constraint may fail with an apparently unrelated null allowed-token
+    state, so every available model slot floors without authoring a patch.
+  cause: |
+    A regex-constrained string also declares redundant minimum or maximum
+    length keywords even though the regex already fixes its exact shape. The
+    grammar library does not support that combination and can cache an
+    incomplete token-enforcer state when schema construction raises.
+  fix: |
+    Express one lexical invariant once. When an anchored regex fully determines
+    the accepted string length, omit redundant min/max length keywords instead
+    of catching formatter exceptions or rotating models. Audit every sibling
+    patch schema that shares the row contract.
+  verify: |
+    Generate each production patch schema, assert the constrained field carries
+    its exact regex without minLength/maxLength, and character-feed a complete
+    valid JSON artifact through the real grammar parser to can_end(). Retain
+    model validation tests for bad prefixes and wrong lengths.
+  tags: [json-schema, grammar, lm-format-enforcer, typed-patch, cache-state, sibling-audit, pre-generation]
+  legacy_id: PBUG-20260721-10
+
+- id: "12.64"
+  phase: 12
+  area: zero-sentinel-semantics
+  symptom: |
+    A downstream consumer reports timing missing and invokes a heuristic even
+    though the producer supplied a valid zero-second or zero-frame onset. The
+    heuristic can then fabricate content in a window that does not exist.
+  cause: |
+    Presence and positivity are collapsed into one truthiness check. Zero is a
+    valid boundary value, while None is the actual missing-state sentinel.
+  fix: |
+    Branch on explicit presence first. Treat every non-None onset as known,
+    clamp its derived window to the legal nonnegative range, and reserve the
+    missing-data fallback and warning for None. Preserve zero in receipts.
+  verify: |
+    Exercise positive, zero, and missing onsets. Positive timing creates the
+    expected window; zero creates no positive window and no missing-data
+    warning; None alone invokes the documented fallback. Include a corrupted
+    negative input to prove clamping cannot create a reverse window.
+  tags: [sentinel, zero, timing, truthiness, fallback, title-card, media-consumer]
+  legacy_id: PBUG-20260721-12
+
+- id: "12.65"
+  phase: 12
+  area: rendered-manifest-ledger-ownership
+  symptom: |
+    A media renderer produces valid cue assets and may even mix some into the
+    final master, but the durable ledger has no rows, paths, placements,
+    timeline positions, or downstream mirrors for them. An inline cue anchored
+    to ordinary content may be silently dropped while bookends remain audible
+    but invisible to later consumers.
+  cause: |
+    Producer families use different cue dialects, legacy producers emit only
+    sentinel rows, and the rendered manifest is reconciled after the first
+    timeline writer or not at all. Consumers key on a particular line role or
+    cue ID instead of canonical placement and anchor semantics. The final wire
+    join copies ordinary timing but omits the media array and its assembler-owned
+    mirrors, so rendered truth dies on disk.
+  fix: |
+    Translate producer-local IDs at the durable boundary and give every cue a
+    canonical placement plus anchor. Reconcile the rendered manifest into the
+    ledger before timeline mutation: recompute authored cue identity, update
+    only render-owned fields on a match, materialize deterministic legacy rows,
+    and fail loudly on mismatch. Resolve insertion by anchor independently of
+    line type, preserving ordinary content dispatch. Give one final assembler
+    sole ownership of mirrors, and make the post-media wire join same-episode
+    and identity-gated for both media rows and their mirrors.
+  verify: |
+    Exercise every producer dialect and a sentinel-only legacy producer.
+    Require reconciliation to be idempotent, to reject a stale cue identity,
+    and to materialize output paths before timing. Insert a cue before both a
+    sentinel and an ordinary content row while proving the ordinary row still
+    consumes its own media/voice input. Require the assembler to place and
+    mirror opening, interstitial, and closing cues by placement. At the final
+    wire join, append valid legacy rows and matched mirrors, but reject a
+    changed cue and every mirror that refers to it.
+  tags: [manifest, ledger, music, media, identity, ownership, timing, anchor, mirror, legacy-materialization, downstream-consumer]
+  legacy_id: PBUG-20260721-13
+
+- id: "12.66"
+  phase: 12
+  area: artifact-tree-rename-transaction
+  symptom: |
+    A pipeline renames a pending artifact directory to its final identity and
+    the files move successfully, yet the durable ledger still points into the
+    deleted source root. Producer-owned rows written only to disk can disappear
+    on the next singleton save, and downstream wires may keep the retired id
+    while rescuing assets from an unrelated newest sibling.
+  cause: |
+    Directory movement is treated as sufficient identity movement. Serialized
+    absolute paths are not rebased, a keyed merge visits only rows already in
+    memory, the post-rename join does not let same-receipt durable identity
+    replace stale wire values, and recovery uses modification time instead of
+    the active owner. A one-sided freeze receipt may also be mistaken for a
+    legacy name-only match.
+  fix: |
+    Make rename one ordered, retryable transaction: move the tree, canonicalize
+    the ledger name, recursively rebase only absolute string values contained
+    by the old root on a path-component boundary, atomically persist durable
+    truth, then advance in-memory identity. Keep external paths exact. Preserve
+    disk-only producer rows only through a narrow immutable-receipt and parent-
+    hash join with producer-specific validation; never copy arbitrary disk
+    content. If either side has a freeze receipt, require both values to match.
+    Gate post-rename consumers on rename completion, let proven durable id/path
+    fields win, and resolve stale inputs through the active ledger with receipt
+    or directory identity checks rather than newest-mtime search.
+  verify: |
+    Parameterize every producer route through a real directory rename containing
+    nested cue, clip, master, and path-block values. Require all episode-local
+    paths and files under the final root, external paths unchanged, immutable
+    seals/hashes/readiness unchanged, and validated producer-only rows preserved
+    after a singleton save. Reject one-sided or foreign receipts, changed parent
+    hashes, malformed/duplicate producer rows, ordinary disk-only content, and
+    consumer ledgers whose episode id disagrees with their directory. Validate
+    the explicit post-rename workflow dependency and prove active-owner recovery
+    cannot select a newer sibling.
+  tags: [rename, transaction, path-rebase, ledger, durable-identity, freeze-receipt, disk-only-row, producer-ownership, active-owner, workflow-gate, cross-route]
+  legacy_id: PBUG-20260721-14
+
+- id: "12.67"
+  phase: 12
+  area: derived-ledger-text-metric-ownership
+  symptom: |
+    A structurally valid authored row is frozen with a stale-count warning, or
+    row, aggregate, and budget receipts disagree even though they describe the
+    same canonical text. Punctuation glued for delivery, especially en/em
+    dashes and smart apostrophes, makes one stage report a different word total
+    from another. A later repair can also change text while leaving one or both
+    derived count fields behind.
+  cause: |
+    Producers, repair passes, readiness normalizers, aggregate writers, and
+    freeze auditors each own a local word-count approximation. Some use a
+    lexical regex, some use whitespace splitting, and some trust previously
+    stored counts. Direct text mutations are not atomic with character and word
+    metrics, while durable save rolls stale fields forward instead of deriving
+    them from the canonical text it is about to serialize.
+  fix: |
+    Put the lexical contract in one dependency-free helper and route every
+    durable text mutation through an atomic text/character-count/word-count
+    setter. Define punctuation semantics explicitly. At durable save, derive
+    every row metric from canonical text before rebuilding cast, scene, root,
+    and role-specific aggregates, including clearing aggregates with no current
+    rows. Preserve the incoming audit for producer diagnosis, then perform one
+    count-only refresh after the final permitted text mutation and before the
+    final freeze audit. Derived-metric refresh must not alter canonical text,
+    delivery projections, authorship hashes, or seals.
+  verify: |
+    Pin straight and smart apostrophes, ASCII hyphens, and en/em dash boundaries
+    including a punctuation-glued production sentence. Corrupt row, cast,
+    scene, root, and role-specific totals, save, and require all of them to be
+    re-derived consistently. Prove the pre-audit still reports an incoming
+    mismatch while the post-audit is clean after the final refresh. Exercise
+    every producer route and AST-scan production modules so a direct ledger-text
+    assignment cannot bypass the atomic owner.
+  tags: [ledger, derived-state, word-count, punctuation, atomic-mutation, aggregate, freeze-audit, all-route, ast-guard]
+  legacy_id: PBUG-20260721-15
+
+- id: "12.68"
+  phase: 12
+  area: bounded-llm-authoring-transport
+  symptom: |
+    An LLM authors a modest script but cannot complete or repair the requested
+    structured artifact inside its real context. A first response truncates at
+    the output cap, a later response drifts one mechanical ID, and typed repair
+    truncates again because it carries the failed whole artifact beside the
+    broad original request. The pass exhausts and kills the episode even though
+    the story text itself is small and repairable.
+  cause: |
+    The authoring boundary is defined by the downstream storage schema instead
+    of field ownership. The model repeatedly serializes compiler-derivable IDs,
+    parents, speakers, scenes, cues, boundaries, fact mappings, and neutral
+    defaults. Repair duplicates those fields, schema authority, and request
+    context. Output and prompt costs therefore scale with mechanical metadata,
+    while fresh LLM retries repeat the same impossible envelope.
+  fix: |
+    Define a strict compact wire artifact containing stable IDs and only the
+    fields the model owns. Require an exact unique bijection to the accepted
+    graph, map by ID rather than position or fuzzy matching, and compile every
+    mechanical field from accepted authority before running the complete
+    downstream validator. Typed repair carries only a parsed compact draft and
+    the smallest trusted context needed to correct it; omit malformed prefixes
+    and raw schema/request echoes. Require the complete prompt and full dynamic
+    output reservation to fit. Keep liveness finite and truthful: one bounded
+    lane, at most one fresh independent lane, then only an explicit deterministic
+    floor for advisory craft defects.
+    A capacity failure must carry a PHASE, and the phase decides whether the
+    ladder may spend another attempt. A pre-call refusal (the measured prompt
+    leaves no room for the artifact) is deterministic: re-rolling re-derives the
+    identical refusal, so it stays terminal. A call that RAN and consumed its
+    whole output allowance without reaching a stop condition is stochastic, and
+    it must advance the ladder rather than escape as an unhandled error on
+    attempt one of N -- a ladder that advertises a budget and spends one call is
+    lying about its own liveness. Being CATCHABLE is not being RETRYABLE: catch
+    both phases at the attempt boundary, then re-raise the deterministic one
+    untouched. Own the phase in the module that owns capacity arithmetic and let
+    the ladder ask it, so the transport and the retry policy cannot hold two
+    different opinions about the same failure. The truncated partial artifact is
+    never fed to a prose repair, and any message that claimed no retry was
+    possible must be corrected when the retry becomes possible.
+  verify: |
+    Exercise the maximum supported word and row surface with the exact production
+    tokenizer. Require both base and semantic-repair prompts plus the complete
+    output reservation to fit the real context. Assert authored text is preserved
+    while compiler-owned graph fields are rebuilt, and reject missing, unknown,
+    or duplicate IDs. Prove typed repair omits whole-request/schema echo and
+    malformed raw prefixes. Record a creative-to-technical restart exactly once
+    and truthful exhaustion after exactly two flat ladders.
+    Drive the real ladder with a transport that raises each capacity phase.
+    Prove the run-and-overflow phase reaches the NEXT rung and that a good next
+    attempt returns a result; prove an unlucky pass spends its whole advertised
+    budget and then dies as the ladder's own typed exhaustion carrying the
+    capacity error, not as a bare transport error on attempt one. Prove the
+    pre-call phase still propagates after exactly ONE call. Distinguish the rungs
+    by an observable the fake transport can see, and assert that observable is
+    not equal to any constant another rung uses -- a fixture value that collides
+    with the constant under test hides a reverted gate.
+  tags: [llm-output, structured-transport, compiler-ownership, context-window, output-budget, typed-repair, line-id, finite-liveness, fail-closed, capacity-phase, retry-policy]
+  legacy_id: PBUG-20260721-16
+
+- id: "12.69"
+  phase: 12
+  area: positioned-media-timeline-ownership
+  symptom: |
+    A complete media render reaches its terminal mux with a video body longer
+    than the authoritative master audio even though every individual shot and
+    credits declaration is valid. The excess can equal the sum of intentional
+    cue/dialogue crossfades.
+  cause: |
+    Full per-shot render requests are summed as final output duration after the
+    audio ledger has positioned overlapping rows. The positioned assembler then
+    emits each request in full instead of giving the later row ownership at its
+    start boundary. A master-duration cross-check may grow the result but is
+    forbidden to shrink the duplicated overlap.
+  fix: |
+    Separate render-work frames from final timeline frames. For a completely
+    positioned manifest, derive the final CFR boundary from the accepted
+    post-audio ledger duration and quantize upward to cover the final fractional
+    frame. Sort rows stably by position and end each visible slot at the earliest
+    of its requested end, the next row's start, or the timeline boundary; fill
+    genuine gaps separately. Let the actual master cross-check shrink or grow a
+    positioned result, while preserving historical grow-only behavior for an
+    unpositioned sequential manifest. Compare engine output with planned visible
+    frames and report intentional overlap trimming separately. Keep terminal mux
+    tolerance and credits ownership strict.
+  verify: |
+    Create full shot requests whose sum exceeds a positioned timeline by two
+    crossfades. Require stable next-start ownership, no duplicated frames, no
+    stretched gaps, an exact authoritative final boundary, and distinct
+    requested/rendered/visible/trimmed telemetry with a green visibility gate.
+    With real media, require an oversized positioned manifest to reconcile down
+    to ceil(master_seconds * fps). Retain a no-position legacy case that keeps
+    its full sequential request sum.
+  tags: [video, timeline, crossfade, positioned-manifest, frame-budget, ledger-authority, mux, qa-telemetry, legacy-compatibility, all-route]
+  legacy_id: PBUG-20260721-17
+
+- id: "12.70"
+  phase: 12
+  area: explicit-word-delivery-ownership
+  symptom: |
+    A source bank completes story passes and advances toward media outside the
+    operator's explicit character-word band, or a finite model-repair ladder
+    correctly detects the miss but fails the whole episode when only its current
+    authored candidate is exhausted.
+  cause: |
+    Producer families implement incompatible counting and length policies, and
+    candidate liveness is conflated with episode liveness. A repair ladder may
+    stop after one failed model pair, retain an out-of-band closest draft, count
+    a different token surface than the ledger, preserve stale row-failure state,
+    treat finite candidate exhaustion as final delivery impossibility, or call a
+    reroll fresh while replaying the same fixed prompt and seed through two logical
+    slots that resolve to one backend.
+  fix: |
+    Define one dependency-light integer delivery law and persist target, inclusive
+    bounds, producer owner, canonical character count, and exact text hash. Repair
+    one owned row, try the alternate writer slot, and retain only strict distance
+    progress. Four consecutive stalls retire Candidate N, never the episode.
+    Then one producer authors a fresh complete candidate; alternate producer
+    priority on successive rerolls. Make that freshness model-observable with a
+    monotonically unique producer prompt nonce or another validated generation
+    input whenever logical slots share a seeded backend. Keep candidates bounded but
+    retain fresh rerolls as the normal recovery. BUG-12.71 later adds a fixed,
+    fail-closed outer campaign ceiling after production proved unbounded retries
+    can hold the queue forever. A temporary provider failure may consume a
+    candidate but must never publish partial state. Reject padding, repetition, fake advertising
+    or products, invented numeric/visual/canon claims, markup, stage directions,
+    and program-authored story prose. Content-owned lanes rebuild proofs and
+    hashes; inline lanes stage a complete reroll before committing. Subjective
+    quality is fail-open. Only the final deterministic in-band ledger stamp may
+    accept a candidate, and every media/readiness consumer stays downstream.
+    Freeze retains a read-only hash-bound recount as the last backstop.
+  verify: |
+    Pin 180 to 163..200 and 320 to 289..356. Prove unlimited strict-progress
+    cycles, four consecutive stalls per candidate, alternate-slot escalation,
+    whole-candidate retirement, distinct model-visible reroll inputs when logical
+    slots share one backend, and successful continuation beyond five outer
+    generation failures. Require canonical counting, current line-id hygiene
+    state, non-target immutability, proof/hash resealing, no fake-commercial or
+    new-claim patch, final reflections from accepted rows, and a hard assembled
+    stamp before readiness or media. A declared freeze miss must stop before
+    video without mutating content text or hashes.
+  tags: [word-budget, delivery-contract, producer-ownership, row-local-repair, candidate-liveness, bounded-outer-retry, hash-receipt, readiness, freeze, all-route]
+  legacy_id: PBUG-20260721-18
+
+- id: "12.71"
+  phase: 12
+  area: bounded-word-fit-campaign-liveness
+  symptom: |
+    A production source-bank sweep can remain pending forever after story
+    generation succeeds. Logs repeat producer-cache reuse while no episode,
+    readiness stamp, media artifact, or terminal error appears, blocking every
+    later leg behind the first non-converging word-fit campaign.
+  cause: |
+    Row-local repair and each authored candidate are finite, but producer
+    families wrap them in an outer while-true campaign that accepts only an
+    in-band ledger or deterministic capacity impossibility. When capacity is
+    sufficient and model output repeatedly misses the band, candidate retirement
+    has no episode-wide terminal condition.
+  fix: |
+    Put one shared, fail-closed outer candidate ceiling in the common retirement
+    owner used by every producer family. Default to twelve retired candidates and
+    accept only positive integer overrides from OTR_MAX_WORD_FIT_CANDIDATES.
+    After the ceiling-th retirement has been recorded and stale readiness state
+    cleared, raise a distinct WordFitCeilingExceeded subclass of the existing
+    WordDeliveryError so current node boundaries remain fail-closed. Preserve the
+    exact in-band ledger stamp as the only acceptance path; never publish a
+    partial or closest candidate.
+  verify: |
+    Exercise the default ceiling, a smaller environment override, and acceptance
+    on candidate k below the ceiling. Require every producer loop to retire
+    through the shared owner. In a production multi-bank sweep, each leg must
+    either reach RESULT SUCCESS plus obs_publish and canonical assets, or
+    terminate promptly with exact WordFitCeilingExceeded. No pending leg may
+    spin indefinitely.
+  tags: [word-budget, delivery-contract, candidate-liveness, bounded-outer-retry, fail-closed, typed-error, environment-override, queue-liveness, all-route]
+  legacy_id: PBUG-20260722-01
+
+- id: "12.72"
+  phase: 12
+  area: pack-seam-accessor-ownership
+  symptom: |
+    A runnable source-bank lane fails before model inference with a missing
+    prompt-seam error even though the selected story pack contains the seam.
+    A valid pack can therefore be rejected at the first structured pass.
+  cause: |
+    Prompt seams are owned by the StoryPack.prompt_stages mapping, but a lane
+    resolves a seam as though it were a dataclass attribute. getattr(pack,
+    seam, None) returns None for every valid mapped seam and masks a registry
+    wiring defect as a missing-pack contract failure.
+  fix: |
+    Resolve every declared seam through the canonical prompt_stages mapping and
+    fail closed only when the mapped value is absent or empty. Keep the seam
+    name and exact prompt text observable at the structured-call boundary.
+  verify: |
+    Build a valid StoryPack with a declared prompt_stages seam, invoke the
+    shared structured-pass boundary, and require the exact mapped text in the
+    system message. Also exercise every runnable bank's declared seams through
+    its selected runner and require the live bank leg to reach RESULT SUCCESS,
+    obs_publish, and canonical assets.
+  tags: [story-pack, prompt-seam, mapping, dataclass, registry, structured-call, fail-closed, all-route]
+  legacy_id: PBUG-20260722-02
+
+- id: "12.73"
+  phase: 12
+  area: capability-declaration-vs-runtime
+  symptom: |
+    A component declares a range of legal values, a planner commits real work
+    against that declaration, and only the execution step discovers the
+    component cannot produce most of that range. The failure is LATE and
+    expensive: everything upstream of the executing step has already been paid
+    for. It reads as a regression in the executing component, because the
+    declaration has usually been wrong for a long time without anyone asking
+    for a value outside the narrow band that happened to work.
+  cause: |
+    The declaration was hand-written and never checked against the runtime that
+    must honour it. Three independent channels can each break the promise:
+    (1) the declaration itself overstates the component; (2) an environment
+    override read at execution time moves a bound the declaration froze, so the
+    planner and the executor disagree even though the declaration is correct;
+    (3) the bound silently depends on a SECOND dimension (canvas, resolution,
+    device, precision) that is itself unpinned, so the declaration is true only
+    under conditions nothing enforces. Closing one channel leaves the others
+    open and produces a fix that appears to work.
+  fix: |
+    Make the declaration describe what the runtime DOES, not what the component
+    is believed capable of, and use literals rather than deriving from a mutable
+    constant -- a static declaration must never track a value that can move
+    underneath it, because drift should fail a test visibly rather than be
+    absorbed silently. Refuse, do not silently win: when an environment value
+    disagrees with a declaration, raise a typed conflict naming the variable and
+    the legal value, because quietly overriding an operator's explicit setting
+    is its own defect. Pin every secondary dimension the bound depends on, and
+    say in the declaration which measurement it came from.
+  verify: |
+    Feed each component's own declared minimum and maximum through the same
+    resolver the execution path uses, and require the values to come back
+    unchanged; for discrete menus test every member, not the endpoints, since
+    inherited min/max are not menu members. Assert the typed refusal fires for
+    a disagreeing environment value, passes for an agreeing one, and is not
+    pedantic when the variable is unset. Prove the secondary dimension is
+    pinned by setting it hostilely and requiring the declaration to win.
+  tags: [capability-declaration, contract-vs-runtime, environment-override, static-contract, fail-closed, typed-error, late-failure, planner-executor-agreement, all-route]
+  legacy_id: PBUG-20260802-01
