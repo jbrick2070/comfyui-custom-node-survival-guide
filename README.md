@@ -2,7 +2,7 @@
 
 **By Jeffrey A. Brick** · April–May 2026
 
-An AI-agent QA harness for ComfyUI custom-node authoring. v2.1 — 228 bible entries + LLM round-robin consult addon.
+An AI-agent QA harness for ComfyUI custom-node authoring. v2.1 — 261 bible entries + LLM round-robin consult addon.
 
 ---
 
@@ -26,7 +26,7 @@ The "AI agent confidently shipped a broken fix" failure mode. Static analysis ca
 
 ## What's in the kit
 
-1. **`BUG_BIBLE.yaml` + `tests/bug_bible_regression.py`** — a 228-entry, machine-readable bug bible plus an automated pytest suite that turns the bible's `verify` fields into executable assertions. Point the suite at any custom-node pack and get a pass/fail report in under 2 seconds. No ComfyUI runtime, no model downloads, no manual grepping.
+1. **`BUG_BIBLE.yaml` + `tests/bug_bible_regression.py`** — a 261-entry, machine-readable bug bible plus an automated pytest suite that turns the bible's `verify` fields into executable assertions. Point the suite at any custom-node pack and get a pass/fail report in under 2 seconds. No ComfyUI runtime, no model downloads, no manual grepping.
 
 2. **`llm_round_robin/`** — a drop-in addon that lets your AI agent call ChatGPT, Gemini, and NVIDIA NIM for second opinions, with probe-first ladder pruning, endpoint-aware dispatch, and capability-tag routing so the agent never silently lands on a stale fallback model. See [`docs/llm_round_robin_explainer.md`](./docs/llm_round_robin_explainer.md).
 
@@ -191,7 +191,7 @@ entries. Exits non-zero on issues so it's easy to wire into a pre-commit hook.
 
 ## What the regression suite checks
 
-228 bible entries across 12 phases; the pytest suite encodes the static-
+261 bible entries across 12 phases; the pytest suite encodes the static-
 analysis-checkable subset as executable assertions.
 
 Entries may carry additive `xref-XX.YY` tags (cross-reference to an
@@ -202,16 +202,16 @@ ids are immutable), added by the 2026-07-12 consistency audit.
 |---|---|---|
 | 01 Bootstrap & Discovery        | Path safety, no dirname chains, folder_paths usage | 01.02, 01.03 |
 | 02 Environment & Dependencies   | UTF-8 no BOM, no mojibake, no zero-byte files; boot launchers force UTF-8 stdio; SD 1.5 .ckpt offline-load; model-architecture admission and split-revision HF caches | 02.11, 02.12, 02.14–02.16 |
-| 03 Registration & Loading       | Isolated per-node loading, namespaced IDs, no ghost registrations | 03.01, 03.03, 12.23 |
-| 04 INPUT_TYPES & Widgets        | Widget positional stability; workflow JSON integrity; preserved-vs-stripped auto-sense; socket-only types | 04.01, 04.02, 04.07–04.13 |
-| 05 Execution Model              | Coordination, migration, list outputs, interrupts, completion checks; feature-flag/role-policy decoupling | 05.05, 05.06, 05.08, 05.09 |
-| 06 Caching & IS_CHANGED         | Stale outputs, signature stability, leaks; model-platform empirical compat | 06.01–06.06 |
-| 07 Tensors, Audio, Video        | VRAM, dtype, audio contracts, motion-onset pad, sample-rate, composite layer ordering | 07.01–07.22 |
+| 03 Registration & Loading       | Isolated per-node loading, namespaced IDs, no ghost registrations; import load-contract, single-instance pack loading | 03.01, 03.03, 03.05, 03.06, 12.23 |
+| 04 INPUT_TYPES & Widgets        | Widget positional stability; workflow JSON integrity; preserved-vs-stripped auto-sense; socket-only types; socket-vs-FUNCTION signature contract | 04.01, 04.02, 04.07–04.14 |
+| 05 Execution Model              | Coordination, migration, list outputs, interrupts, completion checks; feature-flag/role-policy decoupling; V3 NodeOutput migration, python-scoping traps | 05.05, 05.06, 05.08, 05.09, 05.12–05.14 |
+| 06 Caching & IS_CHANGED         | Stale outputs, signature stability, leaks; model-platform empirical compat; deterministic-replay discipline | 06.01–06.07 |
+| 07 Tensors, Audio, Video        | VRAM, dtype, audio contracts, motion-onset pad, sample-rate, composite layer ordering; native-resolution ceilings, engine-prompt coupling, prompt budget and palette hygiene | 07.01–07.30 |
 | 08 I/O & Output Nodes           | Headless API, intermediates, preview thumbnails, OUTPUT_NODE discipline | 08.01–08.08 |
-| 09 Subprocess & Network         | Pipe deadlocks, asyncio, offline fallbacks, cloud-API contracts | 09.02, 09.05, 09.06 |
-| 10 Safety, Pools, RNG           | Content filters, pool sizing, RNG correctness | 10.01–10.07 |
-| 11 LLM-Specific                 | Token budgets, prompt-detector contracts, format normalisers, three-tier resilience, typed repair ladders, schema-grammar compatibility | 11.01–11.56 |
-| 12 Regression, Git, Handoff     | Repo hygiene, AST parse, workflow JSON link integrity, dedup foreign keys, ledger write-back, stale-LLM-API ladder, assembled-surface validation, identity classification, artifact-tree rename transactions, canonical derived-metric ownership, explicit requested-length delivery | 12.02, 12.06, 12.07, 12.35, 12.39, 12.52, 12.60, 12.61, 12.66, 12.67, 12.70 |
+| 09 Subprocess & Network         | Pipe deadlocks, asyncio, offline fallbacks, cloud-API contracts; process identity, Windows portability | 09.02, 09.05–09.08 |
+| 10 Safety, Pools, RNG           | Content filters, pool sizing, RNG correctness; seed provenance, cast coherence | 10.01–10.09 |
+| 11 LLM-Specific                 | Token budgets, prompt-detector contracts, format normalisers, three-tier resilience, typed repair ladders, schema-grammar compatibility | 11.01–11.60 |
+| 12 Regression, Git, Handoff     | Repo hygiene, AST parse, workflow JSON link integrity, dedup foreign keys, ledger write-back, stale-LLM-API ladder, assembled-surface validation, identity classification, artifact-tree rename transactions, canonical derived-metric ownership, explicit requested-length delivery; rewrite parity, multi-window git discipline, test isolation | 12.02, 12.06, 12.07, 12.35, 12.39, 12.52, 12.60, 12.61, 12.66, 12.67, 12.70, 12.75–12.85 |
 
 ## How an AI coding agent uses this kit
 

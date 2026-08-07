@@ -5250,3 +5250,1722 @@ bugs:
     each; a fix whose test stays green when the fix is removed is not covered.
   tags: [dead-code, zero-reader, reachability, extract-to-test, false-green, wiring-vs-behaviour, static-assertion, mutation-check, all-route]
   legacy_id: PBUG-20260805-04
+- id: "03.05"
+  phase: 3
+  area: loading
+  symptom: |
+    ComfyUI boots green and the node registers, but the same module raises
+    ImportError -- attempted relative import with no known parent package, or
+    beyond top-level package -- the moment anything outside the ComfyUI runtime
+    touches it. Every pytest run, every CLI entry point, every offline repro
+    dies at the import line. Because the pack works in the UI, the failure gets
+    read as a broken test harness rather than a broken module, and the helper
+    behind that import quietly stops being exercised by anything at all.
+  cause: |
+    A module has exactly one load identity at a time, and relative imports work
+    only under one of them. A pack whose modules are reached by prepending the
+    nodes directory to sys.path and importing ABSOLUTELY is loaded as a
+    TOP-LEVEL module -- __package__ is empty, so there is no parent for a
+    leading dot to resolve against. The import STYLE is therefore part of the
+    module's load contract, not a matter of taste, and the contract lives in a
+    docstring that the next edit does not read. Editors and refactor tools
+    default to the relative form, so a single line added months later plants a
+    latent break in a file that is otherwise pure absolute imports. It stays
+    invisible under ComfyUI for either of two reasons -- the runtime may import
+    the pack as a PACKAGE, giving the leading dot a parent to resolve against,
+    or the ComfyUI path may simply never reach that branch -- and the defect is
+    per-SITE rather than per-file, so a fix that repairs the two lines someone
+    happened to notice leaves the sibling sites live.
+  fix: |
+    Pick ONE load identity per module, state it at the top of the file, and
+    make every import in that file obey it -- absolute under sys.path-prepend,
+    relative only in a module that is genuinely always a package member. Then
+    stop fixing it by hand. The defect class is repo-wide the instant it
+    appears once, so sweep every module under the contract in the same change,
+    not just the file whose test went red, and delete the temptation by adding
+    a gate that rejects the wrong form mechanically. Treat the untested helper
+    as part of the bug: an import that only ever fails outside the runtime has
+    been shielding its own function from every test you own, so restore the
+    import and then cover what it imports.
+  verify: |
+    AST-parse every module in the pack and assert that no ImportFrom node has
+    level greater than zero in any file declaring the sys.path-prepend
+    contract; the assertion must name the file and the line so the next
+    occurrence is a one-line diagnosis. Prove the gate can fail by planting a
+    single relative import and requiring it to go red. Then import each module
+    standalone in a fresh interpreter with only the nodes directory on
+    sys.path -- runtime-shaped green is not proof -- and require at least one
+    test to CALL the function behind the repaired import, because the import
+    line was reachable all along; it was the caller that never existed.
+  tags: [relative-import, absolute-import, load-contract, sys-path-prepend, top-level-module, latent-break, repo-wide-sweep, static-assertion]
+  legacy_id: BUG-LOCAL-252
+- id: "03.06"
+  phase: 3
+  area: loading
+  symptom: |
+    The boot log stutters. The pack's prestartup banner prints twice, the
+    all-nodes-loaded line prints twice, the HTTP route lines print twice, and
+    the import-times section names two different absolute paths ending in the
+    same pack directory -- all inside ONE process, under one ComfyUI revision
+    banner. The node menu looks perfectly normal, one entry per node, so the
+    operator dismisses the duplicate lines as noise. Later symptoms do not name
+    the cause: an edit to the pack has no effect, a cache or counter behaves as
+    if something else is writing to it, a background job runs twice.
+  cause: |
+    ComfyUI scans more than one custom_nodes root -- the base install tree and
+    the user directory are separate roots, and extra path config can add more.
+    Each root is scanned independently and a pack present in two of them is
+    loaded TWICE, as two distinct module objects with two distinct __file__
+    values, because nothing dedupes by pack name. Prestartup scripts run once
+    per copy as well, before any node code exists to notice. Every module-scope
+    side effect therefore happens twice: environment mutation, sys.modules
+    monkeypatching, aiohttp route registration against the one shared server
+    singleton, thread spawns, log handlers. NODE_CLASS_MAPPINGS is a plain
+    dict, so the second copy's classes silently overwrite the first's -- the UI
+    is correct and the code that actually executes belongs to whichever copy
+    was scanned last, which need not be the one being edited. The usual setup
+    that produces this is the recommended one: keep a source repo and a synced
+    deployed copy, then let both land under scanned roots. It is the mirror
+    image of a key collision between two packs, and namespacing cannot touch
+    it, because the colliding names are correct and identical by construction.
+  fix: |
+    Make the second load impossible to miss and harmless when it happens. Have
+    the pack record a process-global sentinel carrying the __file__ of the
+    first load; on a second load, log BOTH paths at error level and return
+    before re-running any side effect, rather than proceeding quietly. Make
+    every module-scope side effect idempotent on its own terms anyway --
+    setdefault rather than assignment for environment variables, a
+    router-contains check before registering a route, a named-thread lookup
+    before spawning -- because idempotence is what keeps a duplicate scan from
+    becoming a duplicate server. Then fix the deployment rather than living
+    with the guard: exactly one scanned root may contain the pack, and a source
+    repo kept beside a deployed copy belongs OUTSIDE every root ComfyUI scans.
+  verify: |
+    Query the roots ComfyUI actually scanned, not the ones you believe it
+    scanned, and assert that exactly one of them contains the pack directory;
+    on failure raise a typed error naming both absolute paths, since two paths
+    in the message is the entire diagnosis. Prove it fires by copying the pack
+    into the second root, booting, and requiring the error -- then remove the
+    copy and require a clean boot whose registration banner appears exactly
+    once. Separately assert the count of the pack's registered HTTP routes
+    equals the count it declares, because doubled registration is the side
+    effect most likely to be swallowed by a defensive try/except and reported
+    as success.
+  tags: [double-load, duplicate-registration, custom-nodes-roots, module-identity, prestartup, side-effects, idempotence, http-routes, deployment]
+  legacy_id: LOG-20260723-double-load
+- id: "04.14"
+  phase: 4
+  area: validation
+  symptom: |
+    A socket is right there on the node -- correct type, connectable, with a
+    tooltip describing exactly what it does. The pack loads clean, the graph
+    validates, the queue accepts it. The instant anything is wired to that
+    socket, execution dies with TypeError -- got an unexpected keyword argument
+    -- naming an input the node itself advertises. Worse than the crash is the
+    quiet period before it: anyone planning new work reads that socket as
+    evidence the node owns a feature it does not own, and builds on a promise
+    the code never made.
+  cause: |
+    ComfyUI hands every resolved input to the class's FUNCTION method as a
+    KEYWORD argument named by its INPUT_TYPES key. Nothing compares those keys
+    against the method signature at registration -- INPUT_TYPES is just a dict
+    returned by a classmethod, and the mismatch is discovered only when the
+    executor actually calls. Declaration and signature drift independently, and
+    two histories dominate: an input block copy-pasted from a sibling node
+    whose method was never updated, and a migration that stopped after the
+    declaration. Both leave a socket that is visible and unreachable. It stays
+    latent for exactly as long as the canonical workflow declines to wire it,
+    so a green production graph proves nothing about the sockets it does not
+    use. The variant with **kwargs is quieter and worse: no TypeError, the
+    value is simply swallowed, and the node reports success while ignoring an
+    input the operator connected on purpose.
+  fix: |
+    Treat INPUT_TYPES as a contract the FUNCTION must satisfy, and enforce it
+    once at the registry level rather than per node, because a defect that can
+    exist on any node needs a check that visits every node. Walk the node
+    mappings, collect every key in required, optional and hidden, and require
+    each to be a named parameter of the class's FUNCTION method or absorbed by
+    a declared **kwargs; check the reverse direction too, since a parameter
+    with no default and no declaration is the same drift facing the other way.
+    When the audit names a drifted socket, resolve it from history before
+    touching it -- deleting the declaration and implementing the parameter are
+    opposite changes with opposite blast radii, and picking one because it is
+    smaller is a guess wearing a patch's clothes. Where **kwargs is genuinely
+    wanted, read the declared keys out of it explicitly and reject unknown
+    ones, so absorption never becomes silence.
+  verify: |
+    Run the parity sweep over the SHIPPED registry by introspection, and
+    require the set of declared input names minus the set of signature
+    parameters to be empty for every registered class unless that signature
+    takes VAR_KEYWORD; the failure message must name the node and the offending
+    key. Prove the sweep can fail by adding one bogus key to a single node's
+    INPUT_TYPES and requiring red. Then take the specific socket all the way to
+    execution -- wire it in a minimal graph, run it, and require a real result
+    rather than an absence of error -- because a socket nothing wires is a
+    socket nothing tests, and the whole defect lived in that gap.
+  tags: [input_types, function-signature, signature-parity, declared-vs-accepted, latent-socket, kwargs-swallow, registry-wide-audit, static-assertion, late-failure]
+  legacy_id: NEWBUG-20260731-scene-sequencer-music-sockets
+- id: "05.12"
+  phase: 5
+  area: python-scoping
+  symptom: |
+    A feature that is Off by default has been dead for weeks. Every run with it
+    enabled dies at execution with TypeError -- run() got an unexpected keyword
+    argument 'os' -- naming a module the signature never mentions. Default runs
+    are clean, the suite is green, and the commit that broke the feature touched
+    a different part of the function entirely, so the blame lands on the feature
+    rather than on the edit that killed it.
+  cause: |
+    A re-entrant call built its argument bundle from a bare locals() snapshot,
+    filtered by a hand-written exclusion list of the names that existed on the
+    day the gate was authored. locals() is not the parameter list -- it is every
+    name bound in the frame so far, including function-body imports, temporaries
+    and loop variables. Any later edit that binds a new local ABOVE the capture
+    point silently adds a key to the bundle. Here a story-scaffold block landed
+    one day after the gate and introduced a function-body import of os plus a
+    scaffold temporary above it; both were forwarded as keyword arguments into a
+    run() that has no **kwargs. The exclusion list is a denylist over an open
+    set: it can only name what already existed, so it is guaranteed to go stale.
+    Because the path was default-Off, nothing in the suite drove the gate, and
+    the defect shipped latent behind a green board.
+  fix: |
+    Never build a kwargs bundle from a bare locals() snapshot. Derive the
+    bundle's membership from the CALLEE, not the caller's frame: filter locals()
+    against inspect.signature(type(self).run).parameters, an allowlist that a
+    new local cannot poison no matter where it is bound. Keep the explicit
+    exclusions only for names that ARE real parameters but must not be
+    re-forwarded, such as the keyword-only internals that drive the loop.
+    When the forwarded set is small, name the arguments explicitly and delete
+    the reflection entirely. The general rule: an argument bundle assembled by
+    introspecting the caller's scope is a time bomb armed by the next unrelated
+    edit; assemble it from the target's declared interface instead.
+  verify: |
+    Drive the re-entry path with the option ON and the inner loop stubbed, then
+    assert two things separately -- that the captured bundle contains no key
+    outside the callee's signature, and that a value the caller set survives the
+    round trip. The second assertion matters because a filter that throws the
+    payload out with the noise also passes the first. Then bind a junk local
+    immediately above the capture point and require both assertions to still
+    hold; that is the mutation which reproduces the original defect. Finally,
+    inventory the default-Off toggles and drive each one end to end at least
+    once: a branch no test enters is a branch where an unrelated edit can be
+    fatal without turning anything red.
+  tags: [locals-capture, kwargs, signature-filter, denylist-vs-allowlist, re-entry, latent-defect, default-off-path, typeerror, python-scoping]
+  legacy_id: BUG-LOCAL-416
+- id: "05.13"
+  phase: 5
+  area: migration
+  symptom: |
+    After a ComfyUI upgrade, a custom node that invokes core nodes directly
+    crashes partway down a loader chain, on exactly one link: node
+    'AudioEncoderLoader' returned a comfy_api NodeOutput object, expected a
+    non-empty tuple. Four earlier links in the same chain loaded cleanly. No
+    workflow JSON changed, and the pack's own check is unremarkable -- it
+    asserts that a node returned a tuple -- so the failure reads as a defect in
+    that one node instead of what it is: an upstream API migration arriving one
+    node at a time.
+  cause: |
+    ComfyUI is migrating core nodes to the V3 node API incrementally. A V3
+    node's FUNCTION returns a comfy_api NodeOutput wrapper -- positional results
+    stored on .args and exposed through the .result property, which is that
+    tuple when non-empty and None otherwise -- rather than a bare tuple; an
+    async V3 execute returns a coroutine of one. Because the migration is
+    partial, V1 and V3 nodes coexist inside a single invocation chain, so a
+    consumer that validates isinstance(out, (tuple, list)) keeps working for
+    every unmigrated neighbour and breaks only for the node that moved. The
+    underlying error is older than the upgrade: the custom node treated another
+    node's return SHAPE as a stable contract. Reaching past your own declared
+    sockets into a core node's FUNCTION means owning that node's return contract
+    across every host version you claim to support.
+  fix: |
+    Normalize at the boundary. Put one narrow adapter between the invocation and
+    the rest of the pack: run the coroutine if the return is one, unwrap a
+    NodeOutput to its positional tuple, pass a plain tuple through unchanged,
+    and let everything else -- including an EMPTY NodeOutput -- fall through to
+    the loud typed error that names the node and the shape received. Duck-type
+    on attribute shape rather than importing comfy_api, so the pack still
+    imports outside ComfyUI and is not pinned to one internal module path.
+    Record in a comment the host version the shape was confirmed against, and
+    keep the adapter internal -- no INPUT_TYPES, socket, widget or output
+    change, so saved workflows need no rewire and the fix carries no widget
+    regression risk.
+  verify: |
+    Pin BOTH shapes, not only the one that broke. Four cases: a V1 plain tuple
+    passes through identically, a V3 NodeOutput unwraps to its positional tuple,
+    an empty NodeOutput still raises the loud error, and an unregistered node
+    still raises. Build the doubles from attribute shape alone so the tests run
+    with no ComfyUI import. Then re-run the real episode and workflow that
+    crashed and require the chain to load past the migrated node into the next
+    phase. Re-run that same matrix after every host upgrade and pin the version
+    it last passed under: with a partial migration the set of core nodes
+    returning wrappers grows silently, and the next one to move will be a node
+    your chain already depends on.
+  tags: [comfyui-core-api, v3-node-api, nodeoutput, return-contract, partial-migration, node-invocation, duck-typing, version-drift, boundary-normalization]
+  legacy_id: BUG-LOCAL-266
+- id: "05.14"
+  phase: 5
+  area: execution
+  symptom: |
+    A diagnostic the operator reads -- a generated-token count, a size, a
+    duration -- comes back None on a run that plainly produced output, and every
+    branch keyed on it stays silent. Nothing is logged, because the swallow was
+    written to be quiet. In this incident three brand-new tests failed on that
+    None while the shipped code was innocent: the value that could not survive
+    the defensive fallback was the test double, not anything production ever
+    passes.
+  cause: |
+    Three mistakes stacked in one line, getattr(ids, "shape", [len(ids)]) inside
+    a bare except Exception. First, Python evaluates every argument BEFORE the
+    call, so the third argument is built EAGERLY -- len(ids) runs even when
+    .shape exists, and it raises on any object without __len__. A fallback
+    written as an argument is not lazy; it is unconditional work that can fail.
+    Second, the bare except cannot distinguish a genuinely exotic backend value
+    from a TypeError manufactured by the fallback itself, so a programming error
+    is laundered into a plausible None that every downstream reader accepts as
+    data. Third, the double was LESS capable than the real object: a real tensor
+    carries both .shape and __len__, the stand-in carried only .shape, so the
+    tests invented a failure mode production does not have and sent the
+    investigation into the wrong file.
+  fix: |
+    Make the fallback lazy by making it a branch. Read the primary first, then
+    compute the alternative only on the path that needs it -- shape =
+    getattr(ids, "shape", None), then int(shape[-1]) if shape is not None else
+    len(ids) -- or pass a callable and call it in the miss case. Put no work
+    that can raise into a default argument, a dict.get default, or the
+    right-hand side of an or-expression you believe is unreachable. Narrow the
+    swallow to the exception the exotic case actually throws, and when you do
+    swallow, log the exception text and the value's type so a None always
+    carries a receipt. Build test doubles to the real object's FULL touched
+    surface -- every attribute and dunder the production line reads -- and when
+    a failure appears only under a double, repair the double rather than
+    hardening production against a shape it will never see.
+  verify: |
+    Exercise the line with an object that HAS the primary attribute and assert
+    the alternative never runs: put a counter or a raising sentinel in the
+    fallback position and require it untouched. That assertion is the one that
+    fails on the eager form and passes on the branch form, so it is the proof.
+    Exercise it again with an object that lacks the attribute and assert the
+    fallback returns the correct value. Assert that a genuinely uncomputable
+    diagnostic emits a log line naming the exception and the type, so no None is
+    silent. Grep the tree for eager defaults of the same family -- a getattr or
+    a dict.get whose default position holds a CALL -- and require each to be
+    branch-shaped. Drive the whole check through the real object at least once,
+    because a suite that only ever meets the double can only ever verify the
+    double.
+  tags: [eager-default-argument, getattr, lazy-fallback, bare-except, silent-none, diagnostic-field, test-double-fidelity, false-failure, python-semantics]
+  legacy_id: HANDOFF-L1589
+- id: "06.07"
+  phase: 6
+  area: caching
+  symptom: |
+    A QA plan promises a replay leg -- queue the same workflow twice with
+    nothing changed and get the same episode back -- and the leg can never be
+    made to pass. Every requeue authors a fresh story with fresh seeds and
+    different output bytes. Nothing errors, no cache hit is ever logged, and
+    nodes built specifically to FREEZE a decision re-take it on every run. The
+    investigation goes hunting for hidden nondeterminism in the model or the
+    RNG, when the graph has simply been told to discard its cache on purpose.
+  cause: |
+    The node's IS_CHANGED returns time.time(), which can never equal the
+    previous run's value, so ComfyUI's cache always misses. As local advice
+    that is fine, and this guide prescribes it for a live data fetch (see
+    06.01). But a cache signature is not a local property: invalidation
+    propagates to dependents, so one always-refresh node at the head of a
+    subgraph forces its whole downstream cone to re-execute. When that head
+    node is also nondeterministic -- an LLM writer that authors new content on
+    each call -- the subgraph has no stable identity for anything downstream to
+    replay, and a freeze or lock node that returns a wall clock as well pins
+    nothing, because what it froze is re-taken before it is ever read.
+    Replayability is forfeited by the wiring, not lost to chance, so no amount
+    of seed discipline downstream can recover it, and a plan that promises a
+    replay leg over such a subgraph is promising what its own graph forbids.
+  fix: |
+    Derive the signature from what the output actually DEPENDS on, never from a
+    wish to run again. Return a digest of the resolved inputs plus the external
+    state the node reads -- file mtime and size, the environment variables it
+    consults, a version constant you bump when behaviour changes -- so
+    identical conditions produce an identical string and a genuine cache hit
+    becomes possible at all. Where a run truly must be forced, make the forcing
+    an INPUT: a nonce or seed widget the operator bumps, which the graph
+    records and a later run can restate, rather than a clock nobody can
+    reproduce. Reserve time.time() for edge nodes whose output cannot be
+    described by their inputs, and keep those off the deterministic spine,
+    because every node downstream of one inherits its unrepeatability. If a
+    promised replay leg sits under an always-refresh node, either change the
+    signature or move the replay off the live queue onto a captured frozen
+    artifact -- do not ship the promise unchanged.
+  verify: |
+    Call IS_CHANGED twice with identical kwargs and require the two values to
+    be EQUAL, then change one field and require them to differ; failing the
+    first half is a cache defeat, failing the second is a stale-output bug.
+    Statically scan every IS_CHANGED body in the pack for a wall-clock call and
+    assert none appears on any node the deterministic spine is declared to
+    cover. Prove propagation in both directions: perturb one upstream signature
+    and require the dependents to re-execute, leave it untouched and require
+    they do not. Then run the claim end to end -- queue the unchanged workflow
+    twice and require the second run's output digest to equal the first's.
+  tags: [is_changed, cache-signature, determinism, replay, invalidation-propagation, freeze-node, wall-clock, content-derived-signature, xref-06.01]
+  legacy_id: KIBITZ-2026-07-12-replay-leg
+- id: "07.24"
+  phase: 7
+  area: audio
+  symptom: |
+    The default output of a generative slot collapses in quality after a
+    release, and the operator can only describe it subjectively -- the music
+    bed no longer sounds like music. The prompt builder's history is clean back
+    past the last known-good render, the model loads, the node runs, clip
+    lengths and sample counts are exactly right, and the suite is green.
+    Nothing is red because nothing a machine was asked to check moved.
+  cause: |
+    The engine behind the slot was swapped and its prompt was not. A prompt is
+    not a neutral instruction; it is an asset tuned to one model's training
+    distribution and conditioning contract, and it does not migrate. Text that
+    steered the old engine reads as noise to the new one, while the new
+    engine's own required inputs go unfilled -- the old contract had no concept
+    of them, so they take empty defaults: an empty negative prompt where a real
+    one is expected, a structural context window left at a stock value instead
+    of sized to the cue being rendered. Nothing dangles, so every grep, AST
+    parse and import check stays green. The decision that produced the swap is
+    the deeper defect: the new engine became the default because it was the
+    only candidate that introduced no dependency conflict. Conflict-free is a
+    reason a candidate is AVAILABLE, not a reason it should lead -- and the one
+    automated gate that could have bracketed the regression, a byte-identical
+    golden over the rendered audio, fights the repair by design, because any
+    genuine improvement changes the bytes.
+  fix: |
+    Bind the prompt and conditioning bundle to the ENGINE rather than to the
+    slot, so a swap must carry a re-tuned bundle or decline to be the default.
+    Before promoting any default, state the evidence that the new engine is
+    better on THIS content, and name convenience separately from quality; an
+    availability argument must never be allowed to stand in for a comparison
+    nobody ran. Having kept the new engine, fill its whole input contract
+    rather than only the fields the old one had, deriving each new field from
+    the real cue instead of a constant. Expose the settings it is sensitive to
+    as overridable constants and trace the resolved engine, settings and prompt
+    hash into the run log, because an A/B needs two labelled artifacts. Confirm
+    which engine the failing lane ACTUALLY resolved before tuning anything -- a
+    theme path and a bed path can produce similar-sounding output while only
+    one of them moved. When a byte-identical golden guards the output, schedule
+    its operator-gated re-baseline as part of the change instead of meeting it
+    as a surprise red.
+  verify: |
+    Assert that each generative slot's default engine and the prompt bundle
+    feeding it come from one declared pairing, so a swap that leaves the bundle
+    behind fails at import rather than at listen time. Statically check every
+    engine's required conditioning fields against what the shared builder
+    supplies and fail on any field falling through to an empty default. The
+    quality claim itself is not machine-checkable, so gate it honestly: keep a
+    reference render from the last known-good engine, require an operator A/B
+    against it, and re-baseline the golden only after that approval -- stamping
+    the approval date, engine, settings and prompt hash beside the new golden,
+    so the next investigation can tell an intentional byte change from a
+    regression.
+  tags: [audio, engine-swap, default-selection, prompt-model-mismatch, conditioning-contract, silent-quality-regression, golden-rebaseline, operator-ab, provenance]
+  legacy_id: BUG-LOCAL-408
+- id: "07.25"
+  phase: 7
+  area: video
+  symptom: |
+    An animated reveal -- a decode/scramble title card, a typewriter line, a
+    wipe, a counter -- plays for the entire span it was given, and the resolved
+    thing it exists to show is on screen for only the last frame or two before
+    the next transition takes it away. Scrubbing into the middle of the card
+    finds the text still mid-scramble where it should long since have settled.
+    Frame counts are right, durations match the plan, every test passes: the
+    card is simply never READ.
+  cause: |
+    Progress was written as p = (frame - start) / (end - start) across the
+    whole allotted window, so p reaches 1.0 only on the final frame. The
+    animation's span was silently equated with the slot's span, and dwell --
+    the interval in which the payload is legible -- was never a quantity in the
+    code, so it came out as whatever was left over, which is nothing. Every
+    element driven by that same p inherits the defect at once: the characters
+    revealed, a secondary carrier line, a cursor suppressed only once p is 1.0.
+    The exit transition then fires in those same last frames, leaving the
+    resolved state no hold at all. The WINDOW may be perfectly sized; this is
+    pacing INSIDE the window, an independent defect easily confused with, and
+    easily masked by, whatever earlier fix established the window's bounds.
+  fix: |
+    Separate the reveal span from the window span. Compute the reveal over a
+    bounded FRACTION of the window -- the window length times a reveal
+    fraction, floored at one frame, with a tunable default near 0.4 and an
+    environment override -- then clamp p to 1.0 and HOLD the resolved state
+    until the exit. Dwell is a design parameter and must exist in the code as
+    one, with the exit still driven off the window end rather than off the
+    reveal end. Extract the progress term into a pure helper the draw path
+    calls, so pacing can be asserted without rendering a frame, and apply that
+    one helper to every element sharing the animation and to the sibling cards
+    on the same draw path, since a closing bookend usually carries the
+    identical stretch. Confirm the layers around it keep non-overlapping frame
+    ranges, so a longer hold cannot run into what follows.
+  verify: |
+    Assert BOTH ends of the hold in a pure unit test over the helper, with no
+    rendering: fully resolved at start plus the reveal span, and still fully
+    resolved two frames before the window ends. Either end alone is a false
+    green -- the first admits a card that re-scrambles, the second admits one
+    that resolves too late to read. Assert p is monotonic, never exceeds 1.0,
+    and that cursor or blink suppression keys off resolution rather than off
+    the window. Sweep the reveal fraction across its legal range and require
+    the held frame count to stay at or above a stated minimum dwell at the
+    shortest legal window, so a later retune cannot quietly reintroduce the
+    bug. Then look at a real render at the fraction boundary and confirm the
+    title is already solid there.
+  tags: [video, animation-pacing, reveal-span, dwell-time, progress-fraction, title-card, procgen, pure-helper-test, look-qa, xref-07.13]
+  legacy_id: BUG-LOCAL-409
+- id: "07.26"
+  phase: 7
+  area: video
+  symptom: |
+    A generated clip starts sharp and ends as mush. Frame 0 is crisp, every
+    later frame drifts further into blur, and it happens inside a single clip
+    on every clip. Nothing errors -- no warning, no fallback, no workflow JSON
+    change to point at -- and the sibling still-image family from the same run
+    looks correct or even better than before. Because the first frame an
+    operator inspects is the one the conditioning image pins, the defect reads
+    as "the model got worse" and the hunt goes off after a lost sampler, a lost
+    seed, or a lost LoRA.
+  cause: |
+    The model is being driven above its native resolution envelope. A small
+    video model is trained at one canvas -- 480p for a 2B-class LTX -- and
+    above it cannot reconstruct detail out of noise, so each freely denoised
+    step drifts a little further than the last. The image-to-video conditioning
+    anchors frame 0 to the supplied still, which is exactly why the degradation
+    is progressive rather than uniform and exactly why the anchor hides the
+    defect at the frame most likely to be checked. The canvas moved because ONE
+    render canvas was shared across asset families -- a landscape change made
+    correctly for the still-image family dragged the video engine along with
+    it, so the regression has no commit of its own. The tuned
+    image-conditioning strength then compounds it. At native resolution that
+    setting anchored frame 0 while leaving room for motion; at the larger
+    canvas the same setting re-noises far more signal than the model can
+    restore, so the value that was right is now the thing producing artifacts.
+    A constant tuned at one canvas is only valid at that canvas.
+  fix: |
+    Treat native resolution as a per-engine contract, not a property of the
+    deliverable. Resolve the render canvas per engine family so each model
+    renders at its own documented native size, then let the composite scale the
+    result up to the deliverable -- upscaling a clean render beats sampling a
+    dirty one. Never let a single shared canvas value serve families with
+    different envelopes; a change made for one family must be structurally
+    unable to move another. When the canvas does move, re-derive every quality
+    constant whose meaning depends on resolution, and record beside each
+    constant the canvas it was measured at, so the next reader can see the
+    dependency instead of inheriting it.
+  verify: |
+    From one shared canvas input, assert the video engine's built request comes
+    back at its native size while the still family comes back at the
+    deliverable size -- one assertion covering both families, so a future
+    global canvas change cannot silently move the video lane again. Assert the
+    composite scales the clip up to the deliverable rather than rendering
+    there. For a live clip, read the render resolution back out of the engine's
+    own log or ledger and require it to equal the native canvas, because the
+    request is a claim and the log line is the evidence. Judge the look on the
+    LAST frame of a clip, never the first -- an image-to-video anchor makes
+    frame 0 sharp whether or not the render is sound.
+  tags: [video, native-resolution, quality-envelope, i2v, render-canvas, progressive-degradation, upscale-to-deliverable, per-engine-canvas, shared-default, tuned-constant]
+  legacy_id: BUG-LOCAL-412
+- id: "07.27"
+  phase: 7
+  area: vram
+  symptom: |
+    A quantized checkpoint loads at roughly double its on-disk footprint and
+    the sampler falls from seconds per step to minutes per step with no OOM.
+    GPU memory sits pinned at the card ceiling while shared system memory
+    climbs, and the run blows its wall-clock budget several times over. The
+    only direct evidence is one loader line reporting the weight dtype as
+    float16 with no manual cast, against a checkpoint whose own filename says
+    fp8. With no error to anchor on, the crawl gets read as "the weights are
+    too big for this card" and the effort goes into offload policy, reserves,
+    and smaller checkpoints.
+  cause: |
+    A global precision-forcing launch argument overrides the checkpoint's
+    native dtype at load and casts every weight up. A natively fp8 checkpoint
+    that loads at about 11 GiB becomes about 22 GiB; on a 16 GB card that
+    cannot hold the upcast weights plus the text encoder plus the sampler
+    working set, so the dynamic offloader pages weights to system memory once
+    per step and the per-step cost rises by two orders of magnitude. The flag
+    is a GLOBAL -- it knows nothing about which file is being loaded, so it
+    silently defeats the entire point of a quantized checkpoint. It survives
+    because it was inherited verbatim from a pre-quantization launcher recipe
+    and never re-audited when the fp8 checkpoint was adopted, and because that
+    recipe had been copied to several launcher sites, so a diagnosis names the
+    one site a human remembers while the site that actually boots the server
+    keeps the flag.
+  fix: |
+    Read the loader's own dtype line before changing anything about
+    quantization, reserves, or offload policy. It states what precision the
+    weights actually landed at and what the file asked for, and it is cheaper
+    than any experiment. Then remove the precision-forcing argument from EVERY
+    launcher site, enumerated by searching the flag string across the repo, the
+    launcher scripts, the install tree, and any config or environment side-file
+    that can inject arguments -- not by memory, because a partial removal
+    reproduces the symptom and discredits the correct diagnosis. Leave a
+    comment at each site saying why the flag is absent, so the next operator
+    copying the recipe does not restore it. Re-audit precision globals whenever
+    a quantized checkpoint is adopted; precision is a per-checkpoint property
+    and a global cannot express one.
+  verify: |
+    Boot, then assert no process in the launched chain carries the precision
+    flag in its command line -- walk the parent chain rather than trusting the
+    script you edited, since a stale server can still own the port. Assert the
+    loader logs the checkpoint's NATIVE dtype with its expected manual cast,
+    and that the measured allocation delta matches the file's on-disk footprint
+    within a small margin instead of doubling it. Require zero hits for the
+    flag string across the whole tree. Keep the load-time axis and the
+    runtime-pace axis separate and close them separately -- proving the weights
+    now load native is an architectural result, and a per-step time that
+    improved but is still far off target means a second independent defect is
+    live. Do not mark the entry fixed on the first axis alone.
+  tags: [vram, dtype-upcast, launch-args, quantized-checkpoint, fp8, offloader-thrash, no-oom-crawl, inherited-recipe, multi-site-fix, load-time-evidence, xref-07.16]
+  legacy_id: BUG-LOCAL-230
+- id: "07.28"
+  phase: 7
+  area: video
+  symptom: |
+    An image-to-video clip renders clean and error-free but barely moves -- a
+    near-still frame with a trace of drift -- long after the conditioning graph
+    has been proven correct. There is no warning, no truncation notice, and no
+    log line about the prompt at all, and the composed text sits comfortably
+    inside the encoder's nominal token limit. Because a motionless clip looks
+    exactly like a conditioning failure, the wiring gets rebuilt again and
+    again while the lever that actually moved is never touched.
+  cause: |
+    A small model's EFFECTIVE attention window for conditioning text is far
+    shorter than its nominal capacity. On a 2B-class video model the motion
+    signal starts washing out somewhere past roughly 188 characters, and the
+    prompt is composed scene-description core first with motion clauses
+    appended, so the verbs that carry the motion sit at the tail and are the
+    first thing diluted. Nothing is dropped and nothing is truncated; the
+    motion tokens are simply outvoted by scene description. Every length
+    defense in the stack guards a HARD ceiling -- token limits, context
+    windows, output caps -- and not one of them fires, because this is a
+    quality limit rather than a capacity limit and it has no failure surface to
+    fire on. The over-long budget itself was inherited from a shared
+    composition helper whose other callers author still images, where a long
+    descriptive prompt is an asset rather than a dilutant.
+  fix: |
+    Measure the model's effective conditioning length empirically and encode it
+    as a named per-model constant at the composition site, rather than sharing
+    one prompt budget across artifact families whose models have different
+    windows. Cap the composed prompt at that constant. Because the cap now cuts
+    text, make the composition order match what matters -- name the clause that
+    carries the load-bearing axis, protect it explicitly through the cap, and
+    let scene description absorb the loss, since a cap that trims the tail is
+    itself a regression when the tail is the signal. Carry the remaining budget
+    alongside the prompt so a later style prefix or model-side rewrite cannot
+    quietly spend past it.
+  verify: |
+    Compose the prompt for the affected engine and assert its length is at or
+    below the measured constant, then assert the protected motion clause is
+    still present in the final string -- both for a composition that fits and
+    for one that overflows, since only the overflow case exercises the trim.
+    Assert any style prefix or downstream rewrite is charged against the same
+    budget rather than appended after it. Render an A/B at the cap and well
+    above it and confirm the motion difference is visible to the eye; an
+    empirical limit nobody can reproduce decays into superstition, so record
+    the measurement, the model, and the canvas it was taken at in the
+    constant's own comment.
+  tags: [video, prompt-authoring, conditioning, attention-window, motion-signal, silent-degradation, per-model-constant, empirical-limit, protected-clause, char-budget]
+  legacy_id: BUG-LOCAL-112
+- id: "07.29"
+  phase: 7
+  area: prompt-composition
+  symptom: |
+    Generated stills carry a colour cast that tracks the EPISODE rather than
+    the subject. Character portraits come out blue on science-fiction episodes;
+    the same radio-set still comes out red on period-drama episodes. Framing,
+    subject and composition are all correct, audio is unaffected, and no
+    workflow JSON changed -- only the colour is wrong, and it is wrong for a
+    whole class of image at once.
+  cause: |
+    Two channels, both living inside prompt-building code rather than in any
+    widget. (1) A shared prompt-composition helper was invoked with the scope
+    profile meant for establishing shots, which appends the episode's ambient
+    colour palette -- terms like neon blue or amber glow -- onto a per-SUBJECT
+    face prompt. A text-conditioned image model has no way to know those tokens
+    describe the world and not the face, so it tints the only subject in frame.
+    (2) A style phrase naming a colour temperature was hardcoded into the
+    string builder for one subject class, so every render of that class
+    inherited the same skew. Neither looks like a defect while reading: the
+    palette is real episode metadata and the lighting phrase is defensible
+    prose. The defect is SCOPE. The same token is correct at one artifact class
+    and wrong at another, and a hardcoded style term is a permanent bias with
+    no control surface to turn it off.
+  fix: |
+    Give the shared builder one named scope profile per artifact class and make
+    every call site state which class it is authoring. A per-subject prompt --
+    portrait, face, object -- receives mood and lighting terms only and never
+    the episode-wide colour palette; only whole-frame establishing prompts may
+    carry the palette. Delete colour-temperature and lighting literals from
+    string builders: a style term that cannot vary per episode is a bias rather
+    than a default, and if a class genuinely needs lighting language it belongs
+    in that class's profile where it is visible and testable. Keep the
+    profile-to-class mapping in ONE table, so a reader learns which class gets
+    which terms by reading the table instead of by opening every call site.
+  verify: |
+    Assert the mapping, not the picture. Build metadata carrying a loud
+    saturated palette term, compose a prompt for every artifact class, and
+    require the palette token to be ABSENT from each per-subject prompt AND
+    PRESENT in the establishing prompt -- a presence-only test is equally
+    satisfied by a profile that injects everywhere. Grep the shipped builders
+    for colour-temperature vocabulary and require zero literal hits. Finally
+    render one subject under two episodes at opposite ends of the era range and
+    require the subject's colour not to move between them.
+  tags: [prompt-composition, colour-cast, scope-profile, hardcoded-style, text-conditioning, shared-helper, per-subject-prompt, image-generation]
+  legacy_id: BUG-LOCAL-113
+- id: "07.30"
+  phase: 7
+  area: render-planning
+  symptom: |
+    A planner returns a legal plan that is plainly worse than one an operator
+    can build by hand -- four clips where two would do, so four model loads,
+    four renders and four visible seams for a single beat. Nothing errors and
+    no log line complains. The same planner refuses other targets that are
+    demonstrably coverable, and on one shape it stops answering at all: 18
+    seconds at one segment count, still running past 20 at a slightly larger
+    one, so the render node hangs instead of failing.
+  cause: |
+    The search ran TWO full walks over the segment count. The first looked for
+    an exact cover at every count from two up to the ceiling; only when that
+    entire walk failed did a second walk restart at two looking for a cover
+    with a trimmed tail. That ranks candidates by PHASE -- exact before trimmed
+    -- when the stated objective is COST, fewest segments. So an exact cover at
+    a HIGH count always beat a trimmed cover at a LOW one. A 184-frame beat on
+    a min-33 step-4 ladder planned four segments because totals at count c are
+    congruent to c modulo 4, making the first exact cover count four, while two
+    segments with two frames trimmed had been legal the whole time. Three
+    siblings share the shape. The tail-trim window was ASSUMED to be one
+    quantum instead of derived from the ladder, which refused 832 beats that
+    were coverable. The discrete-menu cover was a bare recursive descent whose
+    node count is the menu size raised to the segment count, with no memo, so
+    an unsatisfiable target consumed the thread rather than refusing. And the
+    join-mode verdict declared a single render from a ceiling comparison
+    without checking that a legal length at or above the target exists.
+  fix: |
+    Collapse the phases into ONE walk over the real objective. At each count,
+    give every strategy the contract already permits its chance before the walk
+    advances -- a tail trim the adapter itself declared legal is part of what
+    that count can do, not a last resort reached after the ladder is exhausted.
+    DERIVE every search window from the contract's own arithmetic; a guessed
+    window silently refuses work that is legal, and the silence is the
+    expensive part. Memoize or bound any recursive cover search before it
+    ships, because a search that hangs is worse than one that refuses -- a
+    caller can handle a refusal. Make any verdict function prove the plan it
+    names exists rather than inferring it from a bound; see 12.73 for the
+    general case of a declaration the runtime cannot keep.
+  verify: |
+    Do not read the search -- sweep it. Run a differential over the whole grid
+    of contract and target pairs, old plan against new, and require every
+    change to move in the intended direction and only that direction: here
+    46,949 plans changed, every one a count REDUCTION, with zero refusals
+    introduced and zero increases. Assert the invariant rather than the
+    headline number -- a property test comparing segment COUNT alone is passed
+    by a reversed fill order, so assert that assembled visible length equals
+    the target and that every segment length is legal. Set the sweep floor from
+    the real population size, not a round number. Bound the runtime explicitly:
+    require a refusal to come back inside a fixed wall clock at the worst count
+    the ceiling allows. Mutate each fix once and require the suite to go red
+    for each.
+  tags: [render-planning, combinatorial-search, objective-ordering, two-phase-search, memoization, unbounded-recursion, derived-search-window, differential-sweep, mutation-check, xref-12.73]
+  legacy_id: HANDOFF-L2271, HANDOFF-L4173
+- id: "09.07"
+  phase: 9
+  area: subprocess
+  symptom: |
+    A supervisor launches a server; the server comes up, binds its port and
+    answers requests -- and the launcher refuses it anyway, reporting a PID
+    mismatch on every healthy launch. Then the between-iteration cleanup
+    sweep, instructed to kill everything except itself, kills the supervisor.
+    The run dies at the iteration boundary with no traceback and no crash
+    artifact, so the next investigation starts by suspecting the server.
+  cause: |
+    The venv's python.exe is a uv launcher STUB. It fork-execs the real
+    interpreter out of the uv-managed cpython directory and then stops being
+    the process that does the work. Three numbers a naive reading treats as
+    one are in fact three distinct values: os.getpid() inside the child
+    returns the real interpreter's PID, subprocess.Popen(venv_python).pid
+    returns the STUB's PID, and the OS socket table names the real interpreter
+    as the TCP port owner. Both processes report the same image name and both
+    carry the supervisor's argv, so neither a name-based nor a
+    command-line-based enumeration can separate them. A port-owner check that
+    compares the handle Popen returned against the socket owner therefore
+    mismatches on a perfectly healthy launch, and a keep-list built from
+    os.getpid() alone omits the stub -- so an image-name sweep kills half of
+    the supervisor's own identity.
+  fix: |
+    Stop treating a PID handle as a process identity. Resolve liveness and
+    ownership from the RESOURCE -- the socket's owning PID, or the process
+    tree walked by parent id -- never from the number Popen handed back. For
+    self-identification capture the whole chain, os.getpid() AND os.getppid(),
+    and pass all of it to any sweep as a variadic keep-list so a launcher stub
+    cannot be stranded outside it. Make the keep-list comparison type-exact on
+    both sides; a string PID never equals an integer PID and the miss is
+    silent. Prefer a direct port preflight -- try to bind it -- over inferring
+    readiness from a process handle. Note that the usual wrapper advice
+    inverts here: 01.04 says kill the outermost wrapper and never target the
+    interpreter, but a stub that fork-execs and stops owning anything is not a
+    wrapper you can target, and following that advice here kills the wrong
+    process or none at all.
+  verify: |
+    Print all three numbers on a real launch and require the check to COMPARE
+    them rather than assume equality -- os.getpid(), the Popen handle's pid,
+    and the socket table's owner for the bound port. Assert that the health
+    check passes when the socket owner is a DESCENDANT of the launched handle
+    rather than equal to it. Then run the destructive test on purpose: start
+    the supervisor, run the sweep, and require the supervisor to be alive
+    afterwards, because a keep-list is only proven by a sweep that would
+    otherwise have killed it. Force-kill the worker tree and require no
+    orphans and a recorded death -- but do not assert the worker's own exit
+    hook wrote that record. A forced kill on Windows is SIGKILL-equivalent and
+    atexit cannot fire, so the supervisor must synthesize the crash row from
+    the MISSING artifact instead.
+  tags: [subprocess, pid-identity, uv-launcher-stub, venv, port-ownership, process-tree, self-kill, keep-list, type-coercion, windows, forced-kill, xref-01.04]
+  legacy_id: BUG-LOCAL-229
+- id: "09.08"
+  phase: 9
+  area: platform-portability
+  symptom: |
+    A capability probe reports a graphics backend unavailable on a machine
+    whose GPU is healthy, so an acceleration path stays gated off for a reason
+    that is not true. Separately, an encode smoke meant to measure pipe
+    overhead dies at process start complaining about its output path, on a
+    machine where the equivalent command typed by hand works fine. Both read
+    as environment problems, and neither shows up as a failing test.
+  cause: |
+    The tooling carries Linux defaults into a Windows-only target. The
+    headless-context helper is asked for an EGL backend because EGL is the
+    documented headless path on Linux; on Windows the platform path is WGL and
+    the EGL library is usually absent, so context creation fails and the probe
+    reports a MISSING capability when the real fault is a WRONG REQUEST. The
+    encode sink is handed the POSIX null device as an output path, but ffmpeg
+    needs the null MUXER plus the platform's own null device name, and a Unix
+    path is neither. One defect wearing two faces: a platform-specific
+    constant written literally into code whose target platform is fixed and is
+    not the platform the constant came from. Both stay invisible to a green
+    suite, because a probe that answers not-available and a smoke that is
+    skipped both look exactly like passing.
+  fix: |
+    Branch on the platform at the point the constant is chosen, and name the
+    branch that was taken in the log. Ask for the platform's native context
+    path first -- default/WGL on Windows -- and attempt a foreign backend only
+    where it is actually relevant. Build a null sink from the null muxer plus
+    the platform's device name taken from the standard library, never a
+    hardcoded POSIX path. Then make the probe REFUSE with a distinguishable
+    verdict instead of falling back quietly: backend absent and backend
+    requested wrongly must not produce the same answer, or the wrong one gets
+    believed and a working path stays switched off. Define what passing means
+    before shipping the gate -- context creation, shader compile, framebuffer
+    draw, non-zero readback, clean exit -- and run it in the same detached
+    process shape the server uses, because a context that succeeds in an
+    interactive session can fail in a detached one.
+  verify: |
+    Grep the shipped tree for platform-locked literals -- POSIX device paths,
+    backend name strings -- and require zero hits outside one platform
+    selection helper. Assert that helper directly on both branches by FAKING
+    the platform rather than by skipping: on Windows it returns the native
+    context path and the Windows null device, on POSIX the other pair. Run the
+    probe detached on the target machine and require a non-zero readback, then
+    force the foreign backend and require a DIFFERENT, named verdict rather
+    than the same not-available. Run the null-sink smoke as a marked live test
+    on the target OS, because a portability defect that only a skipped test
+    would have caught is not covered at all.
+  tags: [platform-portability, windows, gpu-context, egl-vs-wgl, null-sink, ffmpeg, hardcoded-constant, capability-probe, silent-fallback, skipped-test]
+  legacy_id: KIBITZ-20260708-scope-accel
+- id: "10.08"
+  phase: 10
+  area: procedural
+  symptom: |
+    A generated character is internally incoherent: a male-coded name on a
+    female slot and a female-coded name on a male slot (MALIK HIBBERT voiced
+    female, PHYLLIS OKAFOR voiced male). Nothing is red. No pool-exhaustion
+    warning fires, the gender quota is exactly the requested split, and the
+    VOICE follows the gender correctly every time -- only the NAME is wrong,
+    and only on some seeds. Because the voice table is the last thing that
+    touched gender, the investigation starts there and finds it innocent.
+  cause: |
+    Two correlated attributes of ONE entity are produced by two independent
+    generators that never reconcile. The gender plan is bound to slots
+    POSITIONALLY -- a quota computed, then shuffled across slots -- while the
+    name is drawn from a flat, gender-blind pool. Each generator is correct in
+    isolation and each is individually testable, so every per-generator test
+    passes. Consumers that read the gender attribute (voice preset, age band)
+    stay coherent; the consumer that reads the NAME is a human listener, who
+    has no assertion. The pool-sizing audit that covers the neighbouring defect
+    passes trivially here because supply was never the problem. Generalize:
+    when attribute A and attribute B of the same entity come from separate
+    draws, correctness of each does not imply coherence of the pair, and no
+    test scoped to one generator can see the gap.
+  fix: |
+    Make one attribute authoritative and reconcile the other against it after
+    both generators have run and BEFORE the entity is frozen. Partition the
+    existing pool by the correlated attribute rather than authoring a second
+    pool -- partition the SAME names so the flat pool stays byte-identical --
+    add an explicit classifier for the attribute, and guard the partition
+    against drift at import time so the two views cannot diverge later. Draw
+    the repair from a per-entity ISOLATED rng seeded on the run seed plus the
+    entity id, never from the main sequence: a repair that consumes from the
+    shared rng reshuffles every downstream draw and takes any byte-identity
+    contract with it. Exempt source-owned entities -- an adaptation's Sir Toby
+    Belch is not a coherence defect, and renaming him to satisfy the rule loses
+    the character the lane exists to perform. Finally, sync every parallel
+    table that restates the same attribute; a stale descriptor table is a
+    third, silent generator of the same fact.
+  verify: |
+    Sweep many seeds and require zero binary-gender slots carrying a name the
+    classifier tags as the other binary gender. Pin a KNOWN-INCOHERENT seed and
+    require the reconciliation to repair it, and pin a KNOWN-COHERENT golden
+    baseline and require the entire cast byte-identical -- that pair is what
+    proves the repair fires when needed and is a true no-op when not, so it
+    cannot have perturbed the rng. Assert the repaired value is still unique
+    within the ensemble, and that an explicitly named or source-owned entity is
+    NOT renamed. Then disable the reconciliation and require the seed sweep to
+    go red; a coherence test that stays green without the reconciler is
+    measuring the generators, not the pair.
+  tags: [cast, coherence, correlated-attributes, independent-generators, reconciliation, positional-binding, isolated-rng, byte-identity, golden-seed, xref-10.06]
+  legacy_id: BUGLOG-L11-cast-coherence
+- id: "10.09"
+  phase: 10
+  area: rng
+  symptom: |
+    A text normalizer is deleted as cosmetic dead code -- nothing consumes its
+    output except a hash -- and every derived image in the pipeline changes.
+    Not a cache miss to be re-warmed: different pictures. A re-render of an old
+    episode no longer reproduces its artwork, and one character's face drifts
+    across every scene that character appears in. Nothing errors, nothing logs,
+    and the diff is a single deleted string cleanup, so the change under
+    suspicion is never the one that moved the output.
+  cause: |
+    The cache key IS the RNG seed. The dedup key and the generator seed are
+    both derived from the same prompt hash, so editing the key derivation does
+    not merely miss the cache -- it MOVES the artifact. Worse, derived hashes
+    CHAIN: a portrait's prompt hash is folded into every scene-character seed
+    derived from that portrait, so one upstream prompt containing one stray
+    character shifts every still downstream of it. The blast radius is not the
+    row that changed. The general shape: any function whose output reaches both
+    an identity and a generator input is a member of the determinism contract,
+    however cosmetic its body looks, and "no reader" is false when the reader
+    is a hash.
+  fix: |
+    Trace a normalizer's output FORWARD to every hash before editing or
+    deleting it, and where that hash reaches a seed, say so at the definition
+    so the next reader does not mistake determinism for formatting. If the two
+    roles must move independently, separate them: derive the dedup key from the
+    full prompt digest and the seed from a stable identity a prompt edit is
+    allowed to leave alone. Do NOT launder the input back into its old shape to
+    hold the seed still -- that restores the defect the normalizer removal was
+    fixing. When the coupling is intended, and it usually is because a changed
+    prompt deserves a new picture, the correct action is to DOCUMENT rather
+    than to fix: write down, where an operator will look, that a prompt edit is
+    a re-render and that pre-edit episodes are no longer reproducible.
+  verify: |
+    Pin the SEED, not merely the key: feed a fixed prompt through the shipped
+    resolver and assert the exact integer, then change the normalizer and
+    require the test to go red -- a determinism contract with no pinned value
+    is not a contract. Assert the CHAIN explicitly: move one upstream prompt
+    and require every seed derived from it to move while every unrelated
+    object's seed stays put, so the blast radius is measured rather than
+    assumed. Keep a fixed-seed lane as a control and require it not to move for
+    any prompt. Finally, enumerate every function whose return value reaches a
+    hash on a seed path and require each to carry the contract annotation, so
+    the next reader inherits the tracing instead of repeating it.
+  tags: [determinism, seed-derivation, prompt-hash, cache-key, derived-identity, hash-chain, blast-radius, apparent-dead-code, reproducibility, xref-12.55]
+  legacy_id: KIBITZ-20260805-prompt-hash-seed
+- id: "11.57"
+  phase: 11
+  area: llm-output-validation
+  symptom: |
+    A verbatim-grounding gate kills lane after lane at the first structured
+    pass -- most of a campaign's P0 deaths -- and every reading of the evidence
+    blames the model: it paraphrased, it quoted the wrong region, it invented a
+    span. The prompt is rewritten, the validator is loosened, the retry ladder
+    gains a rung, and the death rate does not move. The corpus looks clean when
+    a human opens it, because the viewer renders the markup the ingest already
+    discarded.
+  cause: |
+    The source payload was built by stripping HTML tags with ONE substitution
+    to the empty string. Inline tags must vanish with no separator so that
+    H<sub>2</sub>O and anti-<em>microbial</em> keep their literal spelling --
+    but BLOCK tags carry the only sentence boundary those documents have, so
+    the last word of one block welds to the first word of the next:
+    Polygons</p><p>NASA/JPL- becomes PolygonsNASA/JPL-, of</li><li>Engine
+    becomes ofEngine, .</p><p>Let's becomes .Let's. No model can quote a token
+    that exists in no language, so a CORRECT verbatim quote is rejected as
+    non-literal and the lane dies with the model blamed. The standard remedy
+    for this family -- whitespace-normalize both sides of the comparison -- is
+    inert here: there is no whitespace to collapse, the words are genuinely
+    fused, and a pipeline in full compliance with the wrap-tolerant fix still
+    dies exactly this way.
+  fix: |
+    Audit the payload BUILDER's block-boundary join before touching the model,
+    the prompt, or the validator. Tag removal is two rules and never one: an
+    explicit allowlist of block and break tags substitutes a SEPARATOR, and
+    every remaining tag is removed without one. Then treat the change as what
+    it is -- a coordinate migration. The normalized text is the sole coordinate
+    system the source digest pins and that every accepted span offset is
+    measured in, so widening what the stripper touches silently re-indexes
+    already-accepted artifacts; keep the allowlist narrow, apply it upstream of
+    the digest, and scope the migration to future payloads rather than
+    rewriting frozen ones. Leave entity spellings to the downstream normalizer
+    so exactly one component owns what a space is. Cross-reference the
+    wrap-tolerant normalization entry in both directions: whitespace where
+    there should be none and none where there should be whitespace are one
+    subject, and a reader who has met only one polarity will re-derive the
+    other the expensive way.
+  verify: |
+    Build the regression from the REAL payloads that killed the campaign, not
+    from synthetic markup. Require every block boundary in them to survive as a
+    separator AND require the inline counterfactuals to survive without one --
+    H<sub>2</sub>O must come out H2O, never H 2 O. Assert the old catch-all
+    substitution as an explicit counterfactual so the test names the defect it
+    prevents. Prove the production call site reaches the new helper, then
+    mutate that call site back to the old strip and require the wiring test to
+    go red. Pin digest stability last: normalization must run BEFORE the
+    digest, and two payloads differing only in what you now normalize must hash
+    exactly as the migration intends.
+  tags: [llm-output, text-ingest, html-stripping, block-boundary, separator, verbatim-grounding, source-payload, coordinate-system, digest-stability, counterfactual, xref-11.26]
+  legacy_id: HANDOFF-L1580
+- id: "11.58"
+  phase: 11
+  area: llm-output
+  symptom: |
+    Composed text comes back with a term doubled or compounded -- "hand
+    grenade" arrives as "banana banana bomb" -- from a substitution table whose
+    every row is correct when read alone and correct when tested alone. The
+    table is already ordered longest-first and every pattern is word-boundary
+    anchored, so the two defenses everyone reaches for are both in place and
+    neither one is the defense this needs. Because the corruption only appears
+    for inputs that contain one particular seeding term, a sample corpus can
+    pass indefinitely while the table is broken by construction.
+  cause: |
+    The applier walks the rows IN ORDER and reassigns the working string on
+    every row, so each row after the first reads text that earlier rows already
+    rewrote. That makes the table a rewrite SYSTEM, not a lookup -- its input
+    alphabet includes its own output alphabet -- and any row whose REPLACEMENT
+    contains a later row's SOURCE will fire on the table's own product. In the
+    incident, ("hand grenade", "banana bomb") sat above ("bomb", "banana
+    bomb"), and the later row matched the earlier row's output. Longest-first
+    ordering does not help, because it defends source-against-source overlap
+    and says nothing about a source appearing inside a replacement.
+    Word-boundary anchoring does not help either, because the replacement
+    introduces a boundary-complete occurrence of the term. The whole cascade
+    completes inside ONE application, so reasoning that starts from "we only
+    call this once" concludes wrongly that it is safe.
+  fix: |
+    Stop feeding the table its own output. Preferably apply it as a SINGLE
+    non-overlapping sweep over the ORIGINAL text -- build one alternation of
+    every source, longest-first, and pass one replacer function to a single
+    substitution call, so the scan advances past each replacement and no output
+    is ever re-read. That converts the table from a rewrite system back into a
+    lookup, and ordering then resolves ambiguity only, never cascade. If
+    sequential application must stay, make CLOSURE an explicit written contract
+    of the table -- no replacement string may match any row's source under the
+    applier's own matcher -- and enforce it as a standing test, because closure
+    is an obligation every future row has to re-earn while a single sweep is
+    structural and earns it once. Either way, state the invariant next to the
+    table so the next author adding a row knows what they are promising.
+  verify: |
+    Test the TABLE, not a corpus. For every ordered pair of rows, run row j's
+    exact production matcher -- same escaping, same boundaries, same case
+    folding, built by the same code path the applier uses -- against row i's
+    replacement string and require no match, so the test can never pass on a
+    stricter matcher than the one that ships. Then assert single-application
+    correctness on the known cascade seeds by exact equality, not containment:
+    "hand grenade" must yield exactly "banana bomb". Assert the fixed point is
+    reached in one pass by feeding every source AND every replacement back
+    through and requiring apply(apply(x)) to equal apply(x). Finally add a row
+    that deliberately violates closure and require the table test to go red;
+    a closure test that stays green when closure is broken is not a test.
+  tags: [llm-output, rewrite-table, ordered-substitution, closure-under-own-output, single-pass-sweep, idempotence, word-boundary, table-contract, property-test, mutation-check]
+  legacy_id: KIBITZ-20260806-banana-route
+- id: "11.59"
+  phase: 11
+  area: llm-output-validation
+  symptom: |
+    One beat silently produces no image. Nothing raised, nothing crashed, the
+    episode completed -- there is simply a hole where a still should be. The
+    log shows a path-detection guard fired and skip evidence was recorded, and
+    the prompt named in that evidence is ordinary prose: a character wearing "a
+    black/white striped scarf", a scene at "the corner of 5th/Main". The same
+    prompt is clean on a POSIX box, so the defect is invisible to anyone not
+    running the shipping platform.
+  cause: |
+    The "is this a path?" test was assembled out of characters that are LEGAL
+    INSIDE CONTENT -- os.sep in the string, or os.altsep in the string, or an
+    image extension at the end. On Windows os.altsep IS the forward slash, so
+    that predicate rejects any prose containing a slash: a costume description,
+    an intersection, a fraction, an "and/or". The guard's actual job is a
+    socket-crossing check, and a crossed socket delivers a value that IS a
+    path, never prose that merely CONTAINS one, so substring containment was
+    the wrong shape of question from the start -- it asks whether the text
+    mentions a separator when the claim under test is whether the whole value
+    is a path. The cost was total rather than cosmetic because the guard's
+    disposition was skip-and-continue: a false positive spent a render and left
+    a missing artifact as its only symptom. Producers then grew local
+    sanitizers to launder slashes out of prose, which is the worse repair --
+    laundering a REAL path converts the guard's one true positive from a loud
+    refusal into a quiet garbled render.
+  fix: |
+    Never build a content-versus-path discriminator from characters that are
+    legal inside content. Discriminate on the SHAPE OF THE WHOLE VALUE:
+    anchored, ordered most specific first -- drive root, UNC root, POSIX root,
+    file URI, explicit relative, and a whitespace-free string ending in an
+    image extension -- and rule that prose containing a separator is CLEAN.
+    Note the same rule settles the extension case: "host.png" is a filename,
+    "a portrait of the radio host.png" is a sentence, and whitespace is what
+    tells them apart. Delete the producer-side sanitizers in the same change
+    rather than adding another; laundering the input to satisfy a bad guard
+    destroys the only true positive the guard exists for. Make the rejection
+    observable: a guard that fires must raise, or record a named structured
+    verdict carrying the arm, the offending token, its index, an excerpt and
+    the canonical content hash that joins the ledger row -- never a bare
+    continue. And treat platform constants that are None on one OS and
+    meaningful on another as platform FACTS to be read and pinned, not as
+    harmless spellings.
+  verify: |
+    Pin the platform fact first -- assert that on this OS os.altsep is the
+    forward slash -- so the test says out loud why it exists. Then feed the
+    incident prose through and require BOTH that the guard returns clean and
+    that the dispatcher actually mints the still; asserting only that the
+    predicate returned None proves nothing about the artifact. Sweep every arm
+    with a genuine path and require the exact arm name back, so widening for
+    prose did not also reopen the socket-crossing hole: a drive-rooted path, a
+    UNC root, a POSIX root, a file URI, an explicit relative, and a bare
+    filename must each classify, while a sentence ending in an image extension
+    must not. Force one true positive and require the recorded evidence to
+    carry the arm and the joining hash, and require the render count to drop by
+    exactly one with a named reason rather than silently. Then restore the
+    substring predicate and require the prose case to go red.
+  tags: [llm-output, path-guard, os-altsep, windows, whole-string-classification, discriminator, false-positive, silent-skip, missing-artifact, observable-refusal, socket-crossing, mutation-check]
+  legacy_id: KIBITZ-20260805-bug-sprint-path-guard
+- id: "11.60"
+  phase: 11
+  area: source-selection
+  symptom: |
+    Sibling outputs derived from a single call disagree with each other. An
+    adapted scene quoted one identical mid-passage on every beat, so no beat
+    ever saw the opening or the ending; in a neighbouring size band some beats
+    kept their own region while their siblings collapsed to the whole body, so
+    starts were unsorted and duplicated and the arc could run BACKWARDS -- beat
+    6 of 7 quoting the opening while beat 3 quoted later material. Every window
+    is legal read alone, so no per-item assertion can see it; only the family
+    is wrong. The band is narrow and perfectly deterministic -- roughly 741
+    (length, beat-count) pairs in ordinary short-story territory -- so it
+    reproduces every time and no test happened to land inside it.
+  cause: |
+    The degradation decision -- "this work is too short to slice, fall back to
+    the whole body" -- was evaluated PER KEY, inside the loop, against that
+    key's own bucket. Integer division makes bucket sizes differ by one
+    character, so when total divided by key count sits near the floor some
+    buckets clear it and their siblings do not, and the threshold flips item by
+    item instead of once for the family. The invariants that matter here --
+    disjointness, sorted starts, monotonic progression -- are properties of the
+    SET, and no member can hold them; nothing in the loop was computing the set
+    at all. A second failure hid inside the same fallback: it offered only two
+    cases, slice or show-everything, so a work too short for floor-sized
+    disjoint regions but too long to show whole fell through to a single shared
+    window for every key. A sibling module already decided this once up front;
+    this one had diverged from that pattern and reintroduced the bug it avoids.
+  fix: |
+    Decide a degradation ONCE, before the loop, from family-level inputs --
+    total length, key count, floor -- and pass the decision in. The loop may
+    only apply it, never re-derive it. Then fill the case the two-way fallback
+    left open: a work too short to slice but too long to show whole gets
+    SLIDING overlapping windows, offset across the room the budget leaves, so
+    progression survives even where disjointness cannot. Name the collective
+    invariants explicitly and assert them on the RETURNED FAMILY rather than on
+    its members. Do not mistake sharing for the defect: when the whole work
+    genuinely fits one window, every key seeing all of it is correct -- a
+    single short scene is the material for every beat in it. The defect is
+    siblings DISAGREEING. When a neighbouring module already makes the same
+    call once up front, adopt its shape instead of writing a second one.
+  verify: |
+    Sweep the integer-division band exhaustively instead of sampling it: for
+    every (total length, key count) pair straddling the floor -- the incident's
+    band was about 741 of them -- build the family and assert the collective
+    invariants every time, that starts are strictly increasing, that no two
+    keys share a start, that every window lies inside the body, and that either
+    all keys collapsed or none did. Assert STATICALLY that the decision is
+    computed once above the loop and appears exactly once in the shipped
+    source, so a later edit cannot quietly move it back inside. Regress the
+    sliding case on the real incident shape -- 14 beats over an 1,116-character
+    scene must yield 14 DISTINCT windows, the first touching the opening and
+    the last touching the ending -- and require the distinct-window count to
+    equal the key count. Then move the decision back inside the loop and
+    require the band sweep to go red.
+  tags: [derived-slices, per-item-vs-collective, degradation-threshold, integer-division, off-by-one, boundary-band, collective-invariant, monotonic-progression, sibling-divergence, source-window, exhaustive-sweep, static-assertion, mutation-check]
+  legacy_id: GITFIX-cdf8bffb
+- id: "12.75"
+  phase: 12
+  area: rewrite-dropped-quality-input
+  symptom: |
+    A generation subsystem is rewritten rather than edited. Renders still
+    succeed, the suite stays green, no reference dangles, no import breaks --
+    and the operator says the output looks flatter than a build from weeks ago,
+    naming a specific saved artifact as the reference. The obvious knobs are
+    checked first and they all match: same checkpoint, same steps, same cfg,
+    same sampler. Because every parameter that LOOKS like a parameter agrees,
+    the investigation concludes nothing changed and starts blaming the model,
+    the prompt text, or the operator's memory.
+  cause: |
+    A rewrite is an insertion plus a deletion, not an edit, so there is no
+    line-level diff between the old behaviour and the new one to read. The
+    inputs that survive a rewrite are the ones that look like inputs -- a
+    widget, a named argument, a config key. The quality-BEARING inputs do not
+    look like inputs, so they are the ones that vanish: a graph node that was
+    never a workflow widget and existed only as a wire inside the internally
+    built graph (here a guidance node at 3.5 between the positive encode and
+    the sampler; grep for guidance in the new engine returns nothing at all);
+    prompt suffixes that lived as module-level string constants appended to
+    every prompt; and a fixed seed pinning one deterministic asset. Nothing
+    references them any more, so every dead-reference scan, cross-import check
+    and AST parse stays green -- the absence is invisible precisely BECAUSE it
+    is complete. The pipeline keeps producing output, so nothing goes red.
+  fix: |
+    Before deleting the old implementation, enumerate its EFFECTIVE inputs
+    rather than its declared parameters. Walk the graph it constructs node by
+    node and record every node that carries a value; record every module-level
+    string constant that is appended or prepended to a prompt; record every
+    literal seed. Put that inventory in the change itself and tick each item
+    against the replacement. Treat an input with no widget as HIGHER risk than
+    one with a widget, because nothing in the UI or the JSON will ever remind
+    you it existed. Port each recovered value as a named constant with an env
+    override rather than inlining it, so a future disappearance is greppable.
+    Keep the old implementation's last commit reachable: the saved
+    widgets_values in a HISTORICAL commit of the workflow JSON may be the only
+    surviving record of values that never lived in code at all.
+  verify: |
+    Diff INVENTORIES, not files. Assert statically over the graph the new
+    engine builds that each recovered lever is present and positioned -- the
+    guidance node exists, sits between the positive conditioning and the
+    sampler, and the sampler reads the GUIDED conditioning rather than the raw
+    encode. Assert each restored prompt suffix appears in the composed prompt,
+    in the correct layer order, and ONLY on the paths meant to carry it;
+    scoping is part of the contract, and a tail appended everywhere is a
+    different regression wearing the same fix. Pin the deterministic seed by
+    value and prove its env override. Then A/B against a PRESERVED reference
+    artifact from the good build, because this class has no red test to offer:
+    when the pipeline strips its own output metadata, the archived reference
+    plus the source is the entire ground truth. Archive that reference BEFORE
+    the rewrite, not after you need it.
+  tags: [subsystem-rewrite, silent-input-loss, no-dangling-reference, graph-node-not-widget, prompt-suffix-constant, deterministic-seed, look-regression, reference-artifact-ab, historical-widgets-values]
+  legacy_id: BUG-LOCAL-411
+- id: "12.76"
+  phase: 12
+  area: cleanbreak-default-parity
+  symptom: |
+    A cleanbreak removes a legacy path and a newer engine for the same model
+    family takes over. Everything still runs, the suite is green, and the
+    workflow JSON is byte-identical before and after. Weeks later the operator
+    says the output was better in an earlier era and names two reference clips
+    from that era. There is no diff to point at: the JSON did not change and
+    the deleted module is gone from the tree, so the natural first move --
+    diff the workflow -- returns nothing, and the investigation stalls on the
+    belief that no configuration changed.
+  cause: |
+    The tuning did not live where tuning is normally looked for. The saved
+    workflow widgets carried only the mundane values (a seed, an encode
+    method, a duration cap) while the sampler, the step count, the CFG, the
+    conditioning strength, the render dimensions and the loop treatment were
+    all CODE defaults inside the deleted module. The replacement is a
+    different implementation of the same model family, so it ships its own
+    defaults -- each individually defensible, all of them different. A
+    cleanbreak therefore rewrites BEHAVIOUR without rewriting CONFIGURATION,
+    and every habitual diff target (workflow JSON, requirements, node
+    registrations) stays clean. The drift compounds quietly: one replacement
+    default was left at a placeholder with a code comment admitting the
+    correct value and promising a sweep that never ran.
+  fix: |
+    Capture the doomed component's effective defaults as a golden recipe
+    BEFORE deleting it -- read them out of the source at the last commit that
+    still has it, and write them into the change as data, one named constant
+    per value, not as prose in a commit message. Make parity against that
+    recipe an explicit acceptance criterion of the cleanbreak, and where a
+    value must legitimately differ, say in the code WHY and against what
+    measurement. Never land a default as a placeholder with a comment
+    promising to fix it later; a comment is not a task and outlives the person
+    who wrote it. Record the CONDITIONS a value was measured under alongside
+    the value, because a conditioning strength tuned at one canvas is a
+    different strength at another, and a recipe copied without its conditions
+    reproduces the number while losing the result.
+  verify: |
+    Assert each recipe value in the replacement by name against the captured
+    golden constant, in a test that names the deleted implementation and the
+    commit the value was read from, so provenance travels with the assertion.
+    Make every knob env-overridable and exercise the override path, so an
+    operator can A/B a candidate without a code change. Then require the human
+    comparison the numbers cannot substitute for: re-render the same asset and
+    put it beside a preserved artifact from the good era. Finally, mutate one
+    recipe value and require the parity test to go red -- a parity test that
+    merely reads the new engine's own defaults and compares them to themselves
+    is asserting nothing, and will stay green through the next regression.
+  tags: [cleanbreak, recipe-in-code, default-parity, deleted-implementation, golden-recipe, unchanged-json-unchanged-behaviour-fallacy, placeholder-default, measurement-conditions, look-regression]
+  legacy_id: BUG-LOCAL-412
+- id: "12.77"
+  phase: 12
+  area: environment
+  symptom: |
+    A tooling or test step that writes a scratch file works for months, then
+    starts failing on one machine only. The traceback is OSError Errno 22,
+    Invalid argument, raised by open() itself -- before a single byte is
+    written, and with mode wb. Cleanup fails too: unlink raises
+    PermissionError saying the file is in use by another process. Re-running
+    sometimes succeeds, so the failure reads as flakiness and invites a retry
+    loop or a skip marker instead of a diagnosis.
+  cause: |
+    The scratch file was written inside a cloud-synced tree (OneDrive,
+    Dropbox, Google Drive) or another externally watched directory -- a backup
+    agent, a search indexer, an antivirus scanner. Size is the trigger: a
+    multi-megabyte file takes long enough to upload that the sync client still
+    holds a handle when the next run re-opens the path. On Windows, opening an
+    existing file for truncating write must first shrink it, and that
+    operation is refused while another process holds the file -- so the error
+    surfaces at OPEN, which is why write-time error handling never sees it and
+    why switching to wb changes nothing. The errno is misleading: the argument
+    is fine, the file is busy. Because the outcome depends on sync timing, the
+    failure is intermittent, machine-specific, and absent from CI.
+  fix: |
+    Move the scratch file out of the observed tree. Write large or frequently
+    rewritten temporaries to the OS temp directory, and expose the location as
+    an env-overridable setting so the convenient in-repo default survives for
+    manual use while automation points somewhere unsynced. Where a file
+    genuinely must live in a synced tree, never truncate in place -- write a
+    fresh sibling and rename it over the target, because rename is atomic and
+    does not require shrinking a held file. Wrap open and unlink on such paths
+    in a bounded retry with backoff and treat OSError and PermissionError as
+    one transient class. Do not call a sync-client exclusion the fix: an
+    exclusion is host configuration that no clone and no new machine inherits.
+  verify: |
+    Assert the PATH, not the outcome. Take the temp location the tooling
+    actually resolves and require it to lie under the OS temp directory and
+    outside every synced or watched root, and prove the env override is
+    honoured rather than trusting the default to be read. Prove the
+    write-then-rename path by holding an open handle on the target and
+    requiring the write to still succeed. Prove the retry by making the first
+    open fail and requiring a second attempt, and require it to give up loudly
+    with the real path in the message rather than spinning. Then run the tool
+    twice back to back with a payload large enough to still be syncing on the
+    second pass -- a small-file test passes cleanly against a broken
+    implementation, which is how this shipped in the first place.
+  tags: [cloud-sync, onedrive, windows, file-lock, truncating-open, errno-22, permission-error, temp-file-placement, write-then-rename, bounded-retry, machine-specific-flake]
+  legacy_id: BUG-LOCAL-293
+- id: "12.78"
+  phase: 12
+  area: testing
+  symptom: |
+    A cluster of tests fails in the full suite and every one of them passes
+    when its own file is run alone. The error names a missing attribute on a
+    host module that none of the failing tests mentions -- module folder_paths
+    has no attribute get_filename_list -- raised from a node the failing file
+    never imports. Run the failing file first and the failures move somewhere
+    else. The suite looks nondeterministic, so the reflex is to mark the tests
+    flaky, pin an order, or rerun until green, and the real defect survives
+    every one of those remedies.
+  cause: |
+    sys.modules is one process-global namespace shared by every test in the
+    run. Several test modules each install their own stand-in for a host
+    module at IMPORT time, each guarded by an if-not-already-present check, so
+    whichever file pytest collects first wins and the rest become no-ops. Each
+    stub carries only the attributes its own author needed, so the winner is
+    PARTIAL -- and a partial stub is worse than no stub. With nothing
+    installed, the module under test fails to import, the code that enumerates
+    it silently drops it from the set under test, and nothing runs and nothing
+    fails. With a partial stub the import SUCCEEDS, execution reaches the
+    attribute nobody supplied, and the failure lands in an unrelated test that
+    merely happened to be collected later. Collection order is a function of
+    file names and selection, which is why the symptom moves whenever the
+    suite changes shape.
+  fix: |
+    Give the process-global namespace exactly one owner. Install a single stub
+    in conftest, before any test module is collected, and make it carry the
+    COMPLETE surface the code under test touches -- not the subset the first
+    author happened to need. Leave the per-module guards in place as harmless
+    no-ops so a file can still be run standalone, but stop treating them as
+    the installation point; when the stub must grow, grow the canonical one.
+    The same single-owner rule governs every other process-global a test can
+    mutate: environment variables, working directory, warning filters,
+    logging configuration, and any registry or mapping dictionary the host
+    exposes. One owner, installed once, torn down deterministically.
+  verify: |
+    Prove ownership, not luck. Assert that the canonical stub exposes every
+    attribute the production import path calls, enumerated FROM THE SOURCE
+    rather than from memory, so a new call site fails one focused test instead
+    of nine scattered ones. Assert that the module under test imports
+    successfully under that stub, and that the enumerator actually lists it,
+    because a silently dropped module is the exact state this defect hides
+    behind. Then attack the order: run the suite with collection reversed and
+    with a shuffled seed and require the same result, since green in isolation
+    is not green. Finally, remove one attribute from the canonical stub and
+    require the suite to go red; if everything stays green, the stub you are
+    maintaining is not the stub the tests are using.
+  tags: [sys-modules-pollution, process-global-state, partial-stub, conftest-ownership, order-dependent, green-in-isolation, silent-skip, collection-order, test-infra]
+  legacy_id: BUG-LOCAL-251
+- id: "12.79"
+  phase: 12
+  area: gate-input-population
+  symptom: |
+    An operator adds a new module or test file, runs the pre-commit gate --
+    forbidden-identifier sweep, lint, license scan -- and gets green. The
+    commit then turns HEAD red, naming a violation in a file that had been on
+    disk and passing for days, on a commit that changed nothing about the gate
+    or its rules. Because the failure surfaces at commit time, the
+    investigation blames the commit's other content or the CI runner rather
+    than the gate, and the same file will pass green again the moment it is
+    untracked. This one cost two separate red HEADs, the second diagnosed from
+    scratch by someone who then found it already written down.
+  cause: |
+    The gate builds its input from a version-control delta -- git diff against
+    a baseline -- and a diff covers TRACKED files only. An untracked file has
+    no index entry, emits no hunks, and contributes zero lines to the sweep,
+    so the gate is green for exactly as long as the offending code stays
+    untracked. Git add is what makes the file visible, which is why the first
+    commit both admits the file and trips the gate, pointing the investigation
+    at the wrong change. The general defect is that the gate's input
+    population is narrower than the population the commit will carry. Any
+    selector derived from VCS state -- diff, index, changed-files list,
+    files-touched-in-this-PR -- is a different set from the shipped source
+    tree, and the gap is silent: a gate that swept nothing reports the same
+    green as a gate that swept everything and found nothing.
+  fix: |
+    Make the gate walk the set the commit will carry -- tracked plus
+    untracked-and-not-ignored -- rather than a VCS delta. Where the checker's
+    parser genuinely needs diff shape, synthesize it: enumerate untracked
+    files with git ls-files --others --exclude-standard and render each as an
+    added-file hunk. Emit the COMPLETE hunk shape, header included; a plus
+    line outside any hunk header is silently dropped by the diff parser, which
+    yields input that looks perfectly correct and sweeps nothing. The
+    --exclude-standard flag honours .gitignore, so scratch trees stay out
+    without a second exclusion list. Scope the addition repo-wide rather than
+    to a couple of directories: an untracked listing never returns the
+    untouched tracked tree, so narrowing it buys no speed and leaves runtime
+    code under config, scripts and the repo root blind. Fail loud -- a git,
+    read or decode error inside the input builder must raise, never return an
+    empty string, because silently sweeping nothing is the exact failure being
+    closed.
+  verify: |
+    Plant a file containing a known-forbidden identifier, leave it UNTRACKED,
+    and require the gate to go red; remove it and require green. That single
+    test is what distinguishes a gate that sees the working tree from one that
+    sees only the index, and a suite exercising tracked files alone cannot
+    make the distinction at all. Assert the collected input is non-empty and
+    carries a well-formed hunk header for every synthesized file, then assert
+    the exact hit count for the planted file rather than merely that it is
+    non-zero, so a parser that never enters a hunk fails instead of passing
+    quietly. Assert an ignored path is absent from the collected set, and that
+    a failing git invocation raises rather than yielding an empty sweep.
+  tags: [false-green, gate-scope, untracked-files, git-diff, input-population, pre-commit, fail-loud, static-analysis, all-route]
+  legacy_id: HANDOFF-L2291
+- id: "12.80"
+  phase: 12
+  area: concurrency
+  symptom: |
+    Two agent windows work the same checkout at the same time. One commits a
+    documentation change; the push reports success in that window, and origin
+    is left broken -- carrying deletions the OTHER window had staged but not
+    finished, or an untracked scratch file the neighbour had not decided to
+    keep. Here the swept deletions removed an adapter module while the
+    registry it fed kept declaring five engines, so the remote roster audit
+    read missing equals four against a floor of thirty, and origin stayed red
+    about ninety minutes. The committing window's own diff review looked
+    clean, because it reviewed its own edits rather than the index.
+  cause: |
+    The git index is process-global state belonging to the working tree, not
+    to a session. Anything one window stages -- git rm, git add -A on a
+    directory, any early git add -- sits in the same index every other window
+    commits from, and a commit is defined by the index, so the first window to
+    commit carries away whoever else's staged work is sitting there. An -A add
+    additionally sweeps the neighbour's UNTRACKED files under that path.
+    Neither window sees an error: staging takes no lock and raises no
+    advisory. The result is an internally inconsistent commit -- half of a
+    two-file change, a deletion without its registry edit -- which is
+    syntactically valid, passes local review, and lands on the REMOTE past the
+    point where the author would look. The window that caused it has already
+    reported success and moved on.
+  fix: |
+    On a shared tree, treat staging as part of the commit rather than a
+    preparatory step: stage NOTHING until your own commit moment, and stage by
+    explicit pathspec -- name the files -- never git add -A or git add dot,
+    and never an early git rm held across other work. If deletions must be
+    planned ahead, record the paths in a note and run the removal inside the
+    same minute as the commit. Read git status --short as a whole immediately
+    before committing and treat any staged entry you did not just create as
+    another actor's work: stop and reconcile instead of committing over it.
+    Where two agents genuinely must write at once, give each its own worktree
+    so the indexes are physically separate and the shared-state question
+    disappears.
+  verify: |
+    Assert the commit's file list equals the pathspec you intended, read from
+    the commit itself rather than from memory of the edit: git show --stat
+    HEAD must contain exactly your files and nothing else, and in particular
+    no deletions you did not author. Then verify the PUSHED state rather than
+    the local one -- fetch, confirm origin HEAD matches local HEAD, and run
+    the repo's own cross-file consistency checks against the fetched tree:
+    registry roster count, import resolution, AST parse. A mixed commit is
+    valid Python and only a cross-file invariant will name it. Keep those
+    floors as real numbers, so a registry that quietly loses members fails an
+    assertion instead of degrading into a smaller but still plausible roster.
+  tags: [concurrency, shared-index, multi-window, git-add-all, pathspec, staged-state, cross-file-invariant, remote-verification, all-route]
+  legacy_id: HANDOFF-L206
+- id: "12.81"
+  phase: 12
+  area: module-reload-class-identity
+  symptom: |
+    A test passes eleven of eleven alone and fails when it runs right after a
+    sibling test file. Same code, same machine, same seed -- the verdict depends
+    on collection order. The failure looks impossible: an exception escapes a
+    handler that plainly names its class, or an isinstance check returns False
+    against an object whose repr matches exactly. Because a targeted rerun of
+    the failing file is green, the red line gets re-diagnosed as a flake by
+    every person who meets it, and full-suite ordering can hide it for weeks
+    between rediscoveries.
+  cause: |
+    An earlier test called importlib.reload on a shared module. Reload
+    re-executes the module body and REBINDS its names to NEW objects, so the
+    reloaded class is a different object from the same-named class imported
+    before it. Every symbol captured earlier still points at the old object:
+    except clauses the sibling file bound at COLLECTION time, isinstance checks,
+    registry keys, sentinel classes, cached type maps. After the reload the
+    module raises instances of the new class and the old handler no longer
+    matches, so the exception sails straight past a correct-looking except.
+    Nothing is logged, and no fixture can undo it -- teardown cannot un-rebind a
+    class object that other modules already hold. The general shape is
+    in-process module surgery that mutates state outliving the test which
+    performed it, where the damage is visible under one file ordering only.
+  fix: |
+    Do not reload modules in-process. When the property under test genuinely
+    requires a fresh import -- proving an import is lazy, proving no file is
+    read at import time -- run it in a SUBPROCESS, so whatever it does to class
+    objects cannot reach the parent interpreter. Pass the repo root as argv
+    rather than interpolating it into a -c source string, because a Windows path
+    is full of backslashes and every one of them would need escaping. Install
+    the probe's guard inside the child: pytest monkeypatch is in-process and
+    does not cross the boundary. Scope that guard to the repo under test -- a
+    blanket ban on Path.read_text trips third-party import machinery reading its
+    own packaging metadata, which tests the interpreter rather than your module,
+    and only shows up in a fresh child because the parent had already
+    initialised it. If a reload is truly unavoidable, re-import every captured
+    symbol afterwards and accept that symbols other modules already bound are
+    beyond your reach.
+  verify: |
+    Assert class identity across the test itself: capture the class before, and
+    afterwards assert the module attribute IS that same object. That is the real
+    invariant, and it fails on the reload directly instead of waiting for a
+    sibling file to trip over it. Then run the suite in BOTH file orders and
+    require both green -- one order passing is precisely the evidence that
+    misled the previous investigation; here one order was a failure and the
+    other was eleven of eleven, and both orders became twenty-eight of
+    twenty-eight once the reload left the process. Assert the subprocess
+    contract explicitly: exit code zero AND a marker string in its stdout, so an
+    early exit cannot pass as success, under a timeout whose failure message
+    carries the child's stdout and stderr. Treat any test that passes alone and
+    fails adjacent to a sibling as module-state contamination and go find the
+    writer, never as a flake to retry.
+  tags: [test-isolation, importlib-reload, class-identity, order-dependent, module-state, subprocess-isolation, except-clause-mismatch, false-flake, all-route]
+  legacy_id: HANDOFF-L1070
+- id: "12.82"
+  phase: 12
+  area: hygiene
+  symptom: |
+    Every git status reports thousands of untracked files -- 6,308 files and 272
+    MB here -- so nobody reads it any more. Genuine untracked work hides in the
+    noise, the post-push lockstep verification that depends on a clean status
+    becomes useless, and an agent reading status output either truncates it or
+    reasons over a sample. The .gitignore that was supposed to cover the scratch
+    directory contains a rule that LOOKS like it covers it, and reviewers have
+    read past that rule repeatedly without seeing anything wrong.
+  cause: |
+    The ignore pattern is a near-miss on the real path. A rule of the form
+    /tmp_* anchors at the repo root and matches the PREFIX tmp_, so it caught
+    the 93 MB tmp_audit_results.json at the root and never matched the tmp/
+    DIRECTORY sitting beside it, which has no underscore. Git reports nothing:
+    a pattern with zero effect and a pattern doing its job are indistinguishable
+    from the file, and the author's evidence that it works is usually the single
+    path they happened to test. The general class is that an exclusion rule is a
+    silent contract whose correctness cannot be inferred by reading it -- a
+    leading slash anchors to the repo root, a TRAILING slash is what restricts a
+    rule to directories, a star does not cross a path separator, and a prefix
+    pattern is not a directory pattern. The same file carried two earlier
+    near-misses of this same class, so it recurs rather than being a one-off.
+  fix: |
+    Prove every exclusion rule fires against a real path instead of trusting the
+    glob. Add the directory form explicitly -- /tmp/ alongside /tmp_* -- and
+    leave a comment naming which path the old rule missed and why, so the next
+    author does not have to re-derive it. Prefer one rule per intent over a
+    clever pattern meant to cover both a file family and a directory at once;
+    the clever pattern is what fails silently. Remember that an ignore rule does
+    not affect TRACKED files: anything already committed under the newly ignored
+    directory keeps reporting its modifications exactly as before, which is
+    correct behaviour and must not be "repaired" by removing those files from
+    the index in the same change.
+  verify: |
+    Run git check-ignore -v on a concrete path inside the directory and require
+    it to print the rule and the line number that matched. A rule matching
+    nothing prints nothing and exits non-zero, which is the falsifiable signal;
+    do this once per directory the rule claims to cover. Then measure the
+    population before and after: count entries from git status --porcelain and
+    require the untracked count to fall to a small reviewable number -- 6,308
+    down to ten here -- while requiring the count of TRACKED modifications to be
+    unchanged, which proves the rule removed noise rather than history. Keep the
+    untracked-count check in the hygiene suite with a real ceiling, so the next
+    scratch directory is caught by a number instead of by somebody's patience.
+  tags: [hygiene, gitignore, exclusion-pattern, silent-no-match, git-check-ignore, untracked-noise, tracked-vs-ignored, near-miss-glob, all-route]
+  legacy_id: KIBITZ-20260805-gitignore-tmp-directory-miss
+- id: "12.83"
+  phase: 12
+  area: unescaped-content-in-the-evidence-stream
+  symptom: |
+    The log reads as well-formed and tells a lie. A record nobody wrote appears
+    in it -- a plausible WARNING or SKIP line, correctly shaped, at column zero
+    -- or a guard's evidence line arrives split across several records, so the
+    field a reader greps for lands alone with no context and the surrounding
+    detail looks like it belongs to a different event. Line counts drift, a
+    log-scraping regression asserts against a record the writer never emitted,
+    and the operator reconstructs a sequence of events that did not happen.
+    Nothing raises. The stream is syntactically perfect.
+  cause: |
+    A free-form value -- an LLM-authored prompt, an episode title, an exception
+    message, a filename -- is interpolated into a line-delimited record without
+    escaping. The stream's record separator is the newline, and the content is
+    permitted to contain newlines, so the CONTENT CAN EMIT THE SEPARATOR.
+    Everything after an embedded newline becomes, to every reader of that
+    stream -- grep, the harness, the operator's eye -- a record of equal
+    standing to the ones the program wrote. Carriage returns, ANSI escapes and
+    the format's own field delimiter do the same one level down, forging FIELDS
+    instead of records. The bug is invisible in normal operation because
+    well-behaved content carries no separator; it surfaces exactly when content
+    is hostile or merely unlucky, which for model-authored text is routine.
+    Truncation is not a mitigation -- an excerpt like prompt[:200] changes WHICH
+    forged text lands in the log, not whether it can, and it hides a late match
+    entirely.
+  fix: |
+    Escape on the WRITER side, at the instant the value enters the stream, never
+    on the reader side -- a reader cannot un-forge a record it has already been
+    handed as fact. In Python that is repr: interpolate value!r so newlines,
+    carriage returns, tabs and control characters become two-character sequences
+    that cannot terminate a record, and keep the quotes it emits, because they
+    also mark where the untrusted span begins and ends. Escape EVERY free-form
+    field, including the ones that cannot contain a newline -- exception text,
+    paths, model ids -- since the value that surprises you is the one nobody
+    audited. When a reader needs the whole value, do not widen the excerpt:
+    write it to a side file and log the path plus a hash. Center any excerpt on
+    the index that matters rather than on offset zero, and name which arm
+    matched, so the line is diagnostic as well as safe.
+  verify: |
+    Push a value carrying a newline, a CRLF, a tab and a convincing fake record
+    prefix through the real logging call, then COUNT RECORDS in the emitted
+    stream and require exactly one -- counting characters proves nothing here.
+    Assert the fake prefix appears inside the escaped span, not at column zero
+    of a new line. Feed the same stream to the parser or grep the harness
+    actually uses and require it to find one record with the injected text in
+    the field it belongs to. Keep a control case of ordinary content and assert
+    escaping left it readable, so the remedy cannot pass by making every line
+    useless.
+  tags: [logging, log-record-forgery, untrusted-content, repr-escape, record-separator, writer-side-escaping, evidence-stream, llm-authored-text, telemetry]
+  legacy_id: KIBITZ-20260804-log-record-forgery
+- id: "12.84"
+  phase: 12
+  area: powershell
+  symptom: |
+    A CLI run launched from PowerShell dies before it does any work, with
+    "error: unrecognized arguments:" followed by a fragment the operator
+    recognizes -- the tail of an episode title and the whole prompt behind it.
+    The identical command with a different title runs fine, so the failure looks
+    like a flake. Then the sibling invocation that DID start is found carrying
+    the wreckage as canonical state -- episode_title='SPAN_TE_PI;LLA28' on the
+    ledger writer's start line, and the same mangled fragment slugged into the
+    run's own artifact filenames. A quoting accident has become permanent data
+    that no later run will question.
+  cause: |
+    A free-text value was placed on a command line. PowerShell and cmd parse the
+    line BEFORE the process exists: a semicolon ends a statement, ampersand and
+    pipe chain, dollar expands, backtick escapes, and unquoted whitespace splits
+    one intended argument into several. By the time argparse sees argv the
+    damage is done and is not recoverable -- argparse can only report the tail
+    it did not recognize, which is why the error names the Python script and
+    sends the investigation to the parser instead of the launcher. Two harms
+    compound. The split kills one run loudly; where a sibling invocation happens
+    to survive it, the truncated or metacharacter-bearing fragment is accepted
+    as the real value and written into filenames, ledger keys and telemetry, so
+    a transient shell event turns into durable corruption. Title, premise and
+    prompt are the three fields most likely to carry a separator, because they
+    are the three authored by a human or a model rather than by the program.
+  fix: |
+    Stop putting free text on a command line. Pass variable-length,
+    human-or-model-authored values through a file, stdin, or an environment
+    variable and keep only fixed program-authored tokens in the argument vector
+    -- --brief-json C:\runs\brief.json cannot be split by anything. Where an
+    argument genuinely must be passed, BUILD THE INVOCATION AS AN ARRAY and hand
+    it to the process without a shell (subprocess with a list and shell=False;
+    from PowerShell the call operator with an array, or --% to stop parsing), so
+    no parser gets a second look at the string. Never assemble a command by
+    string concatenation, and never rely on the caller to have quoted correctly.
+    Then close the second harm separately from the first: validate the value at
+    the receiving boundary and refuse or normalize shell metacharacters in any
+    field destined for a filename, a ledger key or a persisted title, so a
+    mangled value fails loudly on arrival instead of being adopted as truth.
+  verify: |
+    Launch through the real launcher with a value containing a space, a
+    semicolon, an ampersand, a dollar sign and a backtick, and assert the
+    program receives that value in ONE argv element, byte-identical to what was
+    handed in -- have the entry point echo what it received and diff it against
+    the source, rather than accepting "it started" as proof. Then assert
+    PERSISTENCE, not just startup: read the value back out of the ledger, the
+    log line and the output filename and require all three to match the
+    original. Keep the hostile string as a fixture so a future rewrite of the
+    launcher cannot quietly reintroduce concatenation.
+  tags: [powershell, shell-tokenization, argument-quoting, argparse, free-text-argument, metacharacter, launcher, durable-corruption, stop-parsing, all-route]
+  legacy_id: RUNLOG-20260723-span-lla28
+- id: "12.85"
+  phase: 12
+  area: zero-consumer-declaration-integrity
+  symptom: |
+    A scripted repo-wide refactor lands and everything agrees it is fine: the
+    suite is green across thousands of tests, imports resolve, the pack boots,
+    the banner reports all N nodes loaded with zero skips, and no log line is
+    out of place. Weeks later a human opens one module and finds its export list
+    naming things that do not exist -- entries like self.recipe_id, literal
+    strings naming nothing, sitting in the module's own public contract. No tool
+    ever reported it, because no tool ever read it.
+  cause: |
+    A mechanical string replacement -- sed, a regex codemod, a scripted
+    attribute rename -- rewrote text inside a declaration that has ZERO
+    consumers on any executed path. __all__ only takes effect on a star-import;
+    if nothing star-imports the module, the list is never resolved, never
+    dereferenced, never compared to anything. What the script produced is
+    syntactically valid Python: it AST-parses, it imports, it is a list of
+    strings. So every guard the project owns passes honestly -- the compiler is
+    satisfied, the import succeeds, coverage marks the line executed because it
+    IS a module-level assignment, and the boot signal that catches ghost
+    registrations is silent because nothing failed to load. The script itself
+    cannot tell an identifier in an expression from the same identifier inside a
+    quoted string, so the self. prefix it correctly added to attribute accesses
+    was applied to the string literals beside them. The class generalizes past
+    __all__: any declaration whose elements are STRINGS NAMING CODE -- export
+    lists, registry key tables, plugin manifests, doc automodule lists, test
+    collection lists -- is a place a scripted edit can leave garbage that
+    nothing will ever dereference.
+  fix: |
+    Give every zero-consumer declaration a reader. A parametrized static test
+    that walks each module and resolves every name its __all__ lists against
+    that module closes the whole class in a few lines, and parametrizing over
+    discovered modules rather than a hand-kept list means a new module is
+    covered the day it is added rather than the day it breaks. Treat a scripted
+    replacement as an untrusted transformation in its own right: constrain it so
+    it cannot match inside string literals -- operate on the AST, not on the
+    text -- and READ THE FULL DIFF of a mechanical edit before committing,
+    because the entire premise of a codemod is that nobody reads it, which is
+    precisely why the one place it can hide is the place nobody reads. Delete
+    declarations that have no consumer instead of maintaining them dead; an
+    export list nothing imports is a liability with no reader to notice when it
+    rots.
+  verify: |
+    Assert statically over the shipped source rather than a booted object: for
+    every module, each string in __all__ resolves to a real attribute of that
+    module, and no entry is duplicated. Prove the assertion can fail by
+    injecting one bogus name and requiring the suite to go red -- a test over a
+    construct nothing reads is itself easy to write in a form that reads
+    nothing. Then sweep the tree for the codemod's own fingerprint in places it
+    should never appear -- a self. prefix inside a string literal, a
+    substitution token inside a docstring or a comment -- and require zero hits,
+    because a scripted edit that reached one quoted region reached others.
+  tags: [dead-declaration, zero-reader, star-import, codemod, scripted-refactor, false-green, static-assertion, export-list, ast-over-text, mutation-check]
+  legacy_id: GITFIX-80935627
