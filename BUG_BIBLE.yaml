@@ -4382,6 +4382,117 @@ bugs:
   tags: [llm-output, validation, p1, bounded-repair, word-boundary, fail-closed]
   legacy_id: PBUG-20260713-10
 
+- id: "02.16"
+  phase: 2
+  area: transformers
+  symptom: |
+    A locally cached model is selectable but fails before loading with an
+    unrecognized model_type or architecture error. Alternatively, the loader
+    selects the newest snapshot directory and reports missing weights or tries
+    the network even though an older local revision contains the complete
+    checkpoint. Remapping the checkpoint to an older model class may load but
+    emit degenerate text or invalid structured output.
+  cause: |
+    Catalog admission checked model identity, cache presence, and VRAM fit but
+    not whether the installed Transformers release natively supports the
+    checkpoint architecture. The cache resolver also assumed the newest local
+    revision was complete, while Hugging Face caches may split a complete
+    weighted revision from a newer metadata-only revision.
+  fix: |
+    Declare the minimum Transformers release that natively supports the
+    architecture and capability-gate it before cache, download, or model-load
+    work. Resolve the newest complete weighted snapshot by requiring a model
+    weight file or weight index. Resolve optional local metadata such as
+    chat_template.jinja independently when it exists only in another revision,
+    but never treat a metadata-only snapshot as the model root. Load tokenizer,
+    config, and model with local_files_only=True. Do not remap model_type to a
+    predecessor architecture or silently substitute a network, Ollama,
+    llama.cpp, or sidecar lane. Admit the catalog row only after a real loader
+    smoke proves coherent text and schema-constrained parseable JSON.
+  verify: |
+    Unit-test that an unsupported Transformers version fails actionably before
+    download; a newer metadata-only revision is rejected as the model root; an
+    older weighted revision is selected; newer local chat-template metadata is
+    composed without HTTP; and a complete cache never calls snapshot_download.
+    Then run the actual quantized model on the target GPU and require the
+    official model class, coherent prose, expected VRAM, and LM-format-enforced
+    JSON that validates against the requested schema, with no external server.
+  tags: [transformers, huggingface, model-architecture, catalog-admission, offline, split-revision, weighted-snapshot, local-files-only, structured-json, llm, xphase-11]
+  legacy_id: BUG-LOCAL-306
+
+- id: "11.55"
+  phase: 11
+  area: llm
+  symptom: |
+    A schema-constrained local LLM begins a valid JSON object but is cut off at
+    the same nested-object prefix on every retry. LM Format Enforcer logs an
+    internal parser exception such as `AttributeError: 'bool' object has no
+    attribute 'anyOf'`; downstream parsing then misleadingly reports a
+    character-zero JSONDecodeError because no complete top-level object exists.
+  cause: |
+    A model field such as `list[dict[str, Any]]` compiled to an open JSON Schema
+    object with boolean `additionalProperties: true`. The installed grammar
+    compiler accepted the schema initially but treated that boolean wildcard as
+    a schema object only when generation reached the first arbitrary key, then
+    terminated enforcement mid-object.
+  fix: |
+    Replace open-ended structured-output dictionaries with explicit, closed,
+    typed models that express the real output contract. Inspect every schema
+    bound to constrained generation for boolean wildcard subschemas. Do not
+    disable the prefix constraint or fall back to unconstrained sampling: make
+    the schema grammar-compatible while preserving downstream validation.
+  verify: |
+    Generate the exact production Pydantic schema and assert the formerly open
+    object has named required properties and `additionalProperties: false`.
+    Feed a complete representative artifact through the installed
+    JsonSchemaParser one character at a time, require every character to be
+    allowed, and require `can_end()` at completion. Then run the real local
+    workflow through the affected pass and confirm it publishes successfully.
+  tags: [llm, structured-json, lm-format-enforcer, json-schema, pydantic, grammar, hard-constraint, local-model, fail-closed]
+  legacy_id: PBUG-20260720-02
+
+- id: "11.56"
+  phase: 11
+  area: llm-output-validation
+  symptom: |
+    One voiced line repeatedly fails a non-safety craft or delivery-hygiene
+    gate. Retry exhaustion terminates the complete artifact or workflow, so no
+    frozen ledger or downstream audio/video is produced even though the line
+    can be made non-empty and speakable.
+  cause: |
+    Quality-budget exhaustion is given the same liveness disposition as a
+    structurally invalid graph, and validation may inspect authored text instead
+    of the exact speech-adapter projection. A bounded LLM retry has no total
+    deterministic final rung, so model noncompliance controls workflow liveness.
+    A mixed structural/craft post-validator can also send one dirty line through
+    a full-artifact typed repair, exposing the complete JSON document to output
+    truncation. A raw word-count floor can then manufacture a punctuated fragment
+    instead of a grammatical utterance.
+  fix: |
+    Classify defects before disposition. For craft/quality only, run the
+    ordinary authored repair, a lower-temperature gate-specific repair, an
+    alternate writer slot, then an idempotent deterministic SFW spoken-surface
+    floor. Validate the exact delivery projection, stamp the gate and resolving
+    rung, and continue freeze/readiness. If the floor yields empty text, isolate
+    only that row. Keep content safety and genuinely ambiguous structural
+    contracts fail-closed. Intercept a schema/graph/roster-valid craft rejection
+    before any whole-artifact repair and patch only named line IDs. Give action-
+    narration detectors the locked speaker name, and shorten long dialogue only
+    at complete sentence boundaries (or use a clean deterministic utterance).
+  verify: |
+    Force every craft detector and whole-line stage cue to survive all model
+    rungs, then require a non-empty clean deterministic result, an exact
+    gate/rung receipt, and normal freeze/readiness. Cover every runnable
+    producer, including content-owned lanes whose delivery normalization changes
+    the spoken surface. Assert quality exhaustion is absent from the terminal
+    verdict set, a true empty row is isolated locally, and the SFW gate still
+    refuses an unsafe episode. Prove a craft-only structured artifact invokes no
+    second whole-artifact generation, while a structural-plus-craft artifact
+    remains fail-closed. Cover own-name action narration and require one-breath
+    floors to retain only complete sentences. Complete a real canonical run
+    through publication.
+  tags: [llm-output, spoken-text, quality-gate, repair-ladder, deterministic-floor, delivery-projection, observability, workflow-liveness, row-local-failure, sfw, fail-closed, xref-11-54]
+  legacy_id: PBUG-20260720-03
 - id: "05.11"
   phase: 5
   area: state-sync
