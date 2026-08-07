@@ -6969,3 +6969,49 @@ bugs:
     because a scripted edit that reached one quoted region reached others.
   tags: [dead-declaration, zero-reader, star-import, codemod, scripted-refactor, false-green, static-assertion, export-list, ast-over-text, mutation-check]
   legacy_id: GITFIX-80935627
+
+- id: "12.86"
+  phase: 12
+  area: receipt-keyed-on-a-string-the-producer-never-emits
+  symptom: |
+    A telemetry field, receipt, or prompt-context slot is permanently empty or
+    permanently False, and nothing ever complains. Reports read clean while the
+    condition they describe is happening constantly. Because the wrong value is
+    the SAFE-looking one -- False, "", absent -- no alarm fires, no test fails,
+    and the surface can stay dead for weeks or months. It is usually found by
+    accident while chasing something else, and the giveaway is a field nobody
+    can remember seeing set to anything.
+  cause: |
+    The consumer reads a NAME the producer never emits. Three shapes dominate.
+    (1) An attribute read with a default -- `getattr(obj, "hook", "")` -- where
+    the dataclass has never defined `hook`; the default silently supplies the
+    empty value forever. (2) A membership test against a flag string the emitter
+    does not produce: `"open_safe_fallback" in flags` where the composer emits
+    `announcer_intro_structural_fallback`. (3) A dict/key lookup for a key that
+    was renamed or never existed on that row shape. In every shape the two sides
+    were written at different times, or one was refactored and the other was
+    not, and the language offers no error because a default or a False is a
+    perfectly legal answer. Refactors that RENAME an emitted flag are the most
+    common origin, since nothing links the emitter to its readers.
+  fix: |
+    Make the mismatch LOUD instead of empty. Read required fields by DIRECT
+    attribute access, not `getattr` with a default, so a rename raises
+    AttributeError at the read instead of silently emptying the value; reserve
+    defaults for fields that are genuinely optional. Where a string must be
+    matched, define it ONCE as a shared constant that both the emitter and the
+    reader import, so a rename cannot desynchronise them. Where the producer's
+    vocabulary is closed, validate against that closed set at write time. Then
+    delete the orphaned reader rather than leaving it -- a field nobody sets is
+    a trap for the next person, who will assume it means something.
+  verify: |
+    Assert every stamped flag string against its ACTUAL producer, not against
+    itself: for each `X in flags` test, prove some code path emits X. Assert the
+    label BINDS the value -- a prompt-context test must check that the field's
+    CONTENT reached the prompt, not merely that the label appears. Cover the
+    negative and the positive separately, because a permanently-False receipt
+    passes any test that only ever asserts False; include at least one case
+    where the field MUST be True and one where it must be False. Finally, mutate
+    each receipt predicate once and require the suite to go red -- a receipt
+    whose test stays green when its predicate is reverted was never covered.
+  tags: [telemetry, dead-receipt, silent-failure, getattr-default, flag-string-drift, refactor-desync, fails-safe-so-nobody-notices, prompt-context, mutation-check, all-route]
+  legacy_id: PBUG-20260807-01

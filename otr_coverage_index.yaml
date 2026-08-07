@@ -2170,3 +2170,8 @@ records:
   verdict: covered
   bible_id: '12.74'
   source: qa-kibitz
+- ref: docs/PROD_BUG_LOG.md PBUG-20260807-01
+  title: Receipt or prompt-context field keyed on a producer string the producer never emits, so it reads empty/False forever
+  verdict: promoted
+  bible_id: '12.86'
+  source: prod-bug-log
