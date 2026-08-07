@@ -5094,3 +5094,48 @@ bugs:
     pinned by setting it hostilely and requiring the declaration to win.
   tags: [capability-declaration, contract-vs-runtime, environment-override, static-contract, fail-closed, typed-error, late-failure, planner-executor-agreement, all-route]
   legacy_id: PBUG-20260802-01
+
+- id: "12.74"
+  phase: 12
+  area: fix-applied-to-an-unreachable-function
+  symptom: |
+    A defect is diagnosed correctly, a fix is written, reviewed and merged, the
+    suite is green -- and production keeps emitting the identical defect,
+    unchanged, for weeks. Every artifact of diligence exists except the one that
+    matters: the shipped path never executed the new code. Because the evidence
+    trail says the fix landed, the next investigation starts by doubting the
+    diagnosis rather than the wiring, and re-fixes the same dead function.
+  cause: |
+    The edited function has no callers on the production path. Two shapes
+    dominate. (1) The real logic lives INLINE inside a large orchestrator, and
+    the well-named helper beside it is a leftover from an earlier refactor that
+    was never deleted -- the good name attracts the fix. (2) A second,
+    near-identical helper exists and the caller reaches the other one. Tests
+    authored with the fix call the fixed function DIRECTLY, so they prove it is
+    now correct while proving nothing about reachability; a green suite cannot
+    distinguish "correct and connected" from "correct and orphaned". Coverage
+    tools do not help, because the test does execute the line.
+  fix: |
+    Establish reachability BEFORE editing: find the callers, and if the
+    production path is inline code, EXTRACT it into a named helper in the same
+    change, so the thing under test and the thing that runs are one object.
+    Extract the whole decision -- a helper narrowed to the easy part leaves the
+    branches that actually failed still inline and still untestable. Every value
+    the block reads from outside becomes an explicit parameter rather than
+    migrating with it, and any name the CALLER still needs stays in the caller.
+    Then treat the CALL as a separate deliverable from the behaviour: wiring and
+    correctness are different claims and need different assertions. Delete the
+    orphan rather than leaving it to attract the next fix.
+  verify: |
+    Assert reachability STATICALLY, over the shipped source rather than a booted
+    object, so no stub can satisfy it: the production entry point calls the
+    helper exactly once, passes the complete argument contract, and assigns its
+    return value. Then exercise every ROUTE through the helper and assert the
+    output is PRESENT -- a test that only asserts the bad value is absent is
+    also satisfied by an empty result, which is how a silent failure passes as a
+    pass. Include a control lane that does NOT reach the block, and confirm it
+    genuinely does not, so the matrix cannot be quietly proving nothing. Finally,
+    mutate the shipped code once per claim and require the suite to go red for
+    each; a fix whose test stays green when the fix is removed is not covered.
+  tags: [dead-code, zero-reader, reachability, extract-to-test, false-green, wiring-vs-behaviour, static-assertion, mutation-check, all-route]
+  legacy_id: PBUG-20260805-04
