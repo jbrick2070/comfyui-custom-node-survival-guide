@@ -1,0 +1,2172 @@
+# OTR -> bug-bible coverage index. Generated 2026-08-07 by the full-repo scrape
+# (5 Opus scrapers + adversarial verify of all flagged candidates, 0 dropped).
+# Audited against BUG_BIBLE.yaml; the 35 records verified as uncovered were then
+# authored as entries 03.05-12.85 in commit 88a48d8, so every record is covered.
+# PURPOSE: next scrape only needs the DELTA - bug records added to OTR after
+# 2026-08-07 or refs not listed here. Do not re-scrape what is already indexed.
+# Refs are relative to the ComfyUI-OldTimeRadio repo root, forward slashes.
+# verdict: covered = a bible entry teaches this class (see bible_id).
+# Evidence and reasoning per record: bug_scrape_2026-08-07.md.
+audited: '2026-08-07'
+bible_head: 88a48d8
+bible_entries: 261
+records:
+- ref: BUG_LOG.md L1022 (BUG-LOCAL-231 soak data point)
+  title: A long per-clip render loop had no routine VRAM reclamation — cleanup fired only on an OOM exception, so a gradual
+    fragmentation slowdown (25x clip-to-clip) never triggered it
+  verdict: covered
+  bible_id: '07.03'
+  source: bug-logs
+- ref: BUG_LOG.md L11 (cast-coherence sprint marker)
+  title: Cast name/gender/voice incoherence — names were rolled from a gender-blind pool while the gender plan was bound to
+    slots positionally, never reconciled
+  verdict: covered
+  bible_id: '10.08'
+  source: bug-logs
+- ref: BUG_LOG.md L13 (BUG-LOCAL-308)
+  title: A too-small writer model intermittently fails the grammar/structured passes (~50% of episodes) and fails the whole
+    episode closed with no auto-fallback
+  verdict: covered
+  bible_id: '06.06'
+  source: bug-logs
+- ref: BUG_LOG.md L15 (BUG-LOCAL-307)
+  title: A real-world 45-char org name blew the 40-char `key_term` schema cap; the repair ladder re-emitted it verbatim and
+    the whole episode HARD-HALTED
+  verdict: covered
+  bible_id: '11.26'
+  source: bug-logs
+- ref: BUG_LOG.md L1635-1647 (BUG-LOCAL-095)
+  title: '`LTXVImgToVideo` at strength=1.0 encodes the init image into ALL latent frames, so the sampler receives a zero-noise
+    latent and every I2V clip renders as a static freeze-frame'
+  verdict: covered
+  bible_id: '07.15'
+  source: bug-logs
+- ref: BUG_LOG.md L1649-1657 (BUG-LOCAL-112)
+  title: An over-long visual prompt dilutes a small video model's motion signal — the motion verbs get buried by scene description
+    past ~188 characters
+  verdict: covered
+  bible_id: '07.28'
+  source: bug-logs
+- ref: BUG_LOG.md L1661-1676 (BUG-LOCAL-113)
+  title: Colour bleed from injected era/ambient palette terms and a hardcoded lighting phrase — portraits came out blue on
+    sci-fi episodes and the radio still came out red on period episodes
+  verdict: covered
+  bible_id: '07.29'
+  source: bug-logs
+- ref: BUG_LOG.md L1678-1687 (BUG-LOCAL-113b)
+  title: The distilled 8-step sampler default combined with I2V conditioning produced only a subtle pan instead of dynamic
+    motion
+  verdict: covered
+  bible_id: '06.06'
+  source: bug-logs
+- ref: BUG_LOG.md L169-175 (BUG-LOCAL-291)
+  title: A node pinned the FLUX MODEL on entry with no eviction on exit; the ComfyUI executor's cached loader outputs keep
+    strong refs, so unload_all_models + gc + empty_cache reclaimed nothing and ~14.7 GB survived into the next phase
+  verdict: covered
+  bible_id: '07.03'
+  source: bug-logs
+- ref: BUG_LOG.md L17 (BUG-LOCAL-306)
+  title: A newly-added writer model was not loadable on the pinned transformers version (unrecognized architecture); the episode
+    aborted with no fallback, and remapping onto an older model class loaded but generated garbage
+  verdict: covered
+  bible_id: '02.16'
+  source: bug-logs
+- ref: BUG_LOG.md L177-183 (BUG-LOCAL-290)
+  title: Aborted writer runs leave empty `pending_*` episode directories on disk forever — the up-front skeleton stamp had
+    no expiry or cleanup path
+  verdict: covered
+  bible_id: '12.47'
+  source: bug-logs
+- ref: BUG_LOG.md L185-191 (BUG-LOCAL-288)
+  title: No per-line content gate in the composer — the whole-episode critic caught profanity only post-assembly, so a violating
+    line landed in the ledger and would have rendered through TTS
+  verdict: covered
+  bible_id: '10.01'
+  source: bug-logs
+- ref: BUG_LOG.md L19 (BUG-LOCAL-305)
+  title: Weak models abbreviate a locked multi-word cast name; exact-set membership flagged it WRONG_SPEAKER + PHANTOM_CHARACTER
+    and halted the freeze gate
+  verdict: covered
+  bible_id: '10.03'
+  source: bug-logs
+- ref: BUG_LOG.md L193-199 (BUG-LOCAL-287)
+  title: A critic that FAILED to produce a verdict was treated identically to 'no critic signal', routing to the legacy line-reroll
+    loop which exhausted and killed a shippable episode
+  verdict: covered
+  bible_id: '11.18'
+  source: bug-logs
+- ref: BUG_LOG.md L201-207 (BUG-LOCAL-286)
+  title: The structured-call retry ladder lowers temperature on every retry, which is the correct rule for malformed JSON
+    but the WRONG rule for empty output — lower entropy deepens the stop-token determinism
+  verdict: covered
+  bible_id: '12.68'
+  source: bug-logs
+- ref: BUG_LOG.md L209-215 (BUG-LOCAL-285)
+  title: A token budget constant sized for the v1 schema was never raised when the v2 schema added five fields, so the constrained
+    decoder hit the cap before finishing the first field and returned nothing
+  verdict: covered
+  bible_id: '11.50'
+  source: bug-logs
+- ref: BUG_LOG.md L21 (BUG-LOCAL-304)
+  title: A parallel preset->descriptor table was not synced when the cast pool reclassified a voice preset's gender, so the
+    visual/treatment layer got a stale 'male' descriptor for a female character
+  verdict: covered
+  bible_id: '12.05'
+  source: bug-logs
+- ref: BUG_LOG.md L217-223 (BUG-LOCAL-284)
+  title: A schema field was required-str even for actions that have no natural value for it, so any annotate/skip row failed
+    validation
+  verdict: covered
+  bible_id: '12.61'
+  source: bug-logs
+- ref: BUG_LOG.md L225-231 (BUG-LOCAL-283)
+  title: A schema list cap of 6 rejected a legitimate 7 items on real news headlines, burning a structural-retry LLM call
+    every run
+  verdict: covered
+  bible_id: '11.31'
+  source: bug-logs
+- ref: BUG_LOG.md L23 (BUG-LOCAL-303)
+  title: Structured-output schema demanded `beat_index` while the model naturally emits `index` — burned ~5-7k credit-billed
+    tokens on every run for a pure field-name mismatch
+  verdict: covered
+  bible_id: '11.38'
+  source: bug-logs
+- ref: BUG_LOG.md L233-239 (BUG-LOCAL-282)
+  title: An unconditional per-row field floor (`length_target_words >= 5`) rejected the legitimate 0 that music beats carry,
+    exhausting every shadow-plan retry
+  verdict: covered
+  bible_id: '12.61'
+  source: bug-logs
+- ref: BUG_LOG.md L241-261 (BUG-LOCAL-279)
+  title: A proportional 0.5x word-band floor is unreachable at small targets, so every character line shipped sub-floor, the
+    critic flagged them flat, and the reroll loop exhausted into needs_full_rerun
+  verdict: covered
+  bible_id: '11.31'
+  source: bug-logs
+- ref: BUG_LOG.md L25 (BUG-LOCAL-302)
+  title: A credit-billed quality gate whose only action is ABORT ran by default and discarded a complete, renderable, already-paid-for
+    episode on a subjective verdict
+  verdict: covered
+  bible_id: '11.18'
+  source: bug-logs
+- ref: BUG_LOG.md L263-281 (BUG-LOCAL-278)
+  title: The freeze cascade mutated `meta` in memory only at three of four exits; a later node re-read the pre-cascade ledger
+    from disk and wrote it back, silently dropping every cascade stamp
+  verdict: covered
+  bible_id: '12.57'
+  source: bug-logs
+- ref: BUG_LOG.md L27 (BUG-LOCAL-301)
+  title: Second remote LLM lane shipped with half the sibling lane's output-token floor (512 vs 1024) — a reasoning model
+    exhausted it on chain-of-thought before closing its JSON
+  verdict: covered
+  bible_id: '11.28'
+  source: bug-logs
+- ref: BUG_LOG.md L283-290 (BUG-LOCAL-277)
+  title: A meta field changed shape from string to dict upstream; a consumer still did `(meta.get(...) or "").strip()` and
+    crashed the pass
+  verdict: covered
+  bible_id: '09.06'
+  source: bug-logs
+- ref: BUG_LOG.md L29 (BUG-LOCAL-300)
+  title: A render gate conflated renderability-safety with subjective story quality under one verdict, blocking good output
+    — and the only escape hatch disabled both halves at once
+  verdict: covered
+  bible_id: '11.56'
+  source: bug-logs
+- ref: BUG_LOG.md L292-300 (BUG-LOCAL-276/-241)
+  title: A cascade verdict of 'do not render' had no downstream consumer; the pipeline ran on and died at the TTS node's last-line-of-defense
+    gate with a misleading cast-lock message that hid the real upstream signal
+  verdict: covered
+  bible_id: '07.19'
+  source: bug-logs
+- ref: BUG_LOG.md L302-308 (BUG-LOCAL-275)
+  title: 'A model emits `payload: null` for annotation-only edits; the retry ladder only lowered temperature with the same
+    prompt, so the identical null was re-emitted twice'
+  verdict: covered
+  bible_id: '11.26'
+  source: bug-logs
+- ref: BUG_LOG.md L31 (BUG-LOCAL-299)
+  title: A new remote LLM lane was wired into the dropdown/catalog/backend but not into the four sites that special-case the
+    sibling lane's provider, so the handle fell through to the local HuggingFace loader
+  verdict: covered
+  bible_id: '11.27'
+  source: bug-logs
+- ref: BUG_LOG.md L310-316 (BUG-LOCAL-274)
+  title: A cascade stamped a render plan in memory and passed the ledger downstream as a socket string, but the consuming
+    node loads the ledger from disk, so the plan was invisible and it rendered all lines
+  verdict: covered
+  bible_id: '12.57'
+  source: bug-logs
+- ref: BUG_LOG.md L318-331 (BUG-LOCAL-273)
+  title: '`Ledger.save()` rebinds `self.data` to a new merged dict, so locals captured earlier were orphaned; the critic report
+    was stamped onto a dead dict and every reader silently got schema defaults'
+  verdict: covered
+  bible_id: '12.57'
+  source: bug-logs
+- ref: BUG_LOG.md L33, L51 (BUG-LOCAL-298 / -281)
+  title: UI->API converter counted a forceInput input that still carries a legacy `widget` flag as a kept widgets_values slot,
+    shifting every later value and silently no-op'ing the whole prompt
+  verdict: covered
+  bible_id: '04.09'
+  source: bug-logs
+- ref: BUG_LOG.md L333-339 (BUG-LOCAL-272)
+  title: An attention-implementation selector was computed and logged but the kwargs dict hardcoded `attn_implementation="sdpa"`
+    — the selector was dead and the log could announce a value never used
+  verdict: covered
+  bible_id: '12.24'
+  source: bug-logs
+- ref: BUG_LOG.md L341-347 (BUG-LOCAL-271)
+  title: 'Producer/consumer contract mismatch on a violation field''s shape: the auditor emitted a char_id in `expected` while
+    the repair resolved it as a NAME, so every wrong_char_id auto-repair was dead'
+  verdict: covered
+  bible_id: '12.43'
+  source: bug-logs
+- ref: BUG_LOG.md L349-365, L528-534 (BUG-LOCAL-269 / -270 / -260)
+  title: A shipped fixed `seed` widget pinned every downstream 'random' draw — identical cast every episode, identical style
+    inspiration flavors, and a ~11% easter-egg cameo firing 100% of the time
+  verdict: covered
+  bible_id: '10.07'
+  source: bug-logs
+- ref: BUG_LOG.md L35 (BUG-LOCAL-297)
+  title: A remote proxy chat endpoint path was shipped as an admitted best guess and was short one URL segment, so the first
+    credit-billed call would have hit a 404 surface
+  verdict: covered
+  bible_id: '12.39'
+  source: bug-logs
+- ref: BUG_LOG.md L367-374 (BUG-LOCAL-268)
+  title: A repair arm referenced an unbound name; the NameError was swallowed by a broad `except (Exception, ValidationError)`
+    so the repair pass never executed and every schema failure looked like a model-quality failure
+  verdict: covered
+  bible_id: '05.07'
+  source: bug-logs
+- ref: BUG_LOG.md L37 (BUG-LOCAL-296)
+  title: A per-RUN cost ceiling implemented as a module-level accumulator degraded to per-PROCESS-lifetime because its reset
+    function was defined and exported but never called in the live path
+  verdict: covered
+  bible_id: '12.74'
+  source: bug-logs
+- ref: BUG_LOG.md L376-383 (BUG-LOCAL-267)
+  title: A later rewrite pass wrote its LLM payload verbatim into the line text, bypassing the composer's speaker-label strip,
+    so TTS voiced the character's own name aloud
+  verdict: covered
+  bible_id: '12.67'
+  source: bug-logs
+- ref: BUG_LOG.md L385-398 (BUG-LOCAL-266)
+  title: ComfyUI 0.22.2 migrated a core loader node to the V3 node API, whose FUNCTION returns a `NodeOutput` wrapper rather
+    than a bare tuple — a custom node that validated `isinstance(tuple|list)` crashed mid-chain
+  verdict: covered
+  bible_id: '05.13'
+  source: bug-logs
+- ref: BUG_LOG.md L400-463 (BUG-LOCAL-265)
+  title: A video phase got ~1.7 GB of a 16 GB card because the pipeline's own out-of-band model loaders hold VRAM that ComfyUI's
+    `unload_all_models()` cannot see
+  verdict: covered
+  bible_id: '07.03'
+  source: bug-logs
+- ref: BUG_LOG.md L41 (BUG-LOCAL-295)
+  title: ALL-CAPS roster cast names leaked into line BODY text mid-phrase and inside `*...*` stage directions; the existing
+    leak filter only retried when the WHOLE line equalled the speaker's name
+  verdict: covered
+  bible_id: '10.03'
+  source: bug-logs
+- ref: BUG_LOG.md L43 (BUG-LOCAL-294)
+  title: 'Remote LLM output was truncated, not disobedient: the backend clamped remote `max_tokens` to the local grammar-era
+    per-call budget (~150-200 tokens)'
+  verdict: covered
+  bible_id: '11.50'
+  source: bug-logs
+- ref: BUG_LOG.md L45 (BUG-LOCAL-293 item 2)
+  title: The shipped canonical workflow JSON carried a smoke-iteration leftover widget value that DISABLED a production safety
+    halt
+  verdict: covered
+  bible_id: '04.06'
+  source: bug-logs
+- ref: BUG_LOG.md L45 (BUG-LOCAL-293 items 4+5)
+  title: CI tooling wrote a multi-MB temp diff into a OneDrive-synced repo tree; OneDrive held the file open mid-sync so the
+    next truncating re-open raised OSError(22) at OPEN time and unlink raised PermissionError
+  verdict: covered
+  bible_id: '12.77'
+  source: bug-logs
+- ref: BUG_LOG.md L465-474 (BUG-LOCAL-264)
+  title: A small model overruns strict schema caps on every attempt; the graceful raw-seed fallback keeps the run alive but
+    silently degrades both announcer passes to deterministic filler
+  verdict: covered
+  bible_id: '11.30'
+  source: bug-logs
+- ref: BUG_LOG.md L47 (2026-05-29 investigation)
+  title: Two modules assign char_ids by different orderings (writer roster announcer-first c01 vs cast-contract alphabetical
+    c01), so a re-stamp pass can resolve a character line onto the announcer's voice
+  verdict: covered
+  bible_id: '12.43'
+  source: bug-logs
+- ref: BUG_LOG.md L476-498 (BUG-LOCAL-263)
+  title: 'Prompt/schema contract gap: the casting prompt only ever showed the model `"<short>"` while the schema hard-enforced
+    max_length=200, so a normal 1-2 sentence description failed all 3 attempts and killed the run'
+  verdict: covered
+  bible_id: '11.54'
+  source: bug-logs
+- ref: BUG_LOG.md L49 (BUG-LOCAL-280)
+  title: Smoke harness patched a STRING-valued COMBO widget with an int, and the API validator correctly rejected it — read
+    as 'the smoke just won't run'
+  verdict: covered
+  bible_id: '04.08'
+  source: bug-logs
+- ref: BUG_LOG.md L500-514 (BUG-LOCAL-262)
+  title: Gemma-2's Jinja chat template hard-rejects a system role; every `apply_chat_template` call site passed system messages
+    straight through with no per-tokenizer guard
+  verdict: covered
+  bible_id: '11.29'
+  source: bug-logs
+- ref: BUG_LOG.md L516-526 (BUG-LOCAL-261)
+  title: A naive JSON extractor slicing first `{` to LAST `}` returned two concatenated objects when the LLM hallucinated
+    a second one — and the same brittle extractor was duplicated in four modules
+  verdict: covered
+  bible_id: '11.47'
+  source: bug-logs
+- ref: BUG_LOG.md L536-542 (BUG-LOCAL-259)
+  title: Outline stage raised an uncaught error on an off-cast beat speaker instead of repairing, while the system prompt
+    actively pushed the model to invent speakers and the retry temperature schedule RISES
+  verdict: covered
+  bible_id: '11.18'
+  source: bug-logs
+- ref: BUG_LOG.md L544-551 (BUG-LOCAL-258)
+  title: '`forceInput: True` on an input that ALSO carries the legacy `widget` sub-key makes ComfyUI drop that widgets_values
+    slot; saved vectors went one slot out of alignment and ComfyUI rejected the entire visual branch'
+  verdict: covered
+  bible_id: '04.13'
+  source: bug-logs
+- ref: BUG_LOG.md L553-559 (BUG-LOCAL-257)
+  title: Writer model dropdown listed diffusion and vision checkpoints because the cache scanner walks HF_HOME with no model-type
+    filter and HF_HOME consolidates every model family into one hub
+  verdict: covered
+  bible_id: '06.06'
+  source: bug-logs
+- ref: BUG_LOG.md L561-567 (BUG-LOCAL-256)
+  title: Phantom-name detection tested exact whole-string roster membership, so component words of multi-word cast names and
+    key_terms were flagged as invented names
+  verdict: covered
+  bible_id: '11.19'
+  source: bug-logs
+- ref: BUG_LOG.md L569-575 (BUG-LOCAL-255)
+  title: A helper selected rows by a PRIVATE in-flight key that the public setter strips, so the news closing brief was silently
+    dropped on every episode — its sibling helper in the same module already had the fallback
+  verdict: covered
+  bible_id: '12.72'
+  source: bug-logs
+- ref: BUG_LOG.md L577-583 (BUG-LOCAL-254)
+  title: Hand-built workflow JSONs carried human-readable slug root `id`s; ComfyUI's Vue Zod validator rejects anything that
+    is not a UUID at canvas load
+  verdict: covered
+  bible_id: '12.08'
+  source: bug-logs
+- ref: BUG_LOG.md L585-591 (BUG-LOCAL-253)
+  title: A saved widgets_values vector was short by one (the `episode_seed` slot was missing), shifting model_id / guidance_scale
+    / allow_silence_fallback one position left
+  verdict: covered
+  bible_id: '04.02'
+  source: bug-logs
+- ref: BUG_LOG.md L593-599 (BUG-LOCAL-252), L621 (BUG-LOCAL-249 sibling)
+  title: Relative imports were added to a module whose documented load strategy is sys.path-prepend plus ABSOLUTE imports,
+    so it breaks whenever loaded as a top-level module
+  verdict: covered
+  bible_id: '03.05'
+  source: bug-logs
+- ref: BUG_LOG.md L601-607 (BUG-LOCAL-251)
+  title: Three test modules installed a PARTIAL `folder_paths` stub into `sys.modules` at import time; whichever pytest collected
+    first won, producing 9 order-dependent failures that all passed in isolation
+  verdict: covered
+  bible_id: '12.78'
+  source: bug-logs
+- ref: BUG_LOG.md L609-623 (BUG-LOCAL-249 / -250)
+  title: Downstream visual prompts were steered by the upstream style-preset widget instead of the story brief; the brief
+    was wired only as a Tier-3 fallback behind `if not descriptor` that could never fire
+  verdict: covered
+  bible_id: '04.06'
+  source: bug-logs
+- ref: BUG_LOG.md L625-631 (BUG-LOCAL-248)
+  title: 'An empty socket string reached a subprocess probe: `Path("")` resolves to `.`, so ffprobe was handed the current
+    directory and the run died with an opaque deep-stack error'
+  verdict: covered
+  bible_id: '12.56'
+  source: bug-logs
+- ref: BUG_LOG.md L649-655 (BUG-LOCAL-200)
+  title: Magic-number literals at the widget min/max and in the consumer clamp silently disagreed with the freeze cascade's
+    authoritative duration bounds
+  verdict: covered
+  bible_id: '12.05'
+  source: bug-logs
+- ref: BUG_LOG.md L657-664 (BUG-LOCAL-201)
+  title: Cache key omitted output-determining inputs (model_id, guidance_scale), so switching models silently returned the
+    previous model's rendered wav
+  verdict: covered
+  bible_id: '06.03'
+  source: bug-logs
+- ref: BUG_LOG.md L666-673 (BUG-LOCAL-202)
+  title: With no cache layer the on-disk filename IS the identity, and it keyed only by line_id — a re-render at a new duration
+    silently overwrote the previous wav
+  verdict: covered
+  bible_id: '12.55'
+  source: bug-logs
+- ref: BUG_LOG.md L675-681 (BUG-LOCAL-203)
+  title: The cast contract was preset-shape-aware but not name-shape-aware, so structural tokens like TITLE / NOTE / NARRATOR
+    passed as character names and rendered as voiced lines
+  verdict: covered
+  bible_id: '11.19'
+  source: bug-logs
+- ref: BUG_LOG.md L683-690 (BUG-LOCAL-204)
+  title: No structural enforcement of `line_id` uniqueness even though the filename scheme and every ledger write-back path
+    key by it
+  verdict: covered
+  bible_id: '12.58'
+  source: bug-logs
+- ref: BUG_LOG.md L692-699 (BUG-LOCAL-205)
+  title: A blocklist regex used `\b` after a trailing `.` at end-of-string, which never fires — the patterns were dead and
+    silently allowed every artefact they were meant to catch
+  verdict: covered
+  bible_id: '11.19'
+  source: bug-logs
+- ref: BUG_LOG.md L701-707 (BUG-LOCAL-206)
+  title: Naive f-string concatenation produced a leading-space genre string when the substituted value was empty
+  verdict: covered
+  bible_id: '08.08'
+  source: bug-logs
+- ref: BUG_LOG.md L709-718 (BUG-LOCAL-227)
+  title: Deleting pipeline phases left ~25 orphaned test files referencing symbols and contracts that no longer exist, all
+    reported as NEW regressions by the known-fail guard
+  verdict: covered
+  bible_id: '12.03'
+  source: bug-logs
+- ref: BUG_LOG.md L721-729 (BUG-LOCAL-228)
+  title: Timeout recovery called the FULL GPU teardown helper (model.to('cpu') + empty_cache) while the orphan worker thread
+    was still executing CUDA kernels on the same cached model
+  verdict: covered
+  bible_id: '12.46'
+  source: bug-logs
+- ref: BUG_LOG.md L731-738, L902-909 (BUG-LOCAL-207 / -208)
+  title: 'Deletion waves left orphan helpers and live sockets behind: a Director-derived fallback with zero callers and a
+    bridge node still writing `production_plan.json` for an audience that no longer existed'
+  verdict: covered
+  bible_id: '12.03'
+  source: bug-logs
+- ref: BUG_LOG.md L740-747 (BUG-LOCAL-210)
+  title: Deleting a REQUIRED INPUT_TYPES entry without trimming the saved widgets_values vector left a stale `{}` at position
+    1, positionally shifting every later slot; ComfyUI's permissive load masked it in soak
+  verdict: covered
+  bible_id: '04.02'
+  source: bug-logs
+- ref: BUG_LOG.md L749-756 (BUG-LOCAL-226)
+  title: A sprint plan asserted a function was dead-runtime based on file-local reading; the real call chain crossed three
+    files and fired on the canonical default path every run
+  verdict: covered
+  bible_id: '12.74'
+  source: bug-logs
+- ref: BUG_LOG.md L758-765 (BUG-LOCAL-225)
+  title: A UTF-8 BOM in a tools file survived three sprint closes because the repo-wide static-quality gate was only invoked
+    once, at the end
+  verdict: covered
+  bible_id: '02.12'
+  source: bug-logs
+- ref: BUG_LOG.md L767-774 (BUG-LOCAL-224)
+  title: A `try/except -> None` wrapper around a REQUIRED factory let the consumer silently substitute the wrong generation
+    function, re-injecting the exact regression the factory was added to prevent
+  verdict: covered
+  bible_id: '11.44'
+  source: bug-logs
+- ref: BUG_LOG.md L776-783 (BUG-LOCAL-223)
+  title: A regression gate passed on a proxy artifact (the expected-fail SET delta) while the actual full-suite run had 7
+    undocumented failures shipping under it
+  verdict: covered
+  bible_id: '05.06'
+  source: bug-logs
+- ref: BUG_LOG.md L785-792 (BUG-LOCAL-222)
+  title: A schema-shape deletion's audit missed the validator's pure-data string table mirroring the deleted shape, so a required-top-level-key
+    check still demanded it
+  verdict: covered
+  bible_id: '12.03'
+  source: bug-logs
+- ref: BUG_LOG.md L794-801 (BUG-LOCAL-221)
+  title: The project's own conftest hook raises SystemExit(2) after flagging new failures, aborting pytest before it prints
+    the FAILURES section — the quality gate ate its own diagnostic evidence
+  verdict: covered
+  bible_id: '11.18'
+  source: bug-logs
+- ref: BUG_LOG.md L803-810 (BUG-LOCAL-220)
+  title: A fix introduced an 'ephemeral' scratch directory but shipped no cleanup hook, so orphan wavs accumulated unbounded
+    across re-runs
+  verdict: covered
+  bible_id: '12.47'
+  source: bug-logs
+- ref: BUG_LOG.md L812-819 (BUG-LOCAL-219)
+  title: 'Soft-rollout deadlock: an audit walker shipped with no caller, and the strict-mode flip criterion required the walker
+    to have already been running — the safety surface slept for five sprints'
+  verdict: covered
+  bible_id: '12.74'
+  source: bug-logs
+- ref: BUG_LOG.md L821-828 (BUG-LOCAL-218)
+  title: A silent runtime repair contradicted the node's documented loud-fail contract and its triggering condition had already
+    been fixed at the root, so it survived only to mask the next misconfiguration
+  verdict: covered
+  bible_id: '12.25'
+  source: bug-logs
+- ref: BUG_LOG.md L830-837 (BUG-LOCAL-217)
+  title: A writeback safety gate landed on the new path but not the parallel legacy loop handling the same ledger field
+  verdict: covered
+  bible_id: '11.44'
+  source: bug-logs
+- ref: BUG_LOG.md L839-846 (BUG-LOCAL-216)
+  title: A data contract maintained as two parallel lists in two files drifted, halting the music node mid-pipeline after
+    minutes of model time and thousands of tokens had already been spent
+  verdict: covered
+  bible_id: '09.04'
+  source: bug-logs
+- ref: BUG_LOG.md L84 (BUG-LOCAL-244)
+  title: Unexplained fast-path outliers on the same workflow (42.38 s/it and 1.22 s/it against a ~180 s/it baseline) — two
+    distinct speed-up mechanisms, neither reproduced with full telemetry
+  verdict: covered
+  bible_id: '07.16'
+  source: bug-logs
+- ref: BUG_LOG.md L848-855 (BUG-LOCAL-215)
+  title: In-module NODE_CLASS_MAPPINGS registered the bare class name while the pack registers the prefixed key, and the display
+    name carried a literal '[EMOJI]' placeholder
+  verdict: covered
+  bible_id: '03.03'
+  source: bug-logs
+- ref: BUG_LOG.md L85 (BUG-LOCAL-243)
+  title: The rewritten writer composes silently and only logs at the end of the whole phase, losing the legacy per-line console
+    visibility that would have caught drift immediately
+  verdict: covered
+  bible_id: '11.04'
+  source: bug-logs
+- ref: BUG_LOG.md L857-864 (BUG-LOCAL-214)
+  title: A rarely-exercised silence fallback emitted a fixed 100 ms clip regardless of the cue's real duration, breaking the
+    assembler timeline
+  verdict: covered
+  bible_id: '12.25'
+  source: bug-logs
+- ref: BUG_LOG.md L86 (BUG-LOCAL-242)
+  title: Ledger word/char counts drift from the actual line text and the audit only logs a WARNING, never blocks
+  verdict: covered
+  bible_id: '12.67'
+  source: bug-logs
+- ref: BUG_LOG.md L866-873 (BUG-LOCAL-213)
+  title: A status field promised in the docstring was never written, and an early `return` on the fallback branch bypassed
+    the writeback block entirely
+  verdict: covered
+  bible_id: '12.44'
+  source: bug-logs
+- ref: BUG_LOG.md L875-900 (BUG-LOCAL-209 / -211 / -212)
+  title: Save helpers declared `-> None` and returned implicit None on both success and failure, while the ledger writeback
+    gated on the cache-path string — producing ledger rows that point at files never written
+  verdict: covered
+  bible_id: '12.44'
+  source: bug-logs
+- ref: BUG_LOG.md L88 (BUG-LOCAL-240)
+  title: A freeze validator enforced strict membership against a fixed preset list while the picker is designed to INVENT
+    slugs — and it was guarding a consumer that had stopped reading the slug months earlier
+  verdict: covered
+  bible_id: '11.22'
+  source: bug-logs
+- ref: BUG_LOG.md L89 (BUG-LOCAL-239)
+  title: Music and clip collections stayed empty in the ledger despite music_inter lines existing — no rows, paths or write-back
+    for rendered cues
+  verdict: covered
+  bible_id: '12.65'
+  source: bug-logs
+- ref: BUG_LOG.md L90 (BUG-LOCAL-238)
+  title: Every line carries a `beat_id` but the top-level `beats[]` array is empty — referential integrity between lines and
+    their parent collection is unenforced
+  verdict: covered
+  bible_id: '12.58'
+  source: bug-logs
+- ref: BUG_LOG.md L91 (BUG-LOCAL-237)
+  title: Rendered portrait artifacts exist on disk but `cast.portrait_path` is never stamped into the ledger, because the
+    save call site was guarded behind a path that returned None
+  verdict: covered
+  bible_id: '12.44'
+  source: bug-logs
+- ref: BUG_LOG.md L911-955 (BUG-LOCAL-229 cause 1)
+  title: 'uv launcher-stub PID split: the venv python.exe fork-execs the real cpython, so os.getpid() and Popen().pid disagree
+    — the port-owner check refused every healthy launch and the between-iter sweep killed its own supervisor'
+  verdict: covered
+  bible_id: '09.07'
+  source: bug-logs
+- ref: BUG_LOG.md L916-918 (BUG-LOCAL-229 cause 2)
+  title: 'Two ComfyUI client-side serialization rules are not discoverable from /object_info: `seed` INT widgets carry a hidden
+    `control_after_generate` companion slot, and `forceInput=True` widget-backed inputs occupy no slot at all'
+  verdict: covered
+  bible_id: '04.07'
+  source: bug-logs
+- ref: BUG_LOG.md L92 (BUG-LOCAL-236)
+  title: A later block re-stamped `meta.episode_title` from the blank widget value, clobbering the LLM-regenerated title and
+    forcing the timestamp last-resort fallback downstream
+  verdict: covered
+  bible_id: '04.06'
+  source: bug-logs
+- ref: BUG_LOG.md L93 (BUG-LOCAL-235)
+  title: A portrait-lookup glob still used the pre-rename-era filename pattern while the renderer writes the canonical `{char_id}_portrait.png`,
+    so the Tier-2 fallback could never succeed
+  verdict: covered
+  bible_id: '04.11'
+  source: bug-logs
+- ref: BUG_LOG.md L94, L633-647 (BUG-LOCAL-234 / -246 / -247)
+  title: 'Rename-stale episode paths: several nodes cached the pre-rename `episode_id` from an in-memory or socket ledger
+    and resolved portraits, stills, clip dirs and composites against the renamed-away directory'
+  verdict: covered
+  bible_id: '12.66'
+  source: bug-logs
+- ref: BUG_LOG.md L95 (BUG-LOCAL-233)
+  title: 'Vocative drift: the `[ANNOUNCER]:` label left in the rolling-window prompt induced characters to address ANNOUNCER
+    by name, and the stripper''s mid-sentence regex accepted only a comma so `, ANNOUNCER;` was neither flagged nor stripped'
+  verdict: covered
+  bible_id: '10.03'
+  source: bug-logs
+- ref: BUG_LOG.md L957-987 (BUG-LOCAL-230)
+  title: A global `--force-fp16` launch arg upcast a natively-fp8 checkpoint to fp16 at load, doubling its footprint on a
+    16 GB card and forcing the offloader to page weights per sampler step
+  verdict: covered
+  bible_id: '07.27'
+  source: bug-logs
+- ref: BUG_LOG.md L96 (BUG-LOCAL-232)
+  title: Cast generation stamped an ANNOUNCER name plus a non-Bark voice preset onto a character cast row and the writer's
+    own Gates 1+2 did not reject the shape
+  verdict: covered
+  bible_id: '07.19'
+  source: bug-logs
+- ref: BUG_LOG.md L989-1591 (BUG-LOCAL-231)
+  title: The FLUX sampler ran 130x slower inside the custom-node graph than on a stripped stock workflow on the same box —
+    a state-dependent intermittent whose cause was never pinned after ~10 falsified hypotheses
+  verdict: covered
+  bible_id: '07.16'
+  source: bug-logs
+- ref: BUG_LOG_2026-06.md L100-106 (BUG-LOCAL-413)
+  title: A 'soft LTX open' was not an LTX quality problem at all — LTX rendered zero clips and the by-design procgen/still_kenburns
+    fallback filled the slot
+  verdict: covered
+  bible_id: '05.08'
+  source: bug-logs
+- ref: BUG_LOG_2026-06.md L108-137 (BUG-LOCAL-412)
+  title: A cleanbreak deleted the node that held the entire tuned LTX motion recipe; the replacement engine shipped different
+    code defaults, so the look regressed with no workflow-JSON change to point at
+  verdict: covered
+  bible_id: '12.76'
+  source: bug-logs
+- ref: BUG_LOG_2026-06.md L109 (BUG-LOCAL-412 blur root cause)
+  title: LTX-2B was driven at the deliverable canvas 1472x832, far above its 480p native resolution, so the i2v anchor held
+    frame 0 sharp and later frames re-noised into mush
+  verdict: covered
+  bible_id: '07.26'
+  source: bug-logs
+- ref: BUG_LOG_2026-06.md L139-158 (BUG-LOCAL-411)
+  title: Image-pipeline rewrite silently dropped load-bearing look inputs — the FluxGuidance node, the cinematic style suffix,
+    the radio broadcast-distress suffix, and the deterministic bookend seed
+  verdict: covered
+  bible_id: '12.75'
+  source: bug-logs
+- ref: BUG_LOG_2026-06.md L160-174 (BUG-LOCAL-410)
+  title: 'End-of-episode rolling credits / Telemetry HUD post-roll cut: the deliverable is built to the master-audio budget
+    and the mux asserts video<=audio, so the floor''s ~20 s post-roll never survives'
+  verdict: covered
+  bible_id: '08.08'
+  source: bug-logs
+- ref: BUG_LOG_2026-06.md L176-183 (BUG-LOCAL-409)
+  title: Title decode/reveal animation's completion point was pinned to the END of its window, so the fully-resolved title
+    was on screen for only 1-2 frames
+  verdict: covered
+  bible_id: '07.25'
+  source: bug-logs
+- ref: BUG_LOG_2026-06.md L185-198 (BUG-LOCAL-408)
+  title: Default music engine was swapped to Stable Audio 3 while the prompt builder stayed tuned for musicgen — conflict-free
+    default != better-sounding
+  verdict: covered
+  bible_id: '07.24'
+  source: bug-logs
+- ref: BUG_LOG_2026-06.md L200-206 (BUG-LOCAL-407)
+  title: Every non-face video engine inherited the talking-head 480x832 PORTRAIT canvas default, so stills/b-roll rendered
+    pillarboxed inside the 16:9 deliverable
+  verdict: covered
+  bible_id: '07.23'
+  source: bug-logs
+- ref: BUG_LOG_2026-06.md L208-214 (BUG-LOCAL-406)
+  title: Scopes overlay rendered only the beats-only frame budget; being shorter than the master it clamped the `blend=...:shortest=1`
+    filtergraph and froze the last drama frame under the closing theme
+  verdict: covered
+  bible_id: '08.08'
+  source: bug-logs
+- ref: BUG_LOG_2026-06.md L236-242 (BUG-LOCAL-405)
+  title: 'Per-role image-model dropdown offers engines that cannot mint: the alternates are default-OFF opt-in stubs whose
+    render_image raises NotImplementedError with no weights on disk'
+  verdict: covered
+  bible_id: '06.06'
+  source: bug-logs
+- ref: BUG_LOG_2026-06.md L246-254 (BUG-LOCAL-403)
+  title: Opening music beat is prepended as AUDIO but never represented as a timed LINE or clip-manifest row, so the composite
+    had nothing to place over the head gap
+  verdict: covered
+  bible_id: '12.65'
+  source: bug-logs
+- ref: BUG_LOG_2026-06.md L258-265, L228 (BUG-LOCAL-404)
+  title: Video renderer loaded the PRE-audio ledger snapshot (lines carry no `start_s`), so the title-card window collapsed
+    to the ~1 s envelope fallback
+  verdict: covered
+  bible_id: '12.57'
+  source: bug-logs
+- ref: BUG_LOG_2026-06.md L271-277 (BUG-LOCAL-402)
+  title: Concatenated ffmpeg filter steps produced the bogus option `gbrpformat`; the whole filter_complex was rejected and
+    the silent source-copy fallback dropped burned captions and audio-reactive scopes on every episode
+  verdict: covered
+  bible_id: '08.08'
+  source: bug-logs
+- ref: BUG_LOG_2026-06.md L281-287 (BUG-LOCAL-401)
+  title: Engine's `roles` tuple omitted a role its `required_inputs` actually allow — director fail-closed a compatible operator
+    pick at execute
+  verdict: covered
+  bible_id: '12.73'
+  source: bug-logs
+- ref: BUG_LOG_2026-06.md L291-306 (BUG-LOCAL-400)
+  title: Dynamic COMBO dropped its saved enable-sentinel when the lane was enabled — ComfyUI pre-exec validator rejected node
+    1 and the whole episode aborted
+  verdict: covered
+  bible_id: '03.04'
+  source: bug-logs
+- ref: BUG_LOG_2026-06.md L67-73 (BUG-LOCAL-417)
+  title: 'Threaded kwarg was dead at the call site: reroll/spine passed no `source_bank_id`, and the composer short-circuited
+    to the science system prompt whenever `creative_repo_id is None`, so fixing only the call sites would still have been
+    a no-op'
+  verdict: covered
+  bible_id: '12.24'
+  source: bug-logs
+- ref: BUG_LOG_2026-06.md L75-81 (BUG-LOCAL-416)
+  title: A bare `_core = locals()` kwargs capture swept up non-parameter locals added later by an unrelated edit, so the writer's
+    refine loop raised TypeError on every refine-enabled run
+  verdict: covered
+  bible_id: '05.12'
+  source: bug-logs
+- ref: BUG_LOG_2026-06.md L83-89 (BUG-LOCAL-415)
+  title: A crash-orphaned one-shot env hook file was blindly `call`ed by the launcher on every headless boot, silently forcing
+    an engine map onto unrelated runs
+  verdict: covered
+  bible_id: '12.47'
+  source: bug-logs
+- ref: BUG_LOG_2026-06.md L91-98 (BUG-LOCAL-414)
+  title: ltx_audio_in beats crawled to ~223 s/it with no OOM — one VideoVAE node fed both the i2v encode and the decode so
+    free_after_use held 1.38 GB through the whole denoise, and there was no activation reserve on a desktop-VRAM-tight 16
+    GB box
+  verdict: covered
+  bible_id: '07.16'
+  source: bug-logs
+- ref: docs/2026-07-31-NEWBUG-scene-sequencer-music-sockets.md (whole doc; cites nodes/scene_sequencer.py:741,746 vs :793-798)
+  title: SceneSequencer declares two music INPUT_TYPES sockets its FUNCTION signature cannot accept (TypeError on wire)
+  verdict: covered
+  bible_id: '12.73'
+  source: docs-handoffs
+- ref: docs/2026-07-18-NEWBUG-fable2-v3-rules-id.md:29-43
+  title: A runnable=True bank could never complete a leg because the lane's revision_contract hardcodes a single literal rules_id
+  verdict: covered
+  bible_id: '12.72'
+  source: docs-handoffs
+- ref: docs/2026-07-23-video-failure-inventory.md:40-56
+  title: Campaign receipts recorded PASS for a leg whose own stdout carried RESULT FAIL with exit code 0
+  verdict: covered
+  bible_id: '05.06'
+  source: docs-handoffs
+- ref: docs/2026-07-27-open-bug-triage.md:29-35 (row A1)
+  title: GGUF loader cache reuse_key excluded the VRAM ceiling and a resident model returned without entering preflight, so
+    a permissive load satisfied a stricter request
+  verdict: covered
+  bible_id: '12.40'
+  source: docs-handoffs
+- ref: docs/2026-07-27-open-bug-triage.md:51-56 (row A6); docs/HANDOFF_LOG.md:2938-2942
+  title: GGUF artifact integrity checks are conditional on the pin existing, so the shipped Q4_K_M quant with size None and
+    sha None lets a truncated download pass readiness
+  verdict: covered
+  bible_id: '12.55'
+  source: docs-handoffs
+- ref: docs/2026-07-27-open-bug-triage.md:66-73; docs/2026-07-23-video-failure-inventory.md:137-141
+  title: A ShotRow validation model declaring extra=forbid raises on every real ledger, so the cited live safety net cannot
+    validate a single shipped episode
+  verdict: covered
+  bible_id: '12.73'
+  source: docs-handoffs
+- ref: docs/2026-07-27-open-bug-triage.md:83-92; docs/HANDOFF_LOG.md:2964-2969
+  title: Unguarded float(os.environ.get(...)) at the terminal mux node killed a fully rendered episode with an uncaught ValueError
+  verdict: covered
+  bible_id: '12.73'
+  source: docs-handoffs
+- ref: docs/2026-08-04-POSTMORTEM-still-unmaterialized-320w.md:24-37
+  title: 'A failing completion gate destroyed its own evidence: the per-object reason was wire-only and stamped after the
+    raise, and the boot script truncated the server log with >'
+  verdict: covered
+  bible_id: '12.40'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:1070-1073 and :928-929
+  title: 'Test-ordering pollution from module reload: a test fails right after a sibling test file and passes 11/11 alone
+    (class-identity breakage)'
+  verdict: covered
+  bible_id: '12.81'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:1111-1113
+  title: A schema-required field read by nothing caused a Folger comedy to render as archival_documentary
+  verdict: covered
+  bible_id: '12.24'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:1124-1127
+  title: The saved canonical graph stored a model id without its VRAM badge, and two copies of the licence guard matched the
+    raw badged string so both were inspecting nothing
+  verdict: covered
+  bible_id: '04.08'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:113-117
+  title: Case-mismatched rfind needle against a lowered haystack would have been a silent no-op, and an empty needle returns
+    len
+  verdict: covered
+  bible_id: '12.32'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:1193-1201 (2026-08-02/03, HEAD 350ab0f0)
+  title: 'A shipped Bug Bible entry''s premise failed on measurement: the claimed constant 100-200 ms audio-leads-lips offset
+    does not reproduce'
+  verdict: covered
+  bible_id: '07.13'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:1228-1238
+  title: Campaign acceptance summed clip durations, which a mirrored/padded clip satisfies perfectly; the replacement frame-audit
+    then false-failed a good leg and was contrast-blind
+  verdict: covered
+  bible_id: '07.21'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:148-153
+  title: A length cap measured against the PRE-transform string trimmed the growth off the END, deleting an engineered camera
+    clause
+  verdict: covered
+  bible_id: '12.60'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:1491-1497
+  title: A capacity exception escaped the retry ladder through a bare except-and-reraise, spending one of three attempts and
+    24 minutes on a dead leg
+  verdict: covered
+  bible_id: '11.50'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:154-157 (2026-08-06 QA entry)
+  title: 'Empty string in the env TRUE-token set: a present-but-empty variable read as TRUE and silently enabled a transform
+    on fidelity lanes'
+  verdict: covered
+  bible_id: '12.64'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:1580-1586, 1556
+  title: HTML block-tag stripping fused sentence boundaries in full_text, which is what most writer P0 deaths actually tripped
+    over
+  verdict: covered
+  bible_id: '11.57'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:1589-1592
+  title: getattr(ids, "shape", [len(ids)]) builds its default eagerly inside a bare except, so a fake tensor made the writer
+    report generated_tokens = None
+  verdict: covered
+  bible_id: '05.14'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:1752-1755
+  title: A watchdog re-ran nothing because a PowerShell array does not bind through -File, and the no-progress guard then
+    stopped the watchdog
+  verdict: covered
+  bible_id: '12.50'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:1759-1772
+  title: session_identity() was added engine by engine with no roster gate, so a leg failed at the render gate 730 seconds
+    in after script, stills and audio were already paid for
+  verdict: covered
+  bible_id: '12.73'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:1789-1805
+  title: The GPU campaign counted the wrong output directory from launch, so a successful leg read as producing nothing and
+    the watchdog used those numbers to decide re-runs
+  verdict: covered
+  bible_id: '12.42'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:1832-1849 (WIRE-W4e)
+  title: A beat carrying its own per-line voice WAV skipped the per-segment slicer entirely, so every segment got the whole
+    line from its start
+  verdict: covered
+  bible_id: '11.19'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:1863-1885
+  title: The structural validator reported only the FIRST offending line, so the one repair attempt fixed that and died on
+    a defect present in attempt 1
+  verdict: covered
+  bible_id: '11.43'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:1887-1896 and :313-314
+  title: A UTF-8 BOM in a test file passed the interpreter but failed the AST-scan guard, because ast.parse rejects a leading
+    U+FEFF
+  verdict: covered
+  bible_id: '02.12'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:1918-1926 (2026-07-29 -- HEAD b2060a31)
+  title: 'prestartup_script.py emitted non-ASCII to a cp1252 console: boot logged PRESTARTUP FAILED while the pack silently
+    worked'
+  verdict: covered
+  bible_id: '02.15'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:1961-1964
+  title: A readiness probe run outside the ComfyUI process reports every heavy lane as missing_model, because folder_paths
+    / extra_model_paths only resolve in-process
+  verdict: covered
+  bible_id: '02.16'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:206-213; see also :408-409 and :462-465 (`git add -A docs/` swept another window's untracked file)
+  title: 'Concurrent agent windows share one git index: a docs commit swept another window''s staged deletions and left origin
+    RED with a registry naming five engines whose module was gone'
+  verdict: covered
+  bible_id: '12.80'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:2064-2081 (WIRE-W4c, 4cc76806)
+  title: The conditioning WAV's trimmed tail carried speech from the next beat, which conditions the frames that do survive
+  verdict: covered
+  bible_id: '07.13'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:2082-2085
+  title: Audio-slice cache key omitted the new pad field, so one segment's WAV would be served to a segment owing different
+    silence, and every cached WAV described the old contract
+  verdict: covered
+  bible_id: '12.40'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:2085-2090
+  title: The audio slicer used a bare ffmpeg literal while a sibling honoured OTR_FFMPEG, so a configured-but-not-on-PATH
+    box silently returned an empty slice
+  verdict: covered
+  bible_id: '12.05'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:2170-2175
+  title: A test's own fake decoder had been returning 4 frames for a 33-frame ask since it was written, so that file had been
+    exercising the pad on every render
+  verdict: covered
+  bible_id: '11.28'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:2193-2202 (WIRE-W4b, cb6fafc7)
+  title: Every segment of a multi-clip lip-sync beat received the whole beat's audio slice, so the assembled beat spoke the
+    opening of the line once per clip
+  verdict: covered
+  bible_id: '12.69'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:2271-2278 and :4173-4178
+  title: The beat partitioner solved an exact cover before a trimmed one, planning four clips where two were legal - plus
+    a hang, a one-quantum trim cap, and a wrong SINGLE verdict
+  verdict: covered
+  bible_id: '07.30'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:2284-2287
+  title: plan_backdrop read the clip manifest, so an all-mesh_stage episode rendered 7/7 shots and published nothing
+  verdict: covered
+  bible_id: '05.08'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:2291-2293
+  title: The forbidden-pattern sweep only diffs TRACKED files, so a new test file passes its own gate and then fails the commit
+  verdict: covered
+  bible_id: '12.79'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:2398-2400 and :1625-1627
+  title: 'Control flow keyed on error-message substrings: a deferral classifier''s four needles missed the LTX wording, and
+    a repair pass was undispatchable because the dispatcher matched the literal string ''locked cast'''
+  verdict: covered
+  bible_id: '04.11'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:2453-2455, 1786-1787, 453-455
+  title: 'Provider locality classified by name prefix: a Pixverse cloud engine was counted as local by every filter, in three
+    separate classifiers'
+  verdict: covered
+  bible_id: '07.23'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:2456-2458; docs/2026-08-04-POSTMORTEM-still-unmaterialized-320w.md:111-114
+  title: The soak harness never set the image-engine and wan_i2v enable flags, so engines were scored as failures for a harness
+    gap and burned GPU time proving nothing
+  verdict: covered
+  bible_id: '12.47'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:2477-2482, 2497-2504
+  title: Credits card column overflowed its footer on the shipped canonical canvas and PIL clipped it silently; the returned
+    y was captured and never used
+  verdict: covered
+  bible_id: '08.08'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:2574-2585, 2678-2685
+  title: A third copy of the silent-mp4 encoder read stderr from a PIPE only after the whole frame stream was written - a
+    deadlock that raises nothing and never reaps the child
+  verdict: covered
+  bible_id: '09.02'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:2597-2608
+  title: ffmpeg rawvideo -s declared an even width while the encoder piped the array's real odd rows, producing a silently
+    skewed clip that passed the frame-count proof
+  verdict: covered
+  bible_id: '08.08'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:2687-2694
+  title: h264_nvenc silently refuses canvases below ~145x49, so a small-canvas beat died on a machine WITH a GPU and succeeded
+    on one without
+  verdict: covered
+  bible_id: '09.05'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:272-280
+  title: A padded clip that confessed its own padding still graded ACCEPTED, and an orphan manifest row was invisible to every
+    rule
+  verdict: covered
+  bible_id: '12.24'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:2842-2849, 2870-2874
+  title: Shipped profile JSONs and their generated variant workflows selected a quant the code had just made illegal - a green
+    mutation-proven suite cannot see a shipped artifact
+  verdict: covered
+  bible_id: '04.01'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:2854-2862, 2670-2676, 2652-2660
+  title: Roster gates that grep or glob found nothing and passed vacuously - three separate instances in one build block
+  verdict: covered
+  bible_id: '12.74'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:287-293
+  title: The sanctioned closing-loop reuse had no test at all - it could have been deleted outright and the suite stayed green
+  verdict: covered
+  bible_id: '12.74'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:2885-2890
+  title: build_variants --all emits variants for untracked profiles on disk, inflating a parametrized suite count that will
+    not reproduce on a clean clone
+  verdict: covered
+  bible_id: '12.36'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:2970-2977; docs/2026-07-27-open-bug-triage.md:94-100
+  title: ffprobe-absent sentinel made the video-longer-than-audio gate fail open while the report still printed OK
+  verdict: covered
+  bible_id: '05.06'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:300-304
+  title: A surviving engine imported a deleted helper at module scope, and an HTTP entry point raised a generic LookupError
+    before any registry check
+  verdict: covered
+  bible_id: '03.01'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:3023-3026
+  title: pytest.raises(ExceptionType) without asserting the message passed with the named guard deleted, because a neighbouring
+    line raised the same type incidentally
+  verdict: covered
+  bible_id: '12.74'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:3173-3177, 3093-3099
+  title: Six tests went decorative the moment a default flipped, because every override now agreed with the frozen value
+  verdict: covered
+  bible_id: '12.68'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:332-341 and :424-430
+  title: Beat clip built by copying its LAST segment silently inherited per-segment fields, so the honesty rule fired on honest
+    beats and the peak-VRAM receipt was wrong
+  verdict: covered
+  bible_id: '12.67'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:346-349
+  title: 'grade_episode.py was inert on the real artifact: it looked for video.shots at the root of a wrapper document and
+    printed ACCEPTED: 0 shot(s) with exit 0'
+  verdict: covered
+  bible_id: '12.74'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:3498-3505, 3529-3533
+  title: '*_DIR model-path overrides never reached the loader because ComfyUI resolves the graph''s bare basename through
+    folder_paths, so they had never changed which weights render'
+  verdict: covered
+  bible_id: '12.24'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:3577-3585
+  title: A path guard compared with os.path.abspath, which folds neither case nor NTFS junctions, and falsely refused every
+    multi-segment beat
+  verdict: covered
+  bible_id: '12.32'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:3586-3594
+  title: 'A raise inside __enter__ means __exit__ never runs: BeatSession.open() re-read the identity after taking the lease,
+    stranding it for every later render'
+  verdict: covered
+  bible_id: '07.22'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:3734-3749, 3818-3823
+  title: Canonical workflow node 87 carried a max_render_frames widgets_values entry with no input descriptor - the 8GB frame-cap
+    channel was dead in all 11 variants
+  verdict: covered
+  bible_id: '04.01'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:3736-3739 and :503-504
+  title: Falsy/None guards let unverifiable clips through the plan-vs-output proof
+  verdict: covered
+  bible_id: '12.64'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:3759-3766 and :3657-3661, 3311-3315
+  title: 'Five canvas channels: build_request_from_shot overwrote every non-face engine to 1472x832 with no branch for the
+    8GB tier, and the harness that ''proved the GPU'' rendered at a different canvas than production'
+  verdict: covered
+  bible_id: '12.42'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:38-43
+  title: Grader harness read the per-episode ledger, which carries no video section; the document holding video.shots is the
+    render batch's state wrapper
+  verdict: covered
+  bible_id: '12.50'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:3809-3814
+  title: 'eng_ltx_av parsed env vars at module scope with bare int()/float(): one typo raised at import and silently deleted
+    an engine'
+  verdict: covered
+  bible_id: '03.01'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:3822-3823 (2026-07-27 overnight, HEAD 07a84627)
+  title: ShotLock.IS_CHANGED fingerprints only two routing env vars, so a frame-cap change serves a stale cached plan
+  verdict: covered
+  bible_id: '06.01'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:3900-3919
+  title: 'Engine capability declarations were written in the provider''s units and inherited wrong ceilings: Veo''s 192-frame
+    rung is unreachable, humo_14B_169 declared 177 against a real cap of 49'
+  verdict: covered
+  bible_id: '12.73'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:3921-3931
+  title: The still MINT and the still DEMAND asked different questions about one state, killing six of seven engines at segment
+    1 after segment 0 had already rendered on the GPU
+  verdict: covered
+  bible_id: '05.08'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:393-399
+  title: Registering an engine with unfilled fields silently degrades it four ways, and the VRAM admission set is an empty
+    frozenset so admission is unenforced for every engine
+  verdict: covered
+  bible_id: '12.73'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:3980-3984, 4008-4012
+  title: segment_render_frames short-circuited index 0 to the whole beat's length, which reads as a harmless special case
+    because the two numbers are equal for single-clip plans
+  verdict: covered
+  bible_id: '12.69'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:3987-3993
+  title: The chain terminal frame was written to a request key no production code reads - and the test agreed with the bug
+    because its own builder used the same wrong key
+  verdict: covered
+  bible_id: '12.74'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:4031-4038
+  title: Coverage plans were validated BEFORE the engine override and radio redirect, so a plan was checked against one engine
+    and executed by another - and logged COVERAGE PLANS OK
+  verdict: covered
+  bible_id: '07.23'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:4055-4060
+  title: teardown released the cross-process GPU lease only after unload(), so an overridden unload that raised stranded the
+    lease and failed the NEXT episode for an unrelated reason
+  verdict: covered
+  bible_id: '07.22'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:4229-4233 and :651-655
+  title: 'Node ids are not execution order: the plan''s premise (a ShotLock freeze informing the image phase) was structurally
+    impossible'
+  verdict: covered
+  bible_id: '05.05'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:4249-4253
+  title: 'The decapitation bug: still aspect derived from the PICKED portrait engine while the render redirected to a WIDE
+    engine, so the still was minted portrait and centre-cropped'
+  verdict: covered
+  bible_id: '07.23'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:534-538
+  title: scifi lane hardcoded a slot->voice dict of three male speakers, so every episode shipped the same three male voices
+    regardless of cast gender
+  verdict: covered
+  bible_id: '10.05'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:540-542
+  title: Builtin hash() used for character->voice keying is PYTHONHASHSEED-salted and would give one character different voices
+    across runs
+  verdict: covered
+  bible_id: '05.01'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:566-568
+  title: A source-scanning guard test tripped on the code's own explanatory comment because it did not strip comments first
+  verdict: covered
+  bible_id: '12.03'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:589-596
+  title: Gender-normalization fix landed in render-time resolvers that never execute, because CastLock stamps the field before
+    any render
+  verdict: covered
+  bible_id: '12.74'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:597-605
+  title: 'One normalizer doing two jobs: neutral folded into other (skipping the only neutral voice) and normalize_gender(None)
+    returned a truthy value that broke a blank-gender short-circuit'
+  verdict: covered
+  bible_id: '12.64'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:60-69 and :157-159
+  title: A blanket quote shield let a quoted weapon noun survive the transform, so the route silently under-fired; a stray
+    trailing backslash dropped the shield entirely
+  verdict: covered
+  bible_id: '11.26'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:653-655
+  title: Ledger.set_cast rebuilds a fixed nine-key row and silently drops any new field, so a stamped fix cannot reach its
+    consumer
+  verdict: covered
+  bible_id: '12.57'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:688-699
+  title: The announcer spoke source URLs and licence identifiers for 30 episodes because the fix landed in a function with
+    zero readers - and captions burned it into the video too
+  verdict: covered
+  bible_id: '12.74'
+  source: docs-handoffs
+- ref: docs/HANDOFF_LOG.md:728-730
+  title: An LLM backend swallows unknown kwargs through **_ignored, so a newly added generation parameter would silently do
+    nothing
+  verdict: covered
+  bible_id: '12.24'
+  source: docs-handoffs
+- ref: ' @ 041a21d7 (nodes/_otr_roster_gender.py, nodes/_otr_voice_node_common.py, nodes/cast_lock.py)'
+  title: 'Same dead-code class again: the voice/gender fix was landed in a resolver the production path never reaches'
+  verdict: covered
+  bible_id: '12.74'
+  source: git-fixes
+- ref: ' @ 06f7c0e7 (nodes/otr_silent_composite.py)'
+  title: A behaviour rip stopped at the engine layer; the assembler downstream went on doing the exact thing that was ripped
+    out
+  verdict: covered
+  bible_id: '12.03'
+  source: git-fixes
+- ref: ' @ 0e9bbffe (config/profiles/otr_8gb_fastwan.json, tests/test_fastwan_8gb.py)'
+  title: A profile JSON carried an unschema'd top-level key that made the loader reject the file, and every profile test still
+    passed because they read the JSON directly instead of loading it
+  verdict: covered
+  bible_id: '12.74'
+  source: git-fixes
+- ref: ' @ 0f30dd82 (nodes/_otr_source_document.py)'
+  title: dataclass field(repr=False) only suppressed display; asdict/astuple/vars still reconstructed the entire withheld
+    body
+  verdict: covered
+  bible_id: '11.44'
+  source: git-fixes
+- ref: ' @ 14b0e9a9 (nodes/otr_image_gen_dispatcher.py, scripts/otr_rotate_log.ps1)'
+  title: A still-skip was silent (no object id, wire-only warning, gate raised before the wire was stamped) and the relaunch
+    truncated the log that would have proved it
+  verdict: covered
+  bible_id: '05.09'
+  source: git-fixes
+- ref: ' @ 15c530a0 (nodes/_otr_fable2_markup.py)'
+  title: Markdown decoration on a structural label defeated every ^-anchored classifier and created a character literally
+    named '**TITLE'
+  verdict: covered
+  bible_id: '11.10'
+  source: git-fixes
+- ref: ' @ 178e935a, 5f958c32 (docs/SOURCE_BANK_PREFLIGHT.md)'
+  title: Deleting a module left a test importing AND using its symbol, which NameErrors at pytest collection time
+  verdict: covered
+  bible_id: '12.03'
+  source: git-fixes
+- ref: ' @ 1a746c25 (tests/test_public_domain_sources.py)'
+  title: importlib.reload in one test replaced class objects, breaking another test's except clauses -- a failure that only
+    appeared when the two files ran adjacently
+  verdict: covered
+  bible_id: '12.81'
+  source: git-fixes
+- ref: ' @ 1bdfaaa7 (config/voice_reference_bank.json, nodes/_otr_voice_bank.py)'
+  title: 'A pool of one collapsed a seeded draw to a constant: kokoro shipped the same announcer 64/64, and head-of-sorted-pool
+    still did after data was added'
+  verdict: covered
+  bible_id: '10.04'
+  source: git-fixes
+- ref: ' @ 1e7d8aa4 (tests/test_model_catalog_schema.py, tests/test_canonical_headless_api.py)'
+  title: Licence guard stopped guarding because it string-matched widget values the runtime strips a badge suffix from
+  verdict: covered
+  bible_id: '04.11'
+  source: git-fixes
+- ref: ' @ 1e7d8aa4 (workflows/otr_canonical.json node 1)'
+  title: Saved COMBO value no longer offered by the live /object_info list -- red dropdown that could have silently run a
+    different model
+  verdict: covered
+  bible_id: '03.04'
+  source: git-fixes
+- ref: ' @ 27a4f97c (nodes/_otr_shared/scope_draw.py)'
+  title: stderr=PIPE read only after the whole stream was written -- classic ffmpeg pipe deadlock, and the child would never
+    have been reaped
+  verdict: covered
+  bible_id: '09.02'
+  source: git-fixes
+- ref: ' @ 27a4f97c (nodes/_otr_shared/scope_draw.py, tests/test_terminal_frame.py)'
+  title: A second, unaudited ffmpeg encoder existed because the roster gate grepped for literal call spellings, making its
+    assertion vacuously true
+  verdict: covered
+  bible_id: '12.74'
+  source: git-fixes
+- ref: ' @ 2f6d001d (nodes/_otr_content_authorship.py, nodes/_otr_ledger_freeze.py)'
+  title: A proof was minted from state a later cleanup could still invalidate, producing a coverage mismatch on an ordinary
+    script
+  verdict: covered
+  bible_id: '05.11'
+  source: git-fixes
+- ref: ' @ 2fc81f72 (nodes/_otr_banana_route.py, nodes/otr_image_gen_dispatcher.py)'
+  title: A blanket quoted-span shield made a transform silently under-fire with no crash and honest zero-substitution receipts
+  verdict: covered
+  bible_id: '11.51'
+  source: git-fixes
+- ref: ' @ 350ab0f0 (scripts/otr_w45_campaign.py)'
+  title: A comment described a fix that was never written -- a phantom helper name left the check unchanged and failed every
+    procedural leg
+  verdict: covered
+  bible_id: '12.74'
+  source: git-fixes
+- ref: ' @ 3943dd38 (nodes/OTR_LedgerScriptWriter.py, scripts/audit_spoken_citations.py)'
+  title: A fix landed in a function with zero callers; thirty more episodes shipped the identical defect after it 'landed'
+  verdict: covered
+  bible_id: '12.74'
+  source: git-fixes
+- ref: ' @ 4113f811 (scripts/otr_fetch_public_domain.py)'
+  title: Provenance SHA-256 was computed over CRLF bytes, so git's line-ending normalization made a clone fail its own attribution
+    check
+  verdict: covered
+  bible_id: '12.14'
+  source: git-fixes
+- ref: ' @ 4353095d (nodes/_otr_cast_voice_coverage.py, nodes/_otr_ledger_freeze.py)'
+  title: Two layers used different definitions of the same concept, so a row was skipped by one and hard-refused by the other
+  verdict: covered
+  bible_id: '12.05'
+  source: git-fixes
+- ref: ' @ 4353095d (nodes/_otr_content_authorship.py)'
+  title: A filter keyed on a phantom field with zero writers -- it had never excluded anything in 16,435 real rows
+  verdict: covered
+  bible_id: '12.24'
+  source: git-fixes
+- ref: ' @ 4506b1ed (tests/test_g9_sfw_ship_stop.py, nodes/cast_lock.py)'
+  title: A test filtered on a retired error-code prefix, so its comprehension was permanently empty and the assertion could
+    not fail for any reason
+  verdict: covered
+  bible_id: '04.11'
+  source: git-fixes
+- ref: ' @ 48e3c6fb (nodes/_otr_video_engines/wrapper_bridge.py, wan_shared.py)'
+  title: Encoder returned the frame count it was handed instead of the count in the file it wrote; a zero-frame batch exited
+    0 and produced a container with no video stream
+  verdict: covered
+  bible_id: '05.06'
+  source: git-fixes
+- ref: ' @ 496d9d57 (nodes/_otr_roster_gender.py, nodes/_otr_voice_node_common.py)'
+  title: An unnormalized field failed a raw equality test, so a character recorded as a woman was not female to the caster
+    and drew any voice
+  verdict: covered
+  bible_id: '12.43'
+  source: git-fixes
+- ref: ' @ 499541b6 (nodes/_otr_video_engines/eng_ltx_av.py)'
+  title: Bare int()/float() on env vars at MODULE SCOPE killed an adapter's import, and a broad except upstream hid the deregistration
+  verdict: covered
+  bible_id: '03.01'
+  source: git-fixes
+- ref: ' @ 51cf2938 (nodes/_otr_captions.py)'
+  title: 'Two consumers of one ledger field diverged: TTS spoke cleaned text, the caption burned the raw line into 255 shipped
+    cues'
+  verdict: covered
+  bible_id: '12.05'
+  source: git-fixes
+- ref: ' @ 51cf2938 (tests/test_otr_captions.py)'
+  title: A test file only passed because a sibling module polluted sys.path
+  verdict: covered
+  bible_id: '12.47'
+  source: git-fixes
+- ref: ' @ 53fcebff (nodes/_otr_video_engines/eng_ltx_video.py)'
+  title: Engine declared 21 legal frame lengths for a runtime that can render exactly one; the planner committed work and
+    the leg died 11.8 min in
+  verdict: covered
+  bible_id: '12.73'
+  source: git-fixes
+- ref: ' @ 5eb41c50 (scripts/otr_w45_campaign.py)'
+  title: Acceptance audit false-positived on slow motion and discarded a correct 142-minute render
+  verdict: covered
+  bible_id: '12.50'
+  source: git-fixes
+- ref: ' @ 606dc7f1 (nodes/_otr_image_engines/eng_cloud_image.py)'
+  title: A cloud image node's model parameter is a DYNAMICCOMBO_V3 dict, not a bare slug -- 'string indices must be integers'
+  verdict: covered
+  bible_id: '09.06'
+  source: git-fixes
+- ref: ' @ 65bd6705 (nodes/_otr_video_engines/render_driver.py)'
+  title: A beat-scope fix reached the return value only; the durable manifest kept publishing the last segment's value
+  verdict: covered
+  bible_id: '12.57'
+  source: git-fixes
+- ref: ' @ 6c9da7c8 (nodes/OTR_LedgerScriptWriter.py, nodes/cast_lock.py)'
+  title: meta["episode_seed"] was never written on four lanes, so every episode drew from one constant seed and every randomization
+    fix had nothing to move
+  verdict: covered
+  bible_id: '10.07'
+  source: git-fixes
+- ref: ' @ 6eebc7f7 (nodes/_otr_fable2_markup.py)'
+  title: A marker-balance check counted '**' as two '*', so unbalanced markdown escaped into accepted title and setting fields
+  verdict: covered
+  bible_id: '11.10'
+  source: git-fixes
+- ref: ' @ 76c9f565 (nodes/_otr_gguf_backend.py)'
+  title: The pipeline only worked because an env var happened to survive a reboot -- a green run resting on a remembered export
+  verdict: covered
+  bible_id: '12.47'
+  source: git-fixes
+- ref: ' @ 76c9f565 (scripts/otr_w45_campaign.py)'
+  title: A client-side result timeout did not cancel the server job, so a stranded render kept running and the next leg silently
+    queued behind the ghost
+  verdict: covered
+  bible_id: '12.46'
+  source: git-fixes
+- ref: ' @ 805123ea, 414997f4 (nodes/_otr_gguf_backend.py, tests/test_gguf_registry.py, docs/PROD_BUG_LOG.md)'
+  title: Model-registry row's placeholder context window understated the real GGUF 32x, making the writer pass structurally
+    impossible
+  verdict: covered
+  bible_id: '11.28'
+  source: git-fixes
+- ref: ' @ 80935627 (nodes/_otr_video_engines/eng_wan_ti2v.py)'
+  title: A scripted refactor rewrote a module's __all__ into literal 'self.'-prefixed strings, and the whole suite was blind
+    to it
+  verdict: covered
+  bible_id: '12.85'
+  source: git-fixes
+- ref: ' @ 80935627 (nodes/_otr_video_engines/eng_wan_ti2v.py, wan_shared.py)'
+  title: 'Three identity fields were null on a fully successful episode: the consumer plumbing was complete but no adapter
+    ever produced them'
+  verdict: covered
+  bible_id: '12.44'
+  source: git-fixes
+- ref: ' @ 89e82181 (nodes/otr_image_gen_dispatcher.py, nodes/_otr_image_engines/z_image_turbo.py)'
+  title: Every beat derived its own seed, so a character's face was re-invented on every beat
+  verdict: covered
+  bible_id: '05.01'
+  source: git-fixes
+- ref: ' @ 8c5449db (nodes/_otr_video_engines/eng_ltx_video.py)'
+  title: An env var read at render time could still move the bound a static contract had frozen
+  verdict: covered
+  bible_id: '12.73'
+  source: git-fixes
+- ref: ' @ 8d0593ff (scripts/otr_w45_campaign.py)'
+  title: Verifier asserted the engine under test must be the ONLY engine in the ledger, failing a 97-minute leg that had actually
+    succeeded
+  verdict: covered
+  bible_id: '12.50'
+  source: git-fixes
+- ref: ' @ 8f41af27 (workflows/variants/*.json, tests/test_canonical_widget_input_parity.py)'
+  title: Orphan widgets_values entry with no INPUT_TYPES descriptor silently discarded a real configured cap in eleven shipped
+    workflow JSONs
+  verdict: covered
+  bible_id: '04.02'
+  source: git-fixes
+- ref: ' @ 99349330 (config/.../public_domain/faithful_radio_adaptation.json, folger_scene_adaptation.json)'
+  title: A clause deleted from prompt JSON left its separating comma, so four live prompts read as truncated instructions
+    to the model
+  verdict: covered
+  bible_id: '12.03'
+  source: git-fixes
+- ref: ' @ 9e440021 (nodes/_otr_video_engines/motion_common.py, render_driver.py)'
+  title: An admission guard asked whether a cost row EXISTS rather than whether it is qualified, re-arming a refusal that
+    would have killed every ordinary render
+  verdict: covered
+  bible_id: '11.44'
+  source: git-fixes
+- ref: ' @ a14ecdfa (nodes/otr_credits_roll.py)'
+  title: The terminal node of the graph refused a fully rendered episode because it hunted the clip manifest for a clip KIND
+    one engine never produces
+  verdict: covered
+  bible_id: '11.18'
+  source: git-fixes
+- ref: ' @ aa192a9a (nodes/scene_sequencer.py, config/profiles/widget_mapping.json)'
+  title: A dead widget (default_tts) shipped on OTR_SceneSequencer -- declared, saved into the workflow JSON, never consumed
+  verdict: covered
+  bible_id: '12.24'
+  source: git-fixes
+- ref: ' @ aaaf660a (nodes/_otr_model_catalog.py, docs/PROD_BUG_LOG.md PBUG-20260716-01)'
+  title: Model dropdown mislabeled on-disk models NOT DOWNLOADED because the scanner never read HF_HUB_CACHE and gated on
+    a snapshots/ dir instead of real weights
+  verdict: covered
+  bible_id: '02.16'
+  source: git-fixes
+- ref: ' @ aca2a04b (nodes/otr_credits_roll.py, nodes/video_engine.py)'
+  title: One scroll-speed constant changed twice and the second scroller implementation never heard about it
+  verdict: covered
+  bible_id: '12.05'
+  source: git-fixes
+- ref: ' @ b00b047f (docs/2026-07-31-NEWBUG-scene-sequencer-music-sockets.md)'
+  title: INPUT_TYPES advertises two sockets the node's FUNCTION cannot accept (TypeError at execution)
+  verdict: covered
+  bible_id: '04.14'
+  source: git-fixes
+- ref: ' @ b1f2ee86 (nodes/_otr_video_engines/wan_shared.py, wrapper_bridge.py)'
+  title: ffmpeg rawvideo -s declared even-rounded dimensions while the pipe carried the real ones; an odd canvas skewed every
+    row behind exit code 0, and the test pinned the defect as the contract
+  verdict: covered
+  bible_id: '12.73'
+  source: git-fixes
+- ref: ' @ b2060a31 (prestartup_script.py)'
+  title: prestartup_script.py raised UnicodeEncodeError on a cp1252 console every boot; PRESTARTUP FAILED banner was a red
+    herring and a silent trapdoor
+  verdict: covered
+  bible_id: '02.15'
+  source: git-fixes
+- ref: ' @ bd05f696 (nodes/_otr_casting.py, nodes/_otr_public_domain_sources.py)'
+  title: Authoritative source data already on disk was never loaded, so a roster attribute was rolled by RNG and 44 of 176
+    shipped rows contradicted their own sidecar
+  verdict: covered
+  bible_id: '12.54'
+  source: git-fixes
+- ref: ' @ cdf8bffb (beat-keyed source window module)'
+  title: A per-key short-work fallback made sibling beats disagree, so an adapted scene quoted one identical mid-passage on
+    every beat and arcs could run backwards
+  verdict: covered
+  bible_id: '11.60'
+  source: git-fixes
+- ref: ' @ cdf8bffb (source-window module, tests)'
+  title: A prompt fence could be broken out of by source text containing the literal end delimiter -- injection whose author
+    is just a book
+  verdict: covered
+  bible_id: '10.01'
+  source: git-fixes
+- ref: ' @ d065b62c (tests/test_cast_randomization.py)'
+  title: A test asserted nothing because hasattr() checked a misspelled private name and the conditional collapsed to True
+  verdict: covered
+  bible_id: '12.74'
+  source: git-fixes
+- ref: ' @ d4e51b4d (nodes/production_ledger.py, nodes/cast_lock.py)'
+  title: The ledger never recorded which gender the voice actually presented as, so no audit could check the casting
+  verdict: covered
+  bible_id: '12.44'
+  source: git-fixes
+- ref: ' @ f240e835 (nodes/otr_image_gen_dispatcher.py, nodes/_otr_story_brief_helpers.py)'
+  title: Windows os.altsep is '/', so a path guard refused ordinary prose and the beat rendered no image
+  verdict: covered
+  bible_id: '07.18'
+  source: git-fixes
+- ref: ' @ f5021f4b (nodes/_otr_video_engines/motion_common.py, tests/test_session_ctx_ownership.py)'
+  title: Base class accepted a kwarg and dropped it; two subclasses re-added it privately and worked while four siblings silently
+    degraded
+  verdict: covered
+  bible_id: '11.44'
+  source: git-fixes
+- ref: ' @ f5a5d174 (nodes/_otr_voice_bank.py, nodes/cast_lock.py)'
+  title: A shared fallback draw never received the used-set, so two rows could land on the identical voice under a no-reuse
+    policy
+  verdict: covered
+  bible_id: '07.21'
+  source: git-fixes
+- ref: ' @ f75c2c45 (nodes/_otr_video_engines/eng_ltx_video.py, eng_ltx_av.py, tests/test_multiclip_session_identity_roster.py)'
+  title: A required per-engine capability method was added one engine at a time with no roster gate, so a live leg refused
+    730 seconds in
+  verdict: covered
+  bible_id: '12.73'
+  source: git-fixes
+- ref: '_otr_indextts2_worker.err (3 occurrences, lines ~21609, ~31982, ~31991; also fires at the readiness write `emit({"ready":
+    True})` on line 69 of scripts/_otr_indextts2_worker.py). Code: scripts/_otr_indextts2_worker.py:28 (`emit` has no try/except),
+    :105 (error path calls `emit` again); nodes/_otr_audio_engines/eng_indextts2.py:113 (`proc.stdout.readline()` blocks with
+    no readiness timeout).'
+  title: 'IndexTTS2 sidecar worker: protocol write raises OSError [Errno 22], and the except-handler re-uses the same dead
+    channel so the worker dies unhandled and the parent never gets an error line'
+  verdict: covered
+  bible_id: '02.14'
+  source: loose-logs
+- ref: _otr_indextts2_worker.err — 275 occurrences, one per worker launch (first at line ~6). The `None + str` is an unset
+    CUDA_HOME being concatenated into a compile path; the message names no variable, no path, and no remediation, and the
+    run continues on the fallback vocoder.
+  title: BigVGAN custom CUDA kernel fails to build in the isolated IndexTTS2 venv and the failure is printed as a bare exception
+    repr before silently degrading to the slow torch path — 275 times
+  verdict: covered
+  bible_id: '11.05'
+  source: loose-logs
+- ref: gemma_smoke_status.txt, tmp_bible.log, tmp_suite.log (BOM); tmp_pytest.txt, scifi_smoke_codex.log, scifi_pinned_codex.log,
+    scifi_pinned_gemini.log, scifi_pinned_sonnet.log, smoke_media_archive.log, smoke_science_news.log, smoke_shakespeare.log,
+    smoke_public_domain_story.log, smoke_scifi_fable2.log, task-cricket-run-20260723-004303.log (UTF-16LE). Verified with
+    `head -c 4 <file> | xxd`.
+  title: Harness log files written through PowerShell redirection carry a UTF-8 BOM or are UTF-16LE, breaking plain-text greps
+    and byte comparisons
+  verdict: covered
+  bible_id: '02.12'
+  source: loose-logs
+- ref: kibitz_smoke_r1.log; kibitz_smoke_r2.log / r3 / r4 show the later "[FAILED] antigravity (quota preflight)" form. Bare,
+    reason-free rc=1 lane failures also in _kibitz_r4.out ("[FAILED] antigravity (rc=1) -> antigravity.md") and tmp_kibitz_r2.log
+    ("[FAILED] codex (rc=1, model=gpt-5.5)").
+  title: 'Kibitz review fan-out: an external agent lane exits rc=1 on provider quota exhaustion and writes an empty review
+    file; the r1 run gave no reason at all and only later rounds gained a preflight diagnostic'
+  verdict: covered
+  bible_id: '12.39'
+  source: loose-logs
+- ref: otr_runtime.log lines 19244-19253 (episode 1) and 19261-19270 (episode 2).
+  title: NewsCuration and NewsCurationDeep phases blew their wall-clock budgets on two consecutive episodes with the model
+    never reaching GPU, and the timeout handler deliberately leaves an orphan worker holding the model reference
+  verdict: covered
+  bible_id: '12.46'
+  source: loose-logs
+- ref: 'quantize_gemma.log (last 4 lines). The same path is then recorded as the model in tmp_gemma_q4_download.log: "C:/ComfyUI-Models/LLM/converted/gemma-4-12b-it/gemma-4-12b-it-Q4_K_M.gguf".'
+  title: Failed llama-quantize left a plausible-looking 0.01 GB .gguf at the canonical output path and a downstream log recorded
+    that path as the Q4_K_M model
+  verdict: covered
+  bible_id: '12.50'
+  source: loose-logs
+- ref: run-20260723-003628-span-lla28.err.log (whole file). The mangled title survives into the successful sibling run as
+    episode_title='SPAN_TE_PI;LLA28' in task-20260723-003614-soak.log.
+  title: 'PowerShell-launched CLI run: a semicolon inside an episode title split the command line, so argparse rejected the
+    tail as unrecognized arguments'
+  verdict: covered
+  bible_id: '12.84'
+  source: loose-logs
+- ref: scifi_smoke_codex.log (UTF-16LE, last 2 lines). Same bank succeeded in scifi_pinned_codex.log once a --set OTR_LedgerScriptWriter.custom_premise
+    was pinned.
+  title: OTR_LedgerScriptWriter hard-raises and kills the whole prompt when no live RSS candidate clears the v4 source floor
+  verdict: covered
+  bible_id: '11.49'
+  source: loose-logs
+- ref: task-20260723-003614-soak.log lines 149-182; same block in task-cricket-server-visible.log lines 149-186 and task-cricket-server-20260723-004236.log.
+  title: Stray sibling directories under custom_nodes with no __init__.py produce a permanent IMPORT FAILED traceback on every
+    ComfyUI boot in OTR's own soak logs
+  verdict: covered
+  bible_id: '12.23'
+  source: loose-logs
+- ref: 'task-cricket-run-20260723-004303.log (UTF-16LE tail). Raised from scripts/otr_api.py:211 via patch_widget_by_name
+    (:453) <- patch_creative (:799) <- scripts/otr_canonical_api_run.py:119/160/210. Related surface drift: tmp_codex56_gemma_smoke.log
+    records the same widget as ''google/gemma-4-E4B-it [LOCAL HF]'' while the COMBO list carries the bare id.'
+  title: CLI model shorthand rejected by the node's COMBO choice list — episode dies before queueing with ValueError from
+    _validate_widget_value
+  verdict: covered
+  bible_id: '03.04'
+  source: loose-logs
+- ref: task-cricket-server-visible.log lines 58-61 (prestartup x2), 131-133 and 172-174 (node + route registration x2), 201-202
+    (both import paths). Same double-load in task-20260723-003614-soak.log and task-cricket-server-20260723-004236.log.
+  title: ComfyUI-OldTimeRadio loaded twice in one ComfyUI process from two custom_nodes roots — prestartup runs twice, all
+    34 nodes register twice, and the pack's HTTP routes are registered twice
+  verdict: covered
+  bible_id: '03.06'
+  source: loose-logs
+- ref: tmp_pytest.txt (UTF-16LE, last 5 lines; no traceback was captured in the file).
+  title: 'Known-fail guard caught a live regression: test_sequencer_processes_dialogue_skips_music failed outside the expected-failure
+    allowlist'
+  verdict: covered
+  bible_id: '12.35'
+  source: loose-logs
+- ref: 'tmp_suite.log lines 1-6 and tail. Same pattern in tmp_pytest.txt, tmp_codex56_fullpytest.log, and quantize_gemma.log
+    ("llama-quantize.exe : load_backend: loaded RPC backend ... FullyQualifiedErrorId : NativeCommandError").'
+  title: PowerShell `2>&1 | Out-File` turns the conftest's benign stderr banner into a NativeCommandError/RemoteException
+    block, so a fully green suite reads as a failed command
+  verdict: covered
+  bible_id: '12.11'
+  source: loose-logs
+- ref: watcher.log:88 (the 87 lines before it are RUNNING heartbeats). Corroborated by gemma_smoke_status.txt, whose entire
+    content is "GEMMA_SMOKE=0".
+  title: Local Gemma-4-E4B creative lane hung for 29 minutes and produced no asset with nothing in the server log — only an
+    external watchdog caught it
+  verdict: covered
+  bible_id: '12.33'
+  source: loose-logs
+- ref: kibitz-runs/2026-07-08-av-dialogue-video/r1/final.md item 2
+  title: build_request() hardcodes base_clip_ref=None while the lipsync_overlay schema declares it required, so the engine
+    cannot be selected
+  verdict: covered
+  bible_id: '12.73'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-07-08-av-dialogue-video/r1/final.md item 3
+  title: Audio mux takes the master_copy branch whenever sfx_bed_path is empty, so replacement rows bypass the PCM mix path
+  verdict: covered
+  bible_id: '05.08'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-07-08-av-dialogue-video/r1/final.md item 4 (and r3/final.md item 7)
+  title: OTR_MasterAudioMux.IS_CHANGED returns hash(manifest) -- neither stable across processes nor sensitive to the files
+    the manifest references
+  verdict: covered
+  bible_id: '12.55'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-07-08-scope-accel/r3/final.md
+  title: 'Widget slot map cannot be derived from INPUT_TYPES order: a widget converted to a link-connected input still occupies
+    its saved widgets_values slot'
+  verdict: covered
+  bible_id: '04.09'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-07-08-scope-accel/r3/final.md
+  title: Test pins a specific widget as the LAST optional widget, so any append-only INPUT_TYPES change breaks it
+  verdict: covered
+  bible_id: '04.01'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-07-08-scope-accel/r3/final.md
+  title: 'Same fps parameter has two authorities: planning reads it from the manifest while rendering hard-locks it to 25'
+  verdict: covered
+  bible_id: '12.05'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-07-08-scope-accel/r3/final.md
+  title: 'Windows portability in probe/encode tooling: EGL context path attempted on Windows, and a POSIX null path used as
+    an ffmpeg sink'
+  verdict: covered
+  bible_id: '09.08'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-07-12-dynamic-story-visual/r1/judgment.md M2
+  title: 'Bare except Exception: pass around the visual-style composer swallows a failure that must abort the run'
+  verdict: covered
+  bible_id: '05.07'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-07-12-dynamic-story-visual/r2/judgment.md row 10
+  title: Dropdown registry test asserts choices == registry exactly, so adding a sentinel option breaks it
+  verdict: covered
+  bible_id: '03.04'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-07-12-dynamic-story-visual/r2/judgment.md row 10
+  title: Node/link counters and the freeze fan-out list had to be corrected against the real workflow JSON before insertion
+    (last_node_id=95, last_link_id=283)
+  verdict: covered
+  bible_id: '12.06'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-07-12-dynamic-story-visual/r2/judgment.md row 12
+  title: IS_CHANGED returning time.time() on the writer and freeze cascade makes a deterministic replay leg impossible
+  verdict: covered
+  bible_id: '06.07'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-07-12-dynamic-story-visual/r2/judgment.md row 6
+  title: Doc describes a top-level beats array that does not exist; beats are derived inside ShotLock and the opening music
+    beat is synthesized later
+  verdict: covered
+  bible_id: '12.58'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-07-12-dynamic-story-visual/r2/judgment.md row 8
+  title: Two incompatible generate-function signatures are used interchangeably, and make_generate_fn enforces no context
+    cap
+  verdict: covered
+  bible_id: '09.06'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-07-12-dynamic-story-visual/r2/judgment.md row 9
+  title: 'VRAM guarantee is false: the downstream node reloads the writer LLM immediately after the upstream node unloads
+    it'
+  verdict: covered
+  bible_id: '07.01'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-07-12-dynamic-story-visual/r2/judgment.md row S2
+  title: Canonical hasher falls back to repr() and never raises, so a fail-closed seal can hash unhashable content
+  verdict: covered
+  bible_id: '12.55'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-07-12-dynamic-story-visual/r2/judgment.md row S3
+  title: A test-mode env flag makes stamp_durable skip disk writes, so the merge-survival test cannot exercise the durable
+    path it claims to cover
+  verdict: covered
+  bible_id: '12.74'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-07-12-dynamic-story-visual/r2/judgment.md rows 5 and 7
+  title: 'Migration missed its two deepest consumers: derive_image_prompts has no ledger param and render_driver calls the
+    meta-only resolver directly'
+  verdict: covered
+  bible_id: '12.03'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-07-12-dynamic-story-visual/r3/judgment.md row 10 (and 2026-08-05-continuity-r3r4/r3/judgment.md M5)
+  title: Cache-hit path clones the previous row, so a conditionally stamped field inherits a stale value and the audit chain
+    is not durable
+  verdict: covered
+  bible_id: '12.44'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-07-12-dynamic-story-visual/r3/judgment.md row 2
+  title: Tolerant validator silently clamps over-long authored strings and accepts them with only a log.warning
+  verdict: covered
+  bible_id: '12.25'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-07-13-otr-shakespeare-live-failure/r1/judgment.md
+  title: update_line_text rewrites text and counts but never clears stale skip metadata, so a successful reroll still fails
+    freeze with needs_full_rerun
+  verdict: covered
+  bible_id: '05.11'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-07-23-2026-07-23-video-failure-inventory/r1/input.md (Non-terminal warning inventory)
+  title: Successful video runs still emit MISSING-STILL (LOUD) warnings the code calls unreachable, so a passing composite
+    hides degraded text-only shots
+  verdict: covered
+  bible_id: '08.08'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-07-23-2026-07-23-video-failure-inventory/r1/input.md (Receipt-integrity defect)
+  title: Campaign harness recorded 6/6 PASS while a leg's own stdout carried RESULT FAIL and its receipt recorded status=PASS
+    exit_code=0
+  verdict: covered
+  bible_id: '12.50'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-07-23-2026-07-23-video-failure-inventory/r1/input.md (Terminal failure inventory)
+  title: 'Image phase emitted a deficient ledger: still_word, mesh_stage and ltx_video legs all died because a required per-beat
+    init image was never minted'
+  verdict: covered
+  bible_id: '05.08'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-07-23-2026-07-23-video-failure-inventory/r1/input.md (Terminal failure inventory)
+  title: Safety cleanup left a voiced dialogue row cleaned to empty spoken text, so freeze returned needs_full_rerun and CastLock
+    refused the render
+  verdict: covered
+  bible_id: '07.20'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-07-27-bug-triage/r1/claude.md item 2
+  title: encode_frames_to_silent_mp4 returns the input batch dimension instead of re-probing what ffmpeg wrote -- eight engine
+    call sites over-report frame counts
+  verdict: covered
+  bible_id: '05.06'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-07-27-bug-triage/r1/input.md A1 (CONFIRMED in r1/codex.md item 1)
+  title: GGUF loader path dispatches before the VRAM policy gate and checks physical free VRAM instead of the profile ceiling,
+    so an 8.13 GB writer passes an 8 GB tier
+  verdict: covered
+  bible_id: '04.11'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-07-27-bug-triage/r1/input.md A2 (CONFIRMED in r1/codex.md item 4)
+  title: Applied-overrides summary reports only three channels, hiding a profile that replaced the entire LLM configuration
+  verdict: covered
+  bible_id: '12.40'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-02-cast-member-voice/r2/judgment.md (THE ACTUAL MECHANISM)
+  title: Coverage proof was minted before a later pass emptied the rows and set skip=True, so a cast member ships silent under
+    a read-only content policy
+  verdict: covered
+  bible_id: '11.32'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-02-contract-vs-runtime/r3/judgment.md A1
+  title: Canvas env var is read at render time but exported at boot, so any test over shipped profiles is structurally blind
+    to it and the static frame contract stays invalidatable
+  verdict: covered
+  bible_id: '12.73'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-02-contract-vs-runtime/r3/judgment.md A4
+  title: A decode-floor constant's comment named the wrong canvas, and the floor is applied unconditionally at both canvases
+    -- the shipped contract is more restrictive than the hardware requires
+  verdict: covered
+  bible_id: '12.73'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-03-writer-scaffolding/r1/judgment.md
+  title: The exact code needed for draft re-supply already exists as dead code with no production caller
+  verdict: covered
+  bible_id: '12.74'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-03-writer-scaffolding/r1/judgment.md (THE CONVERGENCE)
+  title: 'The "repair" ladder never re-supplies the rejected draft: raw is parsed then discarded and the defect list cites
+    line numbers into a document the model cannot see'
+  verdict: covered
+  bible_id: '11.20'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-03-writer-scaffolding/r1/judgment.md row 12
+  title: Scripted-ladder tests silently pass because an under-supplied fake generator raises StopIteration, masking the assertion
+  verdict: covered
+  bible_id: '12.68'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-03-writer-scaffolding/r1/judgment.md row 7
+  title: Exhaustion message reports a defect it cannot know, because last_defect_text is only set on parse rejection
+  verdict: covered
+  bible_id: '12.60'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-04-d1-still-unmaterialized/r2/judgment.md row MF2
+  title: Un-escaped prompt content in log lines allows log-record forgery via embedded newlines
+  verdict: covered
+  bible_id: '12.83'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-04-d1-still-unmaterialized/r2/judgment.md row MF4
+  title: Log rotation in the boot launcher has eight callers depending on %1, and a rotation failure silently truncates the
+    evidence the instrumentation exists to protect
+  verdict: covered
+  bible_id: '12.05'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-04-d1-still-unmaterialized/r2/judgment.md row SF1
+  title: Diagnostic state is seeded from a PRIOR ledger revision, so the "no_row" verdict is misleading across revisions
+  verdict: covered
+  bible_id: '12.57'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-04-d1-still-unmaterialized/r2/judgment.md rows MF1 / MF5
+  title: Skip-evidence warning carries only str(exc) with no object id, and naive substring attribution confuses still_b1
+    with still_b12
+  verdict: covered
+  bible_id: '12.44'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-05-2026-08-05-item8-voice-portrait/r1/judgment.md (PBUG-20260805-02)
+  title: Voice-assignment replay cannot accept the writer's source character names, so it burns RNG draws the writer never
+    spent -- gender sequence diverges on 74% of seeds
+  verdict: covered
+  bible_id: '12.51'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-05-2026-08-05-item8-voice-portrait/r1/judgment.md row A5
+  title: Portrait gender anchor tests a raw un-normalized value, so 40 live rows spelled Male/Female receive no anchor at
+    all
+  verdict: covered
+  bible_id: '12.43'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-05-2026-08-05-item8-voice-portrait/r1/judgment.md row A8
+  title: cast_lock_revision increments per RUN, not per policy change, so it cannot serve as the pre/post consistency boundary
+    it was used as
+  verdict: covered
+  bible_id: '12.51'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-05-2026-08-05-item8-voice-portrait/r1/judgment.md rows A2 / REJECTED
+  title: Sci-fi lane hardcodes an all-male voice-preset triple keyed on char_id and never reads gender, so a female row is
+    handed a male preset
+  verdict: covered
+  bible_id: '10.06'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-05-bug-sprint/r1_input.md (Repo hygiene)
+  title: .gitignore pattern /tmp_* misses the tmp/ directory by one character -- 6,308 untracked files / 272 MB in every git
+    status
+  verdict: covered
+  bible_id: '12.82'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-05-bug-sprint/r1_input.md Q6
+  title: A regression test asserted nothing at all because it guarded on a misspelled symbol
+  verdict: covered
+  bible_id: '12.74'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-05-bug-sprint/r1_input.md item A
+  title: Deleting a list item from four live prompt strings left its separating comma, so each prompt ends mid-sentence on
+    ",."
+  verdict: covered
+  bible_id: '12.03'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-05-bug-sprint/r1_input.md item D
+  title: Announcer voice pool duplicated across a config module and the audio engine with nothing enforcing the sync
+  verdict: covered
+  bible_id: '09.04'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-05-bug-sprint/r1_input.md item E
+  title: Engine and voice bank drew the announcer from one pool with two different seeded formulas, so the ledger names one
+    voice and the render opens another
+  verdict: covered
+  bible_id: '12.41'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-05-bug-sprint/r1_input.md item F
+  title: A third inline copy of the gender-agnostic voice draw differed only in its seed suffix, so a cloud row and its local
+    twin resolved to different bank entries
+  verdict: covered
+  bible_id: '12.74'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-05-bug-sprint/r1_input.md item G
+  title: Path-detection guard rejects os.altsep, which on Windows is "/", so ordinary prose ("a black/white striped scarf")
+    suppressed the still for that beat
+  verdict: covered
+  bible_id: '11.59'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-05-bug-sprint/r1_input.md item J
+  title: Forbidden-identifier gate builds its input from git diff, so untracked new modules are invisible to it -- green,
+    then red on first commit
+  verdict: covered
+  bible_id: '12.79'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-05-bug-sprint/r1_input.md item J
+  title: Synthetic diff hunk omitted the @@ header, so the sweep's hunk regex never entered a hunk and silently scanned nothing
+  verdict: covered
+  bible_id: '12.74'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-05-continuity-r3r4/r3/judgment.md M1
+  title: A hoisted local is referenced from an outer scope, raising NameError on every cast
+  verdict: covered
+  bible_id: '05.10'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-05-continuity-r3r4/r3/judgment.md M2
+  title: Ledger writer copies selected meta keys by name, so any newly stamped key is silently dropped before durable write
+  verdict: covered
+  bible_id: '12.57'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-05-item7-citation/r2/judgment.md (The one place I overrule Codex)
+  title: Prompt scaffolding (source URL, rights labels) leaked into spoken dialogue on 84 published lines across 30 episodes
+  verdict: covered
+  bible_id: '12.60'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-05-item7-citation/r2/judgment.md finding G1
+  title: Conditional stamping (if _coda:) leaves the key absent on the empty case, so "key in meta" is not a valid ownership
+    test
+  verdict: covered
+  bible_id: '12.64'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-05-item7-citation/r2/judgment.md finding G2
+  title: 'Receipt chain is dead: the finalizer has no callers anywhere and two of its flags have consumption sites but no
+    producer'
+  verdict: covered
+  bible_id: '12.74'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-05-item7-citation/r2/judgment.md finding G3
+  title: Chosen control lane dispatches to a different runner and returns before the code under test, so the control proved
+    nothing
+  verdict: covered
+  bible_id: '12.74'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-05-shipped-qa/r4/driver_judgment.md section 1
+  title: 'Vacuous test: assertion filters on a retired error prefix (permanently empty) and also sits inside an except block
+    so it may never execute'
+  verdict: covered
+  bible_id: '12.74'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-05-shipped-qa/r4/driver_judgment.md section 3
+  title: Halt-path operator message offers a block class that can no longer occur after a feature rip
+  verdict: covered
+  bible_id: '12.03'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-05-shipped-qa/r4/driver_judgment.md section 4
+  title: Dead projection dict is built by walking every line, then returned past without ever being read
+  verdict: covered
+  bible_id: '12.24'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-05-shipped-qa/r4/driver_judgment.md section 5
+  title: Image seed is derived from the prompt hash, so removing a text sanitizer silently moves every derived still; portrait
+    hashes cascade to scene characters
+  verdict: covered
+  bible_id: '10.09'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-06-2026-08-06-matrix-pattern/r1/judgment.md (SHARPEST FINDING / D1)
+  title: Generated doc contradicts itself because prose numbers are literals in the generator, and the drift gate compares
+    the file to a re-render of itself
+  verdict: covered
+  bible_id: '12.05'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-06-2026-08-06-matrix-pattern/r1/judgment.md (THE DIRECT CONFLICT)
+  title: 'Taxonomy field cannot distinguish two behaviours: SFX engines declare family="text_to_video" identically to the
+    silent adapters yet emit an audio stem'
+  verdict: covered
+  bible_id: '07.23'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-06-2026-08-06-matrix-pattern/r1/judgment.md row D2
+  title: Video engine registry swallows each adapter import individually, so a broken adapter vanishes entirely and has no
+    blank row to validate
+  verdict: covered
+  bible_id: '03.01'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-06-2026-08-06-multiclip-honesty/r2/judgment.md (THE DRIVER'S OWN FINDING, M8)
+  title: ltx_8gb computes and logs its native frame count then drops it, emitting no honesty receipt, so the grader indicts
+    an honest lane
+  verdict: covered
+  bible_id: '12.51'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-06-2026-08-06-multiclip-honesty/r2/judgment.md row A10
+  title: Manifest test asserts the literal source spelling of a line instead of the value it computes
+  verdict: covered
+  bible_id: '12.74'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-06-2026-08-06-multiclip-honesty/r2/judgment.md row A4
+  title: None (missing receipt) and "none" (no padding) conflated during aggregation, synthesizing a clean value from a beat
+    with a hole
+  verdict: covered
+  bible_id: '12.64'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-06-2026-08-06-multiclip-honesty/r2/judgment.md row A5
+  title: Malformed native_frame_count crashes the acceptance grader with ValueError instead of reporting a finding
+  verdict: covered
+  bible_id: '11.18'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-06-2026-08-06-multiclip-honesty/r2/judgment.md row A7
+  title: Per-segment data is written to memory but never reaches the durable manifest (segment_count appears in zero output
+    JSONs)
+  verdict: covered
+  bible_id: '12.44'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-06-banana-route-qa-fixes/r2/judgment.md (ADDENDUM item 4; render-killer section)
+  title: A whitespace scrub can empty its input and hit a NO-FALLBACK ValueError, killing the episode on 1,294 inputs that
+    compose fine today
+  verdict: covered
+  bible_id: '11.56'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-06-banana-route-qa-fixes/r2/judgment.md (ADDENDUM item 9; headline item 1)
+  title: Backward retreat loop in cap_phrase_safe amputates a multi-word replacement mid-phrase (68 splits in 3,641 cases)
+  verdict: covered
+  bible_id: '12.60'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-06-banana-route-qa-fixes/r2/judgment.md (Grounded and FOLDED)
+  title: select_varieties documented as returning dict[str, str] but actually returns int indices
+  verdict: covered
+  bible_id: '12.73'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-06-banana-route-qa-fixes/r2/judgment.md (headline item 2a)
+  title: 'Case-asymmetric matching: only the haystack is lowered, so a constant carrying a capital makes rfind return -1 and
+    the fix becomes a silent no-op'
+  verdict: covered
+  bible_id: '12.43'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-06-banana-route-qa-fixes/r2/judgment.md (headline item 2b)
+  title: 'Empty-needle search: rfind("") returns len(text), so an absent clause is worse than no clause and the whole tail
+    becomes trimmable'
+  verdict: covered
+  bible_id: '12.64'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-06-banana-route-qa/r4/judgment.md section 1
+  title: _committed_profile_ids() globs the filesystem instead of git, so --all would generate variants for six untracked
+    profiles
+  verdict: covered
+  bible_id: '12.25'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-06-banana-route-qa/r4/judgment.md section 1
+  title: 'Documented build command is impossible: --all/--profiles/--check are a mutually exclusive group with required=True,
+    so the bare invocation exits 2'
+  verdict: covered
+  bible_id: '12.73'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-06-banana-route-qa/r4/judgment.md section 7
+  title: Workflow parity test silently skips four .env.json variants, so claimed coverage of 15 files is really 11
+  verdict: covered
+  bible_id: '12.74'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-06-banana-route/r1/judgment.md (Fable items)
+  title: Prompt length cap runs BEFORE the text transform that lengthens the prompt, so substitutions blow the budget the
+    trim just enforced
+  verdict: covered
+  bible_id: '12.60'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-06-banana-route/r1/judgment.md (THE HEADLINE)
+  title: 'Substitution source token collides with domain vocabulary: "shot" rewrites "cinematic establishing shot" on the
+    majority of prompts'
+  verdict: covered
+  bible_id: '12.61'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-06-banana-route/r1/judgment.md (THE SECOND FINDING)
+  title: 'Ordered string-replacement table is not closed under its own outputs: a later row re-matches an earlier row''s replacement
+    in ONE pass'
+  verdict: covered
+  bible_id: '11.58'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-06-banana-route/r1/judgment.md conflict 4
+  title: 'Word-boundary regex under-matches compounds: \bgun\b cannot reach gunfire / gunshot / gunman'
+  verdict: covered
+  bible_id: '11.19'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-06-rip-sfx/r1/judgment.md
+  title: monkeypatch.setattr raises on a missing attribute, so removing a symbol turns a conformance test red for the wrong
+    reason
+  verdict: covered
+  bible_id: '12.03'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-06-rip-sfx/r1/judgment.md (CONFIRMED -- folded in)
+  title: A module-scope import of a helper marked for deletion is still called by a surviving engine, so deleting the helper
+    alone is a startup ImportError
+  verdict: covered
+  bible_id: '12.03'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-06-rip-sfx/r1/judgment.md (script classifications)
+  title: A retired-feature quality flag left armed in the soak operator would false-positive on every new episode
+  verdict: covered
+  bible_id: '12.03'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-07-shield-scoping/r2/judgment.md
+  title: Unit test composes the transform and the hash directly, bypassing the dispatcher, so an inverted branch at the real
+    call site would still pass
+  verdict: covered
+  bible_id: '12.74'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-07-shield-scoping/r2/judgment.md (The catch that would have broken the build on contact)
+  title: Merged spec contradicted itself on the argument name, so a literal implementation ships a TypeError at both production
+    call sites on first run
+  verdict: covered
+  bible_id: '12.05'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-07-small-sprint-items/r3/judgment.md
+  title: 'Legacy schema allowlist is incomplete: 10 real ledgers carry a version that is not in LEGACY_SCHEMA_VERSIONS'
+  verdict: covered
+  bible_id: '12.39'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-07-small-sprint-items/r3/judgment.md (HEADLINE, measurement)
+  title: save_ledger_safe unconditionally restamps schema_version, so a routine write-back promotes historical ledgers and
+    the audit reports a false regression (43 of 48 exposed)
+  verdict: covered
+  bible_id: '12.56'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-07-small-sprint-items/r3/judgment.md (REJECTED)
+  title: A predicate helper has no callers anywhere and no fixture matches it -- changing it adds no coverage
+  verdict: covered
+  bible_id: '12.74'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-07-small-sprint-items/r3/judgment.md row B1
+  title: Helper's declared parameter names do not match the names its body reads
+  verdict: covered
+  bible_id: '05.07'
+  source: qa-kibitz
+- ref: kibitz-runs/2026-08-07-small-sprint-items/r3/judgment.md row B4
+  title: Test stays green against an invented future schema version instead of the production constant
+  verdict: covered
+  bible_id: '12.74'
+  source: qa-kibitz
