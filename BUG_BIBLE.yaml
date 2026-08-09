@@ -831,7 +831,8 @@ bugs:
   phase: 11
   area: attention
   symptom: Downstream input formatting crashes with slice or dict errors on `apply_chat_template`.
-  cause: Migrating from a multimodal LLM (multimodal `AutoProcessor`) to standard models like a standard text LLM (flat `AutoTokenizer`) requires different chat structural types. MultimodalProcessor requires `{"role": "user", "content": [{"type": "text", "text": prompt}]}` while normal tokenizers expect `{"role": "user", "content": prompt}`.
+  cause: |
+    Migrating from a multimodal LLM (multimodal `AutoProcessor`) to standard models like a standard text LLM (flat `AutoTokenizer`) requires different chat structural types. MultimodalProcessor requires `{"role": "user", "content": [{"type": "text", "text": prompt}]}` while normal tokenizers expect `{"role": "user", "content": prompt}`.
   fix: |
     Add dynamic checks when building chat pipelines `is_multimodal = "vision" in model_id.lower()`.
     Conditionally wrap the content arrays depending on model type.
@@ -851,7 +852,8 @@ bugs:
   phase: 11
   area: llm
   symptom: ScriptWriter DONE line shows expected characters list (e.g. "ANNOUNCER, DRACULA MALONE, TITLE, ...") but dialogue parser only recovers 0-2 lines instead of 20+. TITLE string is listed as a speaking character.
-  cause: Writer prompt addition required `TITLE: <name>` as first output line. Both streaming detector and post-stream parser match `NAME: text` shape as dialogue, and neither blacklist contained `TITLE`. Every title line got booked as character TITLE speaking the title text, polluting cast, eating word budget, nudging self-critique into deletion.
+  cause: |
+    Writer prompt addition required `TITLE: <name>` as first output line. Both streaming detector and post-stream parser match `NAME: text` shape as dialogue, and neither blacklist contained `TITLE`. Every title line got booked as character TITLE speaking the title text, polluting cast, eating word budget, nudging self-critique into deletion.
   fix: |
     (1) Add `"TITLE"` to `_DIALOGUE_FALSE_POSITIVES` frozenset (line ~1545).
     (2) Add `"TITLE"` to streaming heartbeat's inline false-positive tuple (line ~1885).
@@ -874,7 +876,8 @@ bugs:
     (2) Tighten FORMAT_NORM skip heuristic: require `has_dialogue AND has_scenes AND has_cast` (all three, not just one).
     (3) Add v5 VOICE pattern (bare `NAME: dialogue`) as first-class regex before fallback, registers as `{"type":"dialogue"}` token directly.
     (4) Loosen 2B-fallback guard: trigger on `dialogue_count < 3 AND raw-text has 5+ NAME: matches` instead of just `== 0`.
-  verify: Next run shows `DIALOGUE_TRACK: 07_AFTER_PARSE | count=N` matching streaming count. `[BatchBark] Found N dialogue lines` shows N >= 15 for normal run (was 0 before). MP4 audio contains character dialogue.
+  verify: |
+    Next run shows `DIALOGUE_TRACK: 07_AFTER_PARSE | count=N` matching streaming count. `[BatchBark] Found N dialogue lines` shows N >= 15 for normal run (was 0 before). MP4 audio contains character dialogue.
   tags: [format-norm, parser, bare-dialogue, mistral, skip-heuristic, fallback]
   legacy_id: BUG-LOCAL-038
 
@@ -882,8 +885,10 @@ bugs:
   phase: 11
   area: llm
   symptom: Title extracted as `'** Bioluminal Tide'` (leading markdown bold wrapper leaks). Every downstream consumer carries the cosmetic garbage in logs, filenames, overlays.
-  cause: LLM emitted `TITLE: **Bioluminal Tide**` (markdown bold wrapping the value). `_RE_TITLE_LINE` only strips `**` prefix BEFORE word TITLE and suffix AFTER trailing quote. Lazy capture `(.+?)` grabbed leading `**` of the value and retained it. Post-processing only did `strip()` + quote-strip, no markdown-wrapper strip.
-  fix: In `_extract_title_from_script_text`, add regex substitutions right after quote-strip to peel leading/trailing `*`/`_` runs (1-3 chars) plus surrounding whitespace, then re-run quote-strip so nested cases like `**"Title"**` land clean. Add empty-result guard so `TITLE: ****` residue returns `""` not invalid.
+  cause: |
+    LLM emitted `TITLE: **Bioluminal Tide**` (markdown bold wrapping the value). `_RE_TITLE_LINE` only strips `**` prefix BEFORE word TITLE and suffix AFTER trailing quote. Lazy capture `(.+?)` grabbed leading `**` of the value and retained it. Post-processing only did `strip()` + quote-strip, no markdown-wrapper strip.
+  fix: |
+    In `_extract_title_from_script_text`, add regex substitutions right after quote-strip to peel leading/trailing `*`/`_` runs (1-3 chars) plus surrounding whitespace, then re-run quote-strip so nested cases like `**"Title"**` land clean. Add empty-result guard so `TITLE: ****` residue returns `""` not invalid.
   verify: Next run's log shows `TITLE_TRACE ... resolved='Bioluminal Tide'` (no leading `**`). Existing unwrapped titles unchanged. Filename varies per episode (BUG-LOCAL-035 regression guard).
   tags: [title-extraction, regex, markdown, post-processing, cosmetic]
   legacy_id: BUG-LOCAL-039
@@ -898,7 +903,8 @@ bugs:
     (1) after first raw `json.loads()` fails, strip comments + trailing commas and retry.
     (2) before truncation-repair brace closure.
     (3) in last-resort brace-scan path. Run before trailing-comma stripping so `value, // comment\n}` collapses cleanly.
-  verify: Next run shows `[LLMDirector] Plan: N voices, N SFX cues, N music cues` instead of FATAL. Runs with clean JSON (no comments) hit first `json.loads()` and skip stripper entirely — zero perf cost on clean path.
+  verify: |
+    Next run shows `[LLMDirector] Plan: N voices, N SFX cues, N music cues` instead of FATAL. Runs with clean JSON (no comments) hit first `json.loads()` and skip stripper entirely — zero perf cost on clean path.
   tags: [director, json-parse, llm-output, comments, mistral, truncation, llm]
   legacy_id: BUG-LOCAL-040
 

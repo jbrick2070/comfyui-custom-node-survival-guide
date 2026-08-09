@@ -1340,7 +1340,10 @@ class TestPhase11BoundedRepairContracts:
 class TestPhase07To12ProductionRegressionCatalog:
     """OTR-local guard for live-only BUG-07.22, BUG-07.23, BUG-08.08,
     BUG-11.46, BUG-11.47, BUG-11.48, BUG-11.49, BUG-11.50, BUG-12.51,
-    BUG-12.52.
+    BUG-12.52, BUG-12.54, BUG-12.55, BUG-12.56, BUG-12.57, BUG-12.58,
+    BUG-12.59, BUG-12.60, BUG-12.61, BUG-12.62, BUG-12.63, BUG-12.64,
+    BUG-12.65, BUG-12.66, BUG-12.67, BUG-12.68, BUG-12.69, BUG-12.70, BUG-12.71,
+    BUG-05.11.
 
     These rules were admitted from dated smokes, published artifacts, or GPU
     runs. The project tests named below exercise their concrete behavior; this
@@ -1348,6 +1351,74 @@ class TestPhase07To12ProductionRegressionCatalog:
     """
 
     EXPECTED_TESTS = {
+        "tests/test_production_ledger.py": (
+            "test_update_line_text_clears_skip_state_on_recomposed_text",
+            "test_update_line_text_preserves_skip_state_for_empty_text",
+            "test_save_merges_schema_l3_fields_from_disk",
+        ),
+        "tests/test_source_payload_chunk3.py": (
+            "test_resolve_inputs_uses_selected_link_not_differing_request",
+        ),
+        "tests/test_video_render_driver_perbeat_audio.py": (
+            "test_episode_assembler_stamps_full_master_byte_identity",
+            "test_master_audio_identity_rejects_non_sha_receipt",
+        ),
+        "tests/test_video_render_driver_additive.py": (
+            "test_build_clip_manifest_positioned_timeline_uses_ledger_boundary",
+        ),
+        "tests/test_meta_paths.py": (
+            "test_published_obs_filename_replaces_planned_alias",
+            "test_invalid_published_obs_path_cannot_redirect_owner",
+            "test_save_ledger_safe_synchronizes_terminal_obs_surfaces",
+        ),
+        "tests/test_video_render_path_cw4.py": (
+            "test_master_audio_mux_terminal_stamp_owns_all_final_paths",
+            "test_positioned_crossfades_partition_visible_timeline_without_duplication",
+            "test_positioned_assemble_reconciles_oversized_manifest_down_to_master",
+        ),
+        "tests/test_video_ledger.py": (
+            "test_post_audio_overlay_rehydrates_owned_sections_despite_existing_timing",
+            "test_post_audio_overlay_rejects_cross_episode_freeze",
+            "test_post_audio_hash_survives_image_dispatcher_wire_serialization",
+        ),
+        "tests/test_radio_editor_live_budget_lineage.py": (
+            "test_requested_budget_counts_character_body_not_announcer_overhead",
+            "test_announcer_still_owns_the_spoken_breath_cap",
+            "test_validator_accepts_good_actual_despite_false_model_projection",
+            "test_validator_rejects_bad_actual_despite_good_model_projection",
+            "test_micro_repair_can_fix_a_row_during_advisory_episode_drift",
+            "test_malformed_present_budget_skips_without_mutating_or_calling_llm",
+            "test_split_child_keeps_parent_beat_and_syncs_retained_beat_membership",
+            "test_repeated_split_pass_never_reuses_an_existing_child_line_id",
+            "test_outline_initialization_materializes_the_durable_beat_collection",
+            "test_common_integer_delivery_law_covers_180_and_320_words",
+            "test_inline_fit_survives_failed_pair_then_repairs_one_row_only",
+            "test_inline_fit_rejects_no_progress_until_typed_exhaustion",
+            "test_word_fit_liveness_allows_more_than_eighteen_strict_progress_cycles",
+            "test_inline_campaign_retires_candidates_and_alternates_complete_reroll",
+            "test_outer_word_fit_campaign_fails_closed_at_default_ceiling",
+            "test_outer_word_fit_campaign_respects_environment_ceiling",
+            "test_outer_word_fit_campaign_can_accept_before_ceiling",
+        ),
+        "tests/test_news_coda_delivery_surface.py": (
+            "test_live_b009_first_pass_keeps_exact_clean_sentence_and_never_rewrites_fact",
+            "test_sentence_prefix_parser_never_splits_initials_or_versions",
+            "test_finalizer_never_returns_an_unscored_emergency_sentence",
+            "test_single_sentence_source_note_defers_intact_fact_to_credits",
+            "test_dirty_old_coda_is_repaired_as_combined_surface_with_hash_receipt",
+            "test_phase7_expansion_then_combined_coda_scour_is_clean",
+            "test_row_local_failure_details_are_returned_for_phase_receipts",
+            "test_content_owned_direct_scour_is_byte_identical",
+        ),
+        "tests/test_story_brief_c5a1.py": (
+            "test_generic_role_labels_are_legal_visual_nouns",
+            "test_all_six_bank_personal_name_shapes_stay_forbidden",
+            "test_role_input_forms_preserve_one_identity_without_mapping_articles",
+            "test_private_repair_detail_names_surface_but_public_code_stays_stable",
+        ),
+        "tests/test_brief_prompt_finishing.py": (
+            "test_failed_brief_still_finishes_a_valid_non_authoring_visual_prompt",
+        ),
         "tests/test_scifi_source_repair.py": (
             "test_repair_rehomes_exact_quote_only_when_field_label_is_wrong",
             "test_repair_drops_unsupported_fact_but_keeps_literal_fact",
@@ -1384,6 +1455,50 @@ class TestPhase07To12ProductionRegressionCatalog:
             "test_script_output_token_budget_receipts_and_bounds",
             "test_script_artifact_metadata_repair_normalizes_only_graph_metadata",
             "test_script_metadata_repair_short_circuits_the_typed_repair_model_call",
+            "test_quality_patch_targets_are_row_local_and_invalid_ids_do_not_widen",
+            "test_quality_patch_prompt_is_compact_complete_and_fact_grounded",
+            "test_quality_patch_merge_changes_only_target_text_and_validates_whole_script",
+            "test_quality_patch_rotates_to_technical_slot_after_malformed_creative",
+            "test_quality_patch_capacity_floor_records_both_slots",
+            "test_two_failed_quality_slots_stop_without_rejudging_unchanged_script",
+            "test_quality_judge_transport_failure_keeps_prior_valid_story",
+            "test_character_word_fit_uses_compact_patch_and_fresh_recount",
+            "test_character_word_fit_retries_a_failed_pair_then_recovers",
+            "test_character_word_fit_exhaustion_fails_before_assembly",
+            "test_character_word_fit_rejects_valid_no_progress_patches",
+            "test_initial_compact_p5_alternates_complete_candidate_producer",
+            "test_complete_script_campaign_retires_candidate_not_episode",
+        ),
+        "tests/test_fable2_assembly.py": (
+            "test_word_band_defect_fails_before_assembly_mutates_ledger",
+            "test_final_word_fit_retries_failed_slots_and_reseals_one_row",
+            "test_final_word_fit_rejects_no_progress_until_typed_exhaustion",
+            "test_word_fit_patch_rejects_fake_commercial_and_new_number",
+            "test_fable_capacity_uses_post_merge_rows_and_the_exact_hygiene_cap",
+            "test_trailing_mechanical_outro_cannot_hide_or_create_thesis",
+        ),
+        "tests/test_freeze_policy_readonly.py": (
+            "test_declared_word_delivery_passes_readonly_freeze_without_content_mutation",
+            "test_declared_word_drift_halts_before_video_readiness",
+        ),
+        "tests/test_story_brief_c5a2.py": (
+            "test_reflections_describe_the_final_word_fitted_rows",
+        ),
+        "tests/test_generation_budget.py": (
+            "test_complete_patch_budget_refuses_clamp_but_default_call_still_clamps",
+            "test_writer_local_complete_patch_refuses_before_model_generate",
+            "test_model_loader_captures_complete_patch_marker_before_normalization",
+            "test_openrouter_complete_patch_refuses_before_network",
+            "test_openrouter_complete_patch_refuses_provider_cap_before_network",
+            "test_comfy_credits_complete_patch_refuses_before_network",
+            "test_comfy_credits_strict_patch_keeps_exact_requested_budget",
+        ),
+        "tests/test_gguf_backend.py": (
+            "test_complete_patch_capacity_refuses_before_llama_call",
+            "test_complete_patch_refuses_gguf_provider_cap",
+        ),
+        "tests/test_google_api_llm_lane.py": (
+            "test_complete_patch_capacity_refuses_before_google_request",
         ),
         "tests/test_structured_call_clamp.py": (
             "test_authored_artifact_can_disable_the_overlong_string_clamp",
@@ -1461,6 +1576,435 @@ class TestPhase07To12ProductionRegressionCatalog:
         assert "Remove-Item -LiteralPath $StaleExtraEnv -Force" in headless_source, (
             "BUG-12.52: canonical headless boot must clear a stale one-shot override"
         )
+
+    def test_otr_positioned_media_timeline_ownership(self, pack_dir):
+        """BUG-12.69: positioned output excludes duplicated crossfade work."""
+        driver_path = os.path.join(
+            pack_dir, "nodes", "_otr_video_engines", "render_driver.py",
+        )
+        composite_path = os.path.join(
+            pack_dir, "nodes", "otr_silent_composite.py",
+        )
+        if not os.path.isfile(driver_path) or not os.path.isfile(composite_path):
+            pytest.skip("BUG-12.69 positioned timeline guard is OTR-local")
+
+        driver_source = open(driver_path, encoding="utf-8").read()
+        composite_source = open(composite_path, encoding="utf-8").read()
+        for marker in (
+            '"timeline_total_frames": timeline_total',
+            '"render_target_frames": total',
+            'timeline_source = "ledger.total_episode_dur_s"',
+            "math.ceil(",
+        ):
+            assert marker in driver_source, (
+                f"BUG-12.69 manifest ownership marker missing: {marker}"
+            )
+        for marker in (
+            "slot_end = min(requested_end, next_start, timeline_end)",
+            "manifest_positioned and base_total != target_total",
+            '"planned_visible_frame_count": planned_visible',
+            '"overlap_trimmed_frame_count"',
+        ):
+            assert marker in composite_source, (
+                f"BUG-12.69 positioned planner marker missing: {marker}"
+            )
+
+        tests = {
+            "tests/test_video_render_driver_additive.py": (
+                "test_build_clip_manifest_positioned_timeline_uses_ledger_boundary",
+            ),
+            "tests/test_video_render_path_cw4.py": (
+                "test_positioned_crossfades_partition_visible_timeline_without_duplication",
+                "test_positioned_assemble_reconciles_oversized_manifest_down_to_master",
+            ),
+        }
+        for relative_path, test_names in tests.items():
+            path = os.path.join(pack_dir, *relative_path.split("/"))
+            source = open(path, encoding="utf-8").read()
+            for test_name in test_names:
+                assert f"def {test_name}(" in source, (
+                    f"BUG-12.69 executable guard missing: {test_name}"
+                )
+
+    def test_otr_explicit_word_delivery_is_owned_before_media(self, pack_dir):
+        """BUG-12.70: requested length is hash-bound before media readiness."""
+        paths = {
+            "shared": os.path.join(pack_dir, "nodes", "_otr_word_delivery.py"),
+            "codex": os.path.join(pack_dir, "nodes", "_otr_scifi_codex.py"),
+            "fable2": os.path.join(pack_dir, "nodes", "_otr_scifi_fable2.py"),
+            "inline": os.path.join(pack_dir, "nodes", "_otr_radio_editor.py"),
+            "writer": os.path.join(pack_dir, "nodes", "OTR_LedgerScriptWriter.py"),
+            "freeze": os.path.join(pack_dir, "nodes", "_otr_freeze_cascade.py"),
+        }
+        if not os.path.isfile(paths["shared"]):
+            pytest.skip("BUG-12.70 explicit word-delivery guard is OTR-local")
+        sources = {
+            name: open(path, encoding="utf-8").read()
+            for name, path in paths.items()
+        }
+        expected = {
+            "shared": (
+                "def delivery_word_bounds(",
+                "MAX_CONSECUTIVE_REPAIR_STALLS = 4",
+                "class WordFitLivenessController",
+                "def retire_word_fit_candidate(",
+                "def accept_word_fit_candidate(",
+                "bounded_model_output_retries_until_ledger_legal",
+                '"actual_text_sha256": character_text_sha256(ledger_data)',
+                "if require_in_band and drift:",
+            ),
+            "codex": (
+                "class CodexWordDeliveryError",
+                "def _run_complete_script_campaign(",
+                "candidate_index=candidate_index",
+                'owner="scifi_codex"',
+                "accept_word_fit_candidate(",
+            ),
+            "fable2": (
+                "class Fable2WordDeliveryError",
+                "canonical_word_count",
+                "delivery_candidate_index",
+                'owner="scifi_news_pro"',
+                "retire_word_fit_candidate(",
+                "accept_word_fit_candidate(",
+            ),
+            "inline": (
+                "def fit_final_word_delivery_campaign(",
+                "def _author_complete_inline_candidate(",
+                "owner=spec.owner",
+                "retire_word_fit_candidate(",
+                "accept_word_fit_candidate(",
+            ),
+            "writer": (
+                "fit_final_word_delivery_campaign(",
+                'stage="writer_final_rows"',
+                "run_story_brief_reflection(",
+            ),
+            "freeze": (
+                'stage="freeze_pre_media"',
+                'verdict="needs_full_rerun"',
+                '"phase_8_video_readiness"',
+            ),
+        }
+        for name, markers in expected.items():
+            for marker in markers:
+                assert marker in sources[name], (
+                    f"BUG-12.70 {name} ownership marker missing: {marker}"
+                )
+
+
+    def test_otr_outer_word_fit_campaign_is_fail_closed(self, pack_dir):
+        """BUG-12.71: a non-converging word-fit campaign must stop the queue."""
+        shared_path = os.path.join(pack_dir, "nodes", "_otr_word_delivery.py")
+        test_path = os.path.join(
+            pack_dir, "tests", "test_radio_editor_live_budget_lineage.py",
+        )
+        if not os.path.isfile(shared_path):
+            pytest.skip("BUG-12.71 word-fit ceiling guard is OTR-local")
+
+        shared_source = open(shared_path, encoding="utf-8").read()
+        for marker in (
+            "DEFAULT_MAX_OUTER_WORD_FIT_CANDIDATES = 12",
+            "def _resolve_outer_candidate_ceiling(",
+            "class WordFitCeilingExceeded(WordDeliveryError)",
+            "OTR_MAX_WORD_FIT_CANDIDATES",
+            "bounded_model_output_retries_until_ledger_legal",
+            'if int(state["active_candidate_index"]) >= ceiling:',
+        ):
+            assert marker in shared_source, (
+                f"BUG-12.71 fail-closed ceiling marker missing: {marker}"
+            )
+
+        test_source = open(test_path, encoding="utf-8").read()
+        for test_name in (
+            "test_outer_word_fit_campaign_fails_closed_at_default_ceiling",
+            "test_outer_word_fit_campaign_respects_environment_ceiling",
+            "test_outer_word_fit_campaign_can_accept_before_ceiling",
+        ):
+            assert f"def {test_name}(" in test_source, (
+                f"BUG-12.71 executable guard missing: {test_name}"
+            )
+    def test_otr_protected_suffix_final_surface_contract(self, pack_dir):
+        """BUG-12.60: the assembled delivery surface owns the final gate."""
+        test_path = os.path.join(
+            pack_dir, "tests", "test_news_coda_delivery_surface.py",
+        )
+        if not os.path.isfile(test_path):
+            pytest.skip("BUG-12.60 assembled-coda guard is OTR-local")
+        with open(test_path, "r", encoding="utf-8") as f:
+            source = f.read()
+        for test_name in (
+            "test_live_b009_first_pass_keeps_exact_clean_sentence_and_never_rewrites_fact",
+            "test_sentence_prefix_parser_never_splits_initials_or_versions",
+            "test_finalizer_never_returns_an_unscored_emergency_sentence",
+            "test_single_sentence_source_note_defers_intact_fact_to_credits",
+            "test_dirty_old_coda_is_repaired_as_combined_surface_with_hash_receipt",
+            "test_phase7_expansion_then_combined_coda_scour_is_clean",
+            "test_row_local_failure_details_are_returned_for_phase_receipts",
+            "test_content_owned_direct_scour_is_byte_identical",
+        ):
+            assert f"def {test_name}(" in source, (
+                f"BUG-12.60 executable guard missing: {test_name}"
+            )
+
+    def test_otr_cast_role_identity_classification_is_covered(self, pack_dir):
+        """BUG-12.61: role labels and personal names need distinct projections."""
+        modules = {
+            "tests/test_story_brief_c5a1.py": (
+                "test_generic_role_labels_are_legal_visual_nouns",
+                "test_all_six_bank_personal_name_shapes_stay_forbidden",
+                "test_role_input_forms_preserve_one_identity_without_mapping_articles",
+                "test_private_repair_detail_names_surface_but_public_code_stays_stable",
+            ),
+            "tests/test_brief_prompt_finishing.py": (
+                "test_failed_brief_still_finishes_a_valid_non_authoring_visual_prompt",
+            ),
+        }
+        anchor = os.path.join(pack_dir, "nodes", "_otr_story_brief.py")
+        if not os.path.isfile(anchor):
+            pytest.skip("BUG-12.61 cast-role identity guard is OTR-local")
+        with open(anchor, "r", encoding="utf-8") as f:
+            story_brief_source = f.read()
+        for symbol in (
+            "_is_generic_role_label",
+            "_cast_input_substitution_forms",
+            "_cast_output_forbidden_forms",
+            "_matched_cast_name_token",
+        ):
+            assert f"def {symbol}(" in story_brief_source, (
+                f"BUG-12.61 production classifier missing: {symbol}"
+            )
+        for relative_path, test_names in modules.items():
+            path = os.path.join(pack_dir, *relative_path.split("/"))
+            with open(path, "r", encoding="utf-8") as f:
+                source = f.read()
+            for test_name in test_names:
+                assert f"def {test_name}(" in source, (
+                    f"BUG-12.61 executable guard missing: {test_name}"
+                )
+
+    def test_otr_rename_transaction_and_active_consumer_join(self, pack_dir):
+        """BUG-12.66: a renamed artifact tree must carry durable identity."""
+        ledger_path = os.path.join(pack_dir, "nodes", "production_ledger.py")
+        if not os.path.isfile(ledger_path):
+            pytest.skip("BUG-12.66 artifact-tree rename guard is OTR-local")
+
+        with open(ledger_path, "r", encoding="utf-8") as f:
+            ledger_source = f.read()
+        tree = ast.parse(ledger_source)
+        function_names = {
+            node.name for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+        assert {
+            "_rebase_episode_local_paths",
+            "_same_durable_run",
+            "rename_episode",
+            "_merge_with_disk",
+        } <= function_names
+        assert "save_ledger_safe" in ledger_source
+        assert "mirrored_from" in ledger_source
+        assert "music_cue_spec_sha256" in ledger_source
+
+        modules = {
+            "tests/test_production_ledger.py": (
+                "test_path_rebase_handles_windows_slashes_and_component_boundaries",
+                "test_rename_rebases_shared_six_bank_episode_paths",
+                "test_merge_rejects_foreign_or_reauthored_disk_only_music_mirrors",
+                "test_durable_identity_rejects_one_sided_freeze",
+            ),
+            "tests/test_video_ledger.py": (
+                "test_shot_lock_identity_rejects_one_sided_freeze",
+                "test_post_audio_overlay_rehydrates_owned_sections_despite_existing_timing",
+                "test_post_audio_overlay_identity_merges_music_and_assembler_mirrors",
+                "test_post_audio_overlay_rejects_cross_episode_freeze",
+            ),
+            "tests/test_image_platform_c1.py": (
+                "test_reresolve_stale_pending_rekeys_to_renamed_episode",
+                "test_reresolve_rejects_active_sibling_with_different_freeze",
+            ),
+            "tests/test_clip_fill.py": (
+                "test_resolve_stale_pending_clip_episode_to_renamed_dir",
+                "test_resolve_stale_pending_clip_rejects_foreign_freeze",
+            ),
+            "tests/test_google_video_sfx_workflow.py": (
+                "test_master_audio_reresolve_uses_active_ledger_not_newest_sibling",
+                "test_master_audio_reresolve_fails_closed_without_active_ledger",
+                "test_master_audio_reresolve_rejects_ledger_directory_identity_mismatch",
+            ),
+            "tests/test_workflow_live_passes_validator.py": (
+                "test_production_workflow_visual_structure_pinned",
+            ),
+        }
+        for relative_path, test_names in modules.items():
+            path = os.path.join(pack_dir, *relative_path.split("/"))
+            assert os.path.isfile(path), (
+                f"BUG-12.66 regression module missing: {relative_path}"
+            )
+            with open(path, "r", encoding="utf-8") as f:
+                source = f.read()
+            for test_name in test_names:
+                assert f"def {test_name}(" in source, (
+                    f"BUG-12.66 executable guard missing: "
+                    f"{relative_path}::{test_name}"
+                )
+
+        workflow_path = os.path.join(pack_dir, "workflows", "otr_canonical.json")
+        with open(workflow_path, "r", encoding="utf-8") as f:
+            workflow = json.load(f)
+        links = {int(row[0]): row for row in workflow.get("links", [])}
+        assert links.get(284) == [284, 12, 0, 90, 4, "STRING"], (
+            "BUG-12.66: canonical workflow must gate ShotLock on rename owner"
+        )
+
+    def test_otr_canonical_ledger_text_metric_owner(self, pack_dir):
+        """BUG-12.67: every durable text/count surface shares one owner."""
+        import runpy
+
+        metrics_path = os.path.join(pack_dir, "nodes", "_otr_text_metrics.py")
+        if not os.path.isfile(metrics_path):
+            pytest.skip("BUG-12.67 canonical text-metric guard is OTR-local")
+
+        metrics = runpy.run_path(metrics_path)
+        count = metrics["canonical_word_count"]
+        assert count("forty-two") == 1
+        assert count("don't don\u2019t") == 2
+        assert count("off\u2014it's") == 2
+        assert count("off\u2013it\u2019s") == 2
+
+        required_uses = {
+            "nodes/production_ledger.py": "refresh_ledger_text_metrics",
+            "nodes/_otr_ledger_freeze.py": "canonical_word_count",
+            "nodes/_otr_freeze_cascade.py": "refresh_ledger_text_metrics(led)",
+            "nodes/_otr_readiness.py": "set_line_text_metrics",
+            "nodes/_otr_ledger_scrub.py": "set_line_text_metrics",
+            "nodes/_otr_ledger_reviewer.py": "set_line_text_metrics",
+            "nodes/_otr_story_spine.py": "set_line_text_metrics",
+            "nodes/_otr_scifi_codex.py": "set_line_text_metrics",
+        }
+        for relative_path, marker in required_uses.items():
+            path = os.path.join(pack_dir, *relative_path.split("/"))
+            assert os.path.isfile(path), (
+                f"BUG-12.67 production module missing: {relative_path}"
+            )
+            source = open(path, encoding="utf-8").read()
+            assert marker in source, (
+                f"BUG-12.67 owner marker missing from {relative_path}: {marker}"
+            )
+
+        tests = {
+            "tests/test_production_ledger.py": (
+                "test_save_self_heals_all_text_metrics_for_every_bank",
+            ),
+            "tests/test_lfc_phase_0_10_gap_audit.py": (
+                "test_punctuation_glue_count_is_clean_for_every_bank",
+            ),
+            "tests/test_lfc_phase_7_8_readiness.py": (
+                "test_final_metric_refresh_preserves_pre_diagnosis_and_cleans_post",
+            ),
+            "tests/test_text_metric_ownership.py": (
+                "test_production_nodes_do_not_bypass_canonical_text_metric_owner",
+            ),
+        }
+        for relative_path, test_names in tests.items():
+            path = os.path.join(pack_dir, *relative_path.split("/"))
+            assert os.path.isfile(path), (
+                f"BUG-12.67 regression module missing: {relative_path}"
+            )
+            source = open(path, encoding="utf-8").read()
+            for test_name in test_names:
+                assert f"def {test_name}(" in source, (
+                    f"BUG-12.67 executable guard missing: "
+                    f"{relative_path}::{test_name}"
+                )
+
+    def test_otr_compiler_owned_p5_text_transport(self, pack_dir):
+        """BUG-12.68: bounded P5 transports only model-owned line text."""
+        lane_path = os.path.join(pack_dir, "nodes", "_otr_scifi_codex.py")
+        if not os.path.isfile(lane_path):
+            pytest.skip("BUG-12.68 compact P5 transport guard is OTR-local")
+        with open(lane_path, "r", encoding="utf-8") as f:
+            source = f.read()
+        tree = ast.parse(source)
+        classes = {
+            node.name: node for node in ast.walk(tree)
+            if isinstance(node, ast.ClassDef)
+        }
+        functions = {
+            node.name: node for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+        assert {
+            "ScriptTextDraftLineV4",
+            "ScriptTextDraftV4",
+            "_P5TextDraftMessages",
+        } <= set(classes)
+        assert {
+            "compile_script_text_draft",
+            "_call_script_text_draft",
+            "_run_initial_script_generation",
+        } <= set(functions)
+
+        compiler_source = ast.get_source_segment(
+            source, functions["compile_script_text_draft"],
+        ) or ""
+        call_source = ast.get_source_segment(
+            source, functions["_call_script_text_draft"],
+        ) or ""
+        restart_source = ast.get_source_segment(
+            source, functions["_run_initial_script_generation"],
+        ) or ""
+        assert "set(observed_ids) != set(expected)" in compiler_source
+        assert "text=text_by_id[line_id]" in compiler_source
+        assert "result_type=ScriptTextDraftV4" in call_source
+        assert "include_result_json_schema=False" in call_source
+        assert "repair_script_hygiene_after_exhaustion" in call_source
+        assert '"max_ladders": 2' in restart_source
+        assert '"creative"' in restart_source and '"technical"' in restart_source
+        assert "for (" in restart_source and "in lanes:" in restart_source
+        assert "_otr_require_full_output_budget = True" in source
+        assert 'repair_payload["failed_text_draft"]' in source
+
+        pack_path = os.path.join(
+            pack_dir, "nodes", "story_packs", "scifi_news", "scifi_news.json",
+        )
+        pipeline_path = os.path.join(
+            pack_dir, "nodes", "story_packs", "pipelines.json",
+        )
+        with open(pack_path, "r", encoding="utf-8") as f:
+            pack = json.load(f)
+        with open(pipeline_path, "r", encoding="utf-8") as f:
+            pipelines = json.load(f)
+        prompt = pack["prompt_stages"]["codex_play_system"]
+        assert "ScriptTextDraftV4" in prompt
+        assert "exactly one key" in prompt
+        assert "Python compiles" in prompt
+        pipeline = next(
+            row for row in pipelines["pipelines"]
+            if row["story_pipeline_id"] == "scifi_news_circuit"
+        )
+        p5 = next(
+            row for row in pipeline["passes"]
+            if row["pass_id"] == "P5_first_play"
+        )
+        assert "compact closed {line_id,text}" in p5["description"]
+        assert "fresh technical-slot ladder" in p5["description"]
+
+        test_path = os.path.join(pack_dir, "tests", "test_scifi_codex_lane.py")
+        with open(test_path, "r", encoding="utf-8") as f:
+            test_source = f.read()
+        for test_name in (
+            "test_max_width_p5_text_envelopes_fit_the_live_gemma_12b_context",
+            "test_compact_p5_compiler_preserves_text_and_owns_every_mechanical_field",
+            "test_compact_p5_compiler_fails_closed_on_non_bijective_line_ids",
+            "test_compact_p5_typed_repair_carries_small_authority_not_whole_request",
+            "test_compact_p5_malformed_retry_omits_unusable_failed_prefix",
+            "test_initial_compact_p5_restart_is_flat_creative_then_technical",
+            "test_initial_compact_p5_restart_exhausts_after_exactly_two_ladders",
+        ):
+            assert f"def {test_name}(" in test_source, (
+                f"BUG-12.68 executable guard missing: {test_name}"
+            )
 
     def test_otr_p3_prose_patch_transports_are_declared_and_fail_closed(self, pack_dir):
         """BUG-11.42: bounded prose repair requires a proven transport."""
@@ -1585,193 +2129,86 @@ class TestPhase02BugBible0214:
                "BUG-02.14 layer 4b: pipe.set_progress_bar_config missing"
 
 
-class TestPhase02BugBible0216:
-    """BUG-02.16: capability-gated architecture and split-revision HF cache."""
+# ---------------------------------------------------------------------------
+# The bible must actually BE machine-readable
+# ---------------------------------------------------------------------------
+# README.md calls BUG_BIBLE.yaml "machine-readable" in three places and the
+# Three-File Contract is built on that claim. It was not true: six entry fields
+# were written as PLAIN scalars whose text contains ': ', which YAML reads as a
+# second mapping value, so yaml.safe_load raised a ScannerError at line 834 and
+# had done since those entries landed. Nothing noticed because every structural
+# check in this suite counts '^- id:' with a REGEX -- a text scan that cannot
+# tell a parseable file from an unparseable one.
+#
+# That is the same defect class the bible itself now carries as BUG-12.87: a
+# check that reports clean because it never examined the thing it claims to
+# cover. Fixed by converting those six fields to block scalars; kept fixed here.
 
-    def test_otr_gemma4_unified_admission_contract(self, pack_dir):
-        loader_path = os.path.join(pack_dir, "nodes", "_otr_model_loader.py")
-        env_path = os.path.join(pack_dir, "nodes", "_otr_hf_env.py")
-        requirements_path = os.path.join(pack_dir, "requirements.txt")
-        tests_path = os.path.join(pack_dir, "tests", "test_hf_env_offline.py")
-        doctor_path = os.path.join(pack_dir, "scripts", "otr_gemma4_doctor.py")
+class TestBibleIsActuallyParseable:
+    def _repo_root(self):
+        """Survival-guide repo root (parent of tests/).
 
-        if not os.path.isfile(loader_path):
-            pytest.skip("BUG-02.16 Gemma4Unified admission guard is OTR-local")
-        for path in (env_path, requirements_path, tests_path, doctor_path):
-            assert os.path.isfile(path), f"BUG-02.16 required artifact missing: {path}"
+        Same one-liner TestThreeFileContract uses. Deliberately duplicated
+        rather than imported across classes: these tests must resolve the
+        BIBLE's own location, never the --pack-dir target the rest of the
+        suite is aimed at.
+        """
+        return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-        with open(loader_path, encoding="utf-8") as handle:
-            loader_source = handle.read()
-        with open(env_path, encoding="utf-8") as handle:
-            env_source = handle.read()
-        with open(requirements_path, encoding="utf-8") as handle:
-            requirements = handle.read()
-        with open(tests_path, encoding="utf-8") as handle:
-            test_source = handle.read()
-        with open(doctor_path, encoding="utf-8") as handle:
-            doctor_source = handle.read()
+    def _bible_text(self):
+        with open(os.path.join(self._repo_root(), "BUG_BIBLE.yaml"),
+                  encoding="utf-8") as fh:
+            return fh.read()
 
-        assert re.search(
-            r"(?m)^transformers>=5\.10\.4,<6\.0\s*$", requirements
-        )
-        assert '_GEMMA4_UNIFIED_MIN_TRANSFORMERS = "5.10.4"' in loader_source
-        gate = loader_source.index(
-            "_require_transformers_model_support(normalized)"
-        )
-        download = loader_source.index(
-            "_otr_catalog.auto_download_if_missing("
-        )
-        assert gate < download
-
-        assert "def _snapshot_has_weights(" in env_source
-        assert "if _snapshot_has_weights(p)" in env_source
-        assert "def resolve_snapshot_file(" in env_source
-        assert '"chat_template.jinja"' in loader_source
-        assert "local_files_only=True" in loader_source
-
-        for test_name in (
-            "test_snapshot_resolver_prefers_weights_and_composes_newer_metadata",
-            "test_snapshot_resolver_rejects_metadata_only_cache",
-            "test_gemma_version_guard_is_early_and_actionable",
-            "test_request_slot_uses_complete_canonical_cache_without_download",
-        ):
-            assert f"def {test_name}(" in test_source
-
-        assert "get_cached_transformers_schema_constraint" in doctor_source
-        assert "local_files_only=True" in doctor_source
-        assert (
-            "RESULT=PASS (official Transformers + NF4 + LMFE, fully offline)"
-            in doctor_source
-        )
-
-
-class TestPhase11BugBible1155:
-    """BUG-11.55: constrained schemas must be compiler-safe, not open wildcards."""
-
-    def test_otr_script_artifact_uses_a_closed_scene_schema(self, pack_dir):
-        lane_path = os.path.join(pack_dir, "nodes", "_otr_scifi_codex.py")
-        tests_path = os.path.join(pack_dir, "tests", "test_scifi_codex_lane.py")
-
-        if not os.path.isfile(lane_path):
-            pytest.skip("BUG-11.55 ScriptArtifactV4 contract is OTR-local")
-        assert os.path.isfile(tests_path), (
-            f"BUG-11.55 executable regression missing: {tests_path}"
-        )
-
-        with open(lane_path, encoding="utf-8") as handle:
-            lane_source = handle.read()
-        with open(tests_path, encoding="utf-8") as handle:
-            test_source = handle.read()
-
-        assert "class ScriptSceneV4(_Strict):" in lane_source
-        assert "scenes: list[ScriptSceneV4]" in lane_source
-        assert (
-            "    scenes: list[dict[str, Any]] = Field(min_length=1)"
-            not in lane_source
-        )
-        assert (
-            "def test_script_artifact_scene_schema_is_closed_for_lm_format_enforcer("
-            in test_source
-        )
-        for proof in (
-            "JsonSchemaParser(schema)",
-            "parser.get_allowed_characters()",
-            "parser.add_character(character)",
-            "parser.can_end()",
-            'scene_schema["additionalProperties"] is False',
-        ):
-            assert proof in test_source, f"BUG-11.55 proof missing: {proof}"
-
-
-class TestPhase11BugBible1156:
-    """BUG-11.56: craft exhaustion repairs and ships; safety stays closed."""
-
-    def test_otr_spoken_quality_has_a_total_nonterminal_repair_floor(
-        self, pack_dir,
-    ):
-        hygiene_path = os.path.join(pack_dir, "nodes", "_otr_line_hygiene.py")
-        composer_path = os.path.join(pack_dir, "nodes", "_otr_line_composer.py")
-        codex_path = os.path.join(pack_dir, "nodes", "_otr_scifi_codex.py")
-        freeze_path = os.path.join(pack_dir, "nodes", "_otr_freeze_cascade.py")
-        tests_dir = os.path.join(pack_dir, "tests")
-
-        if not os.path.isfile(hygiene_path):
-            pytest.skip("BUG-11.56 spoken-hygiene cascade is OTR-local")
-        for path in (composer_path, codex_path, freeze_path, tests_dir):
-            assert os.path.exists(path), f"BUG-11.56 required artifact missing: {path}"
-
-        with open(hygiene_path, encoding="utf-8") as handle:
-            hygiene_source = handle.read()
-        with open(composer_path, encoding="utf-8") as handle:
-            composer_source = handle.read()
-        with open(codex_path, encoding="utf-8") as handle:
-            codex_source = handle.read()
-        with open(freeze_path, encoding="utf-8") as handle:
-            freeze_source = handle.read()
-
-        assert "def deterministic_hygiene_floor(" in hygiene_source
-        assert "def repair_existing_spoken_line(" in composer_source
-        for rung in (
-            "repair_a",
-            "repair_b_same_slot",
-            "repair_c_alternate_slot",
-            "deterministic_floor",
-            "hygiene_repaired_after_reroll",
-        ):
-            assert rung in composer_source, f"BUG-11.56 rung/receipt missing: {rung}"
-
-        for proof in (
-            "repair_a_same_slot",
-            "shared_artifact_repair_bypassed",
-            "_validate_script_roster_contract",
-            "whole-artifact repair",
-        ):
-            assert proof in codex_source, f"BUG-11.56 Codex boundary missing: {proof}"
-
-        terminal_match = re.search(
-            r"FREEZE_TERMINAL_FAILURE_VERDICTS[^=]*=\s*frozenset\(\{(.*?)\}\)",
-            freeze_source,
-            re.DOTALL,
-        )
-        assert terminal_match, "BUG-11.56 terminal verdict set is not inspectable"
-        terminal_body = terminal_match.group(1)
-        assert '"needs_full_rerun"' in terminal_body
-        assert '"too_many_edits"' not in terminal_body
-
-        regression_files = (
-            "test_spoken_hygiene_repair_cascade.py",
-            "test_text_delivery.py",
-            "test_scifi_codex_lane.py",
-            "test_fable2_assembly.py",
-            "test_lfc_freeze_cascade_orchestrator.py",
-            "test_g9_sfw_ship_stop.py",
-        )
-        regression_source = ""
-        for filename in regression_files:
-            path = os.path.join(tests_dir, filename)
-            assert os.path.isfile(path), (
-                f"BUG-11.56 executable regression missing: {path}"
+    def test_bug_bible_yaml_safe_loads(self):
+        yaml = pytest.importorskip(
+            "yaml", reason="pyyaml not installed on this host")
+        raw = self._bible_text()
+        try:
+            data = yaml.safe_load(raw)
+        except yaml.YAMLError as exc:              # pragma: no cover - the bug
+            mark = getattr(exc, "problem_mark", None)
+            where = f" at line {mark.line + 1} col {mark.column + 1}" if mark else ""
+            pytest.fail(
+                f"BUG_BIBLE.yaml does not parse{where}: "
+                f"{getattr(exc, 'problem', exc)}. README calls this file "
+                f"machine-readable. The usual cause is a plain (unquoted) "
+                f"scalar containing ': ' -- use a '|' block scalar instead."
             )
-            with open(path, encoding="utf-8") as handle:
-                regression_source += handle.read()
+        assert isinstance(data, dict), (
+            f"top level parsed as {type(data).__name__}, expected a mapping "
+            f"with 'schema' and 'bugs'"
+        )
+        assert "bugs" in data, f"no 'bugs' key; got {sorted(data)}"
 
-        for proof_name in (
-            "test_floor_resolves_every_named_craft_gate_and_is_idempotent",
-            "test_bare_production_cues_become_spoken_words_after_exhaustion",
-            "test_own_name_action_narration_is_scoured_and_floored_as_dialogue",
-            "test_delivery_backstop_uses_cast_name_for_own_action_narration",
-            "test_one_breath_floor_keeps_complete_sentences_never_token_fragments",
-            "test_content_owned_projection_repairs_exact_normalized_tts_surface",
-            "test_each_inline_bank_repairs_bare_cue_after_reroll_exhaustion",
-            "test_all_six_runnable_banks_resolve_the_correct_delivery_mode",
-            "test_p5_hygiene_exhaustion_uses_alternate_slot_then_floor",
-            "test_p5_craft_reject_bypasses_whole_artifact_repair_a_ships_and_stamps",
-            "test_p5_structural_and_craft_reject_stays_on_fail_closed_artifact_path",
-            "test_fable_content_owned_projection_repairs_and_reseals_tts_surface",
-            "test_p5_empty_mechanical_row_is_skipped_locally_not_filled_with_canned_speech",
-            "test_quality_edit_exhaustion_runs_phase_10_and_ships",
-            "test_phase_10_refuses_to_freeze_a_profane_episode",
-        ):
-            assert f"def {proof_name}(" in regression_source, (
-                f"BUG-11.56 proof missing: {proof_name}"
-            )
+    def test_parsed_entry_count_matches_the_regex_count(self):
+        """Ties the two views together.
+
+        Every other structural test here counts '^- id:' textually. If the
+        parsed count and the text count ever disagree, one of the two views is
+        lying and both are load-bearing.
+        """
+        yaml = pytest.importorskip(
+            "yaml", reason="pyyaml not installed on this host")
+        raw = self._bible_text()
+        text_count = sum(1 for ln in raw.splitlines()
+                         if ln.startswith("- id:"))
+        parsed = yaml.safe_load(raw)["bugs"]
+        assert len(parsed) == text_count, (
+            f"parsed {len(parsed)} entries but {text_count} '- id:' lines"
+        )
+
+    def test_every_parsed_entry_has_the_documented_fields(self):
+        """README: 'Each entry: id, phase, area, symptom, cause, fix, verify,
+        tags, legacy_id.' Unreachable while the file would not parse."""
+        yaml = pytest.importorskip(
+            "yaml", reason="pyyaml not installed on this host")
+        parsed = yaml.safe_load(self._bible_text())["bugs"]
+        required = ("id", "phase", "area", "symptom", "cause", "fix", "verify",
+                    "tags")
+        missing = []
+        for entry in parsed:
+            gaps = [k for k in required if not entry.get(k)]
+            if gaps:
+                missing.append((entry.get("id", "<no id>"), gaps))
+        assert not missing, f"entries missing documented fields: {missing[:10]}"
