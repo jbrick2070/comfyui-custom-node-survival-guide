@@ -7015,3 +7015,73 @@ bugs:
     whose test stays green when its predicate is reverted was never covered.
   tags: [telemetry, dead-receipt, silent-failure, getattr-default, flag-string-drift, refactor-desync, fails-safe-so-nobody-notices, prompt-context, mutation-check, all-route]
   legacy_id: PBUG-20260807-01
+
+- id: "12.87"
+  phase: 12
+  area: gate-reports-success-from-its-own-error-path
+  symptom: |
+    A validation step prints a clean result and exits 0 while its headline
+    check never executed. The reassuring line is real -- the script did run,
+    the JSON did parse, the secondary audits did pass -- so the receipt is
+    quoted in commit messages and acceptance sections as proof of the ONE thing
+    it did not do. Nothing looks broken: there is no traceback, no red, no
+    missing artifact. The only trace is a note on stderr saying the check was
+    skipped, which is invisible to anyone reading an exit code, a CI status, or
+    a pasted "OK" line. The failure can persist for weeks because every symptom
+    of it looks like success.
+  cause: |
+    An error path returns the SAME sentinel the success path returns. A
+    problem-collecting function that answers with an empty list means "nothing
+    wrong", so `except: return []` converts "I could not check" into "I
+    checked and it was fine". The caller sums problem counts, finds zero, and
+    reports OK.
+    Two things make it durable. First, the skip is usually DELIBERATE and
+    documented as a convenience -- "skip rather than fail when the package is
+    not importable" -- so a reader who finds it assumes it is a rare
+    degradation rather than the normal path. Second, the condition that
+    triggers it may be PERMANENT rather than occasional: an import keyed on a
+    name that can never resolve (a directory with a hyphen imported as an
+    identifier, a package the host loads BY PATH), an environment variable that
+    is never set in the context the gate runs in, a service that is never
+    reachable from CI. When the trigger is permanent the check has run ZERO
+    times in its entire life, while its output has been cited as evidence
+    throughout.
+    The strongest tell that this has already happened: somewhere in the tree
+    another component has quietly reimplemented the same check for itself,
+    with a comment explaining that the shared one cannot be trusted. Someone
+    hit the hole, solved it locally, and left the shared gate lying.
+  fix: |
+    Make "could not check" a FAILURE, never a silent pass. The error path must
+    return a problem, raise, or exit non-zero -- and its message must say the
+    check did not run, not merely that something went wrong, because those
+    prompt different responses from the reader.
+    Fix the resolution itself rather than only the reporting: if the check
+    cannot find what it needs, find out WHY before making the skip loud, or the
+    change simply converts a silent false green into a permanent red. Load
+    resources the way the host actually loads them -- by path when the host
+    loads by path -- instead of by a name that cannot resolve.
+    Take a `--strict` flag only if every call site can be updated in the same
+    change; a flag that defaults to the old behaviour leaves the lie in place
+    behind a new option. Prefer making the honest behaviour the default.
+    When a gate reports partial results, say which parts ran. A summary that
+    cannot distinguish "all checks passed" from "the checks that ran passed"
+    is not a gate. And when you route AROUND a broken gate to get a real
+    answer, fix the gate in the same change -- the workaround is proof the gate
+    is broken, and shipping only the workaround guarantees the next person
+    inherits the false green.
+  verify: |
+    Force the failure and assert the EXIT CODE, not the log text: make the
+    resource unresolvable -- point the root at an empty directory, unset the
+    variable, break the import -- and require a non-zero exit. Pair it with a
+    control on the real target that must still pass, so fail-closed does not
+    silently become fail-always.
+    Then prove the check RUNS in the normal case, which is the assertion the
+    original gate never made: assert on a positive artifact only the real check
+    can produce -- a count of validated items, a resolved path, a named
+    contract result -- rather than on the absence of problems. Absence of
+    problems is exactly what the broken version reported.
+    Grep the repo for reimplementations of the same check before closing:
+    another module carrying its own copy is evidence the shared gate has been
+    failing open, and tells you how long for.
+  tags: [gate, false-green, fail-open, exit-code, skipped-check, empty-sentinel, permanent-trigger, import-by-path, ci, acceptance-evidence, workaround-shipped-gate-left-broken, xref-12.86]
+  legacy_id: OTR-2026-08-09-validate-canonical-workflow-false-green

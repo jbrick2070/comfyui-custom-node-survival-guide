@@ -2175,3 +2175,8 @@ records:
   verdict: promoted
   bible_id: '12.86'
   source: prod-bug-log
+- ref: docs/HANDOFF_LOG.md 2026-08-09 (validate_canonical_workflow fail-open, fixed OTR 5fdf93f1)
+  title: Gate reports success from its own error path -- skipped check returns the no-problems sentinel so the caller exits 0
+  verdict: promoted
+  bible_id: '12.87'
+  source: handoff-log
