@@ -7126,3 +7126,154 @@ bugs:
     directory and assert it reads as absent, so the probe is proved to be
     probing rather than always answering yes.
   tags: [models, paths, folder_paths, preflight, headless, false-negative]
+
+- id: "12.89"
+  phase: 12
+  area: receipt-asserts-a-fact-the-render-disproves
+  symptom: |
+    A telemetry field is confidently WRONG rather than missing, and the wrong
+    value is the assertive one -- True, a feature name, a version. Nothing looks
+    empty, so the checks that hunt for null fields walk straight past it, and the
+    value propagates: a rollup groups on it, a summary reports it, and eventually
+    a PUBLISHED artifact states it to an end user. The work itself is correct
+    throughout; only the description of the work is false. This is the inverse
+    polarity of the permanently-empty receipt and needs its own hunt, because it
+    cannot be found by looking for fields nobody ever sets.
+  cause: |
+    The runtime and the receipt read the same underlying value through DIFFERENT
+    rules. Code that decides behaviour uses a named predicate -- "is this
+    component switched off?" -- while code that writes the receipt uses raw
+    truthiness on the same token. They agree for every value except the one that
+    means "off", and a config that switches a component off BY NAME ("none",
+    "off", "disabled", "0") is a non-empty string, which is truthy. So the branch
+    that skips the component and the field that reports it running are reading
+    one variable and reaching opposite answers.
+    What makes it durable is that the nearest test asserts the field's SHAPE --
+    isinstance(value, bool) -- and a wrong bool is still a bool. That test passes
+    forever while the value is inverted for a whole tier.
+  fix: |
+    Give the fact ONE authority and make every consumer read it. Where a
+    predicate already exists because the runtime needed it, the receipt calls
+    that same predicate rather than re-deriving the answer from the raw token.
+    Never let a receipt compute a fact the runtime already decided.
+    Then push the check up to the GATE rather than the one component: a preflight
+    assertion comparing each receipt field against what the code actually does
+    makes every later component inherit it, because this recurs wherever a
+    skip-token idiom is adopted.
+  verify: |
+    For every tier, assert the receipt field EQUALS what the runtime does with
+    the same token -- not that it is the right type, and not against a literal.
+    Add a second assertion at the CONSUMER that publishes it, so the fix is
+    pinned where the falsehood actually surfaced and not only at its source.
+  tags: [receipts, telemetry, truthiness, sentinel, published-artifact, gate-hole]
+
+- id: "12.90"
+  phase: 12
+  area: a-test-that-pins-the-bug-it-should-have-caught
+  symptom: |
+    Fixing a real defect turns the suite RED, and the failing tests are the ones
+    whose names describe the invariant just restored. The suite argues for the
+    broken behaviour, confidently and in numbers, so the fix reads as the
+    regression. This is the most expensive shape a stale test takes: it does not
+    merely fail to catch the bug, it actively defends it, and an engineer who
+    trusts the suite will revert a correct fix.
+  cause: |
+    Two ways in, both of which look like diligence at the time. Either the test
+    was written from the CODE rather than from the requirement -- someone
+    captured what the function currently returned and froze it -- or the body
+    drifted from its own name while the name kept stating the rule. The second is
+    worse, because the name is what a reviewer reads: a test called "unknowable
+    is not the same as satisfied" whose body asserts the unknowable case returns
+    satisfied passes review by everyone who does not open it.
+    A related instance: a test that pins a DERIVED value (a half-size, a computed
+    offset) instead of the rule producing it. When the input changes legally, the
+    pinned derivation is wrong and the test calls the new correct value an error.
+  fix: |
+    When a fix turns tests red, read each failing test's NAME against its BODY
+    before touching either. If the name states the rule just implemented, the
+    body is the bug -- rewrite the body to assert the name. If the test was using
+    the fixed function as a PROXY for a different subject, give it what the
+    stricter code now needs (a fixture, an injected state) rather than weakening
+    the code back to make it pass.
+    Assert rules and invariants, not captured outputs. Where a value is derived,
+    assert the derivation against its source so a legal change to the input moves
+    the expectation with it.
+  verify: |
+    After rewriting, confirm each test FAILS against the old behaviour -- a
+    rewritten test that passes both ways is pinning nothing. Grep the suite for
+    literals duplicating a value the code declares, and replace each with a read
+    of the declaration.
+  tags: [tests, regression, stale-assertions, invariants, review, false-red]
+
+- id: "12.91"
+  phase: 12
+  area: defect-filed-against-one-component-lives-in-every-component-sharing-the-mechanism
+  symptom: |
+    A defect is found, fixed, written up and closed against ONE component -- and
+    an identical instance is still live one file away. Worse than an ordinary
+    miss: the ledger now says this class was dealt with, so the second instance
+    is protected by the record of the first being fixed. It resurfaces later
+    looking novel, in a component whose own tests are green.
+  cause: |
+    The defect was attributed to where it was NOTICED rather than to what CAUSED
+    it. When the cause is a shared mechanism -- a common helper, a third-party
+    node several graphs call, an idiom copied between siblings -- the blast
+    radius is every consumer of that mechanism, not the one that failed first.
+    A second effect hides it: the same code can be LEGAL in one configuration and
+    illegal in another, so a sibling that has not moved yet looks fine and
+    genuinely is. The defect arrives there later, with no change to that file,
+    when its configuration moves to a value the mechanism cannot accept. A
+    component can break because something it depends on was reconfigured
+    elsewhere, and no diff on that component will ever show it.
+  fix: |
+    Before closing a defect, name the MECHANISM that caused it and enumerate
+    every consumer. Fix or explicitly clear each one, and record the defect
+    against the mechanism rather than the component.
+    Then encode the rule as a check over the whole registry rather than the one
+    component: derive the constraint the mechanism imposes and assert it for
+    every consumer carrying the mechanism's fingerprint, so a component adopting
+    the idiom later is covered on arrival instead of when someone remembers.
+  verify: |
+    Grep for the mechanism's signature -- the helper call, the node class, the
+    idiom -- and assert the derived constraint for every hit, driven off the live
+    registry rather than a hand-written list. Prove the check by pointing one
+    consumer at an illegal configuration and confirming it fails.
+  tags: [shared-code, blast-radius, registry-wide, attribution, configuration, gate-hole]
+
+- id: "12.92"
+  phase: 12
+  area: a-config-pin-that-becomes-a-bug-by-remote-action
+  symptom: |
+    A configuration value that was correct when written starts causing damage
+    without anyone touching it, its file, or its component. There is no diff to
+    blame and no commit that introduced the failure -- the change happened in a
+    DIFFERENT module and the pin's meaning changed underneath it. Symptoms are
+    downstream and diffuse: work chopped into fragments, a ceiling refusing what
+    it used to allow, a budget applying at the wrong stage.
+  cause: |
+    The pin constrained one mechanism, and a later change moved the value into a
+    second mechanism's path -- typically by adding the component to a list that
+    gives an existing knob new authority (a planning cap, an admission gate, a
+    scheduling tier). Compensation elsewhere that made the pin harmless is often
+    ripped in the same change, so the protection disappears at the exact moment
+    the pin gains reach.
+    Comments make it durable: the component's own documentation still describes
+    the protection that was deleted, so a reader who checks concludes the pin is
+    safe. And the tests pinning the value are numerous and confident, because it
+    WAS correct when they were written.
+  fix: |
+    When adding a component to any list that gives an existing knob new
+    authority, enumerate every config setting that knob for the component and
+    re-derive whether each is still correct under the new meaning. Treat list
+    membership as the breaking change it is.
+    Assert tunable numbers against the source of truth they come from rather than
+    against copied literals, so the value can move without the tests lying in
+    either direction. Audit any comment describing a protection: a comment
+    describing deleted protection is how the next reader is talked out of the
+    correct diagnosis.
+  verify: |
+    For each component in a capability list, assert its configs are legal under
+    the semantics that list confers, and that the emitted work matches what was
+    requested rather than the pin. Prove the value reaches the stage you think:
+    set it, run, and check the produced segmentation, not the config file.
+  tags: [config, profiles, planning, stale-comment, remote-change, tests-defend-bug]

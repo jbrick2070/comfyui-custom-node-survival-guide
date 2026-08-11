@@ -3,13 +3,15 @@
 # Audited against BUG_BIBLE.yaml; the 35 records verified as uncovered were then
 # authored as entries 03.05-12.85 in commit 88a48d8, so every record is covered.
 # PURPOSE: next scrape only needs the DELTA - bug records added to OTR after
-# 2026-08-07 or refs not listed here. Do not re-scrape what is already indexed.
+# 2026-08-11 or refs not listed here. Do not re-scrape what is already indexed.
+# 2026-08-11 delta (video lane build, lanes 0-8): 8 records appended -- 4
+# promoted as 12.89-12.92, 4 already covered by 12.86/12.87/12.88.
 # Refs are relative to the ComfyUI-OldTimeRadio repo root, forward slashes.
 # verdict: covered = a bible entry teaches this class (see bible_id).
 # Evidence and reasoning per record: bug_scrape_2026-08-07.md.
-audited: '2026-08-07'
+audited: '2026-08-11'
 bible_head: 88a48d8
-bible_entries: 261
+bible_entries: 268
 records:
 - ref: BUG_LOG.md L1022 (BUG-LOCAL-231 soak data point)
   title: A long per-clip render loop had no routine VRAM reclamation — cleanup fired only on an OOM exception, so a gradual
@@ -2183,5 +2185,45 @@ records:
 - ref: docs/HANDOFF_LOG.md 2026-08-11 (video lane build, OTR b303afa3 lane 1)
   title: Weight probe knows one root while the box uses another -- installed models read MISSING to every caller without a running ComfyUI
   verdict: promoted
+  bible_id: '12.88'
+  source: handoff-log
+- ref: docs/evidence/lane_receipts/lane03-humo17_high_audio_in_portrait.md (OTR 38b77ecc)
+  title: A LoRA-free tier stamped use_lora=True because bool("none") is truthy -- the receipt asserted a fact the render disproved, and credits published "lora" for a LoRA that never loaded
+  verdict: promoted
+  bible_id: '12.89'
+  source: handoff-log
+- ref: docs/LANE_BUILD_LESSONS.md L14 (OTR 38b77ecc)
+  title: A test named test_unknowable_is_not_the_same_as_satisfied whose body asserted that unknowable IS satisfied -- the suite defended the bug its own name forbade
+  verdict: promoted
+  bible_id: '12.90'
+  source: handoff-log
+- ref: docs/LANE_BUILD_LESSONS.md L13 (OTR 7afe40e5)
+  title: S8b-10 was filed against ltx_audio_in and recurred verbatim in eng_ltx_video -- a fixed-x2 upsampler makes an illegal stage-A latent on every non-/64 canvas, so it was never one lane's defect
+  verdict: promoted
+  bible_id: '12.91'
+  source: handoff-log
+- ref: docs/evidence/lane_receipts/lane05-wan22_high_video.md (OTR d0536e72)
+  title: max_render_frames 17 stayed correct-looking after the engine joined PLANNING_CAP_ENGINES, chopping every beat into 0.68 s segments -- and three tests defended it
+  verdict: promoted
+  bible_id: '12.92'
+  source: handoff-log
+- ref: docs/LANE_BUILD_LESSONS.md L14 (OTR 38b77ecc, boot-contract guard)
+  title: check_running_server returned an empty problem list when the server state was unreadable, so "I could not check" read as "it passed" for every contract constraining a real clamp
+  verdict: covered
+  bible_id: '12.87'
+  source: handoff-log
+- ref: nodes/_otr_shared/boot_contracts.py sage_probe_error (OTR 38b77ecc)
+  title: A probe error was recorded into a field nothing ever read, so a failed SageAttention probe silently satisfied a Sage-constrained contract
+  verdict: covered
+  bible_id: '12.87'
+  source: handoff-log
+- ref: docs/evidence/lane_receipts/lane07-ltx23_low_audio_in.md (OTR 57665ee8)
+  title: render_driver._clip_summary dropped vram_peak_mb and the recipe fields, so lanes smoked with no usable cost-row seed while the probe measured correctly all along
+  verdict: covered
+  bible_id: '12.86'
+  source: handoff-log
+- ref: docs/evidence/lane_receipts/lane01-wan22_high_i2v.md (OTR b303afa3)
+  title: The wan_i2v weight resolver stopped at one hardcoded path with no folder_paths fallback, so the lane shipped DEAD -- assert_usable raised MISSING_MODEL before the first forward
+  verdict: covered
   bible_id: '12.88'
   source: handoff-log
