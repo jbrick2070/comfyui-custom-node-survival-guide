@@ -7091,3 +7091,38 @@ bugs:
     failing open, and tells you how long for.
   tags: [gate, false-green, fail-open, exit-code, skipped-check, empty-sentinel, permanent-trigger, import-by-path, ci, acceptance-evidence, workaround-shipped-gate-left-broken, xref-12.86]
   legacy_id: OTR-2026-08-09-validate-canonical-workflow-false-green
+
+- id: "12.88"
+  phase: 12
+  area: weight-probe-knows-one-root-while-the-box-uses-another
+  symptom: |
+    An installed model reads as MISSING to everything that asks without a
+    running ComfyUI -- a CPU test suite, a preflight matrix, a doctor script,
+    an "is this lane installed?" check. The weight is plainly on disk and the
+    node loads it fine at render time, so the failure looks like a broken
+    probe rather than a wrong one, and the usual response is to pin an env var
+    on the one box that noticed. That fixes the box and leaves the lane broken
+    everywhere else.
+  cause: |
+    Two different questions were sharing one probe. "Where would the LOADER
+    find this?" is answered by folder_paths, which honours
+    extra_model_paths.yaml and is only importable INSIDE a ComfyUI process.
+    "Is this weight on this box?" has to be answerable outside one -- and the
+    fallback for that case was a bare join against <comfy_root>/models/<cat>,
+    which is correct only for installs that keep their models under the comfy
+    tree. A box whose extra_model_paths.yaml points somewhere else gets a
+    confident wrong NO from every off-runtime caller.
+  fix: |
+    Give the fallback the SAME override chain the rest of the project already
+    uses for model roots (an OTR_*_MODELS_ROOT / COMFYUI_MODELS_ROOT env plus
+    the install's documented default), and probe it LAST -- after folder_paths
+    and after the comfy-root join. Probing last makes the change additive by
+    construction: it cannot alter an answer that was already a hit, only turn a
+    false negative into the truth. Put the root resolution in ONE named helper
+    so a second copy of the chain cannot drift from the first.
+  verify: |
+    Unset every model-path env var for the engine and assert the installed
+    weight still resolves. Then point the models-root env at an EMPTY temp
+    directory and assert it reads as absent, so the probe is proved to be
+    probing rather than always answering yes.
+  tags: [models, paths, folder_paths, preflight, headless, false-negative]

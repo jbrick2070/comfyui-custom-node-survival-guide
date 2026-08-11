@@ -2180,3 +2180,8 @@ records:
   verdict: promoted
   bible_id: '12.87'
   source: handoff-log
+- ref: docs/HANDOFF_LOG.md 2026-08-11 (video lane build, OTR b303afa3 lane 1)
+  title: Weight probe knows one root while the box uses another -- installed models read MISSING to every caller without a running ComfyUI
+  verdict: promoted
+  bible_id: '12.88'
+  source: handoff-log
