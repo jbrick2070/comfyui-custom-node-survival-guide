@@ -7408,3 +7408,37 @@ bugs:
     (compare a hash before and after). Assert a real permission failure still
     propagates.
   tags: [windows, file-staging, self-copy, winerror32, fail-loud]
+- id: "12.97"
+  phase: 12
+  area: a-model-field-name-that-collides-with-its-base-class
+  symptom: |
+    A pydantic field is declared required, yet instances validate WITHOUT it and
+    the missing value comes back as a bound method. The next json.dumps dies
+    with "Object of type method is not JSON serializable", naming neither the
+    model nor the field. The quieter half is worse: the JSON schema generated
+    from that model stops listing the field in `required`, so an LLM prompted
+    against it is never asked for a documented value, and the method repr
+    reaches the prompt as text.
+  cause: |
+    The field name also resolves on the base class or its METACLASS. Pydantic's
+    ModelMetaclass inherits ABCMeta, so a name like `register` resolves on
+    BaseModel without appearing in vars(BaseModel). Pydantic does not reject the
+    collision -- it adopts the inherited attribute as the field's DEFAULT, which
+    silently turns a required field optional. `copy`, `json`, `schema`, `dict`,
+    `validate` and `construct` are the same trap. A warnings filter that
+    silences the shadowing warning hides the only signal.
+  fix: |
+    Declare the field explicitly with `Field(...)` so the class body shadows the
+    inherited attribute and restores required-ness. The wire name is unchanged,
+    so a contract term that cannot be renamed stays put. Do NOT "fix" it with a
+    default: that stops the crash while leaving the field optional and the model
+    never asked for it. Renaming is correct only when the name is not part of an
+    external contract.
+  verify: |
+    Assert `Model.model_fields[name].is_required()` is True and that the name
+    appears in `model_json_schema()["required"]`. Then sweep EVERY pydantic
+    model in the package: for each field default, `json.dumps(default)` must not
+    raise. Guard the sweep with a companion assertion that it actually found the
+    models, so a broken import cannot make it vacuously green.
+  tags: [pydantic, schema, serialization, structured-output, silent-default]
+  legacy_id: "PBUG-20260812-02"

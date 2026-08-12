@@ -25,8 +25,8 @@
 # verdict: covered = a bible entry teaches this class (see bible_id).
 # Evidence and reasoning per record: bug_scrape_2026-08-07.md.
 audited: '2026-08-11'
-bible_head: 88a48d8
-bible_entries: 272
+bible_head: 4f56d52 (+12.97 appended 2026-08-12)
+bible_entries: 273
 records:
 - ref: BUG_LOG.md L1022 (BUG-LOCAL-231 soak data point)
   title: A long per-clip render loop had no routine VRAM reclamation — cleanup fired only on an OOM exception, so a gradual
@@ -2267,3 +2267,8 @@ records:
   verdict: covered
   bible_id: '12.88'
   source: handoff-log
+- ref: docs/PROD_BUG_LOG.md PBUG-20260812-02 (OTR 9d03cba9)
+  title: A pydantic field name that also resolves on the METACLASS -- CastShape.register -- was adopted by pydantic as the field's DEFAULT, so a field declared required went silently optional, the JSON schema handed to the writer stopped requiring it, and an omitted value reached the prompt as a bound-method repr before dying on json.dumps; found by a live headless leg, not by review
+  verdict: promoted
+  bible_id: '12.97'
+  source: prod-bug-log
