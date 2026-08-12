@@ -6,6 +6,17 @@
 # 2026-08-11 or refs not listed here. Do not re-scrape what is already indexed.
 # 2026-08-11 delta (video lane build, lanes 0-8): 8 records appended -- 4
 # promoted as 12.89-12.92, 4 already covered by 12.86/12.87/12.88.
+# 2026-08-11 delta (video lane build, lanes 10-18): 1 record appended, 0
+# promoted. Lanes 10-18 closed nine packets, but only ONE finding met the
+# admission rule (verified by a live artifact/smoke) -- mesh_stage shipping
+# DEAD off the runtime, which is 12.88's class for the third time. Every
+# other finding this window (L17-L22 in docs/LANE_BUILD_LESSONS.md) came
+# from a review or QA pass, and a static-audit finding never creates a
+# Bible rule on its own. The strongest future candidates if a LIVE failure
+# ever admits them: L20 (a lexical gate satisfied by the comment that
+# documents the rule it enforces -- checked, genuinely uncovered; 11.59 is
+# an adjacent content-vs-path substring entry, not the same class) and L19
+# (a static declaration silently disabling an operator env lever).
 # Refs are relative to the ComfyUI-OldTimeRadio repo root, forward slashes.
 # verdict: covered = a bible entry teaches this class (see bible_id).
 # Evidence and reasoning per record: bug_scrape_2026-08-07.md.
@@ -2246,4 +2257,9 @@ records:
   title: stage_into_comfy_input copied an init still onto itself when the supplied path already lived in ComfyUI's input directory, killing a live headless render with WinError 32 at the staging seam before any GPU work
   verdict: covered
   bible_id: '12.96'
+  source: handoff-log
+- ref: docs/evidence/lane_receipts/lane10-mesh_stage.md (OTR 8e1f02bf)
+  title: The hy3d weight resolver walked a hardcoded <comfy_root>/models/checkpoints plus an HF_HOME sibling and never consulted folder_paths, so mesh_stage read as NOT INSTALLED and refused by name while the 4.93 GB weight sat in this box's configured models root -- the lane was dead on the box with no env pin anywhere
+  verdict: covered
+  bible_id: '12.88'
   source: handoff-log
