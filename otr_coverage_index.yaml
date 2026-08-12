@@ -11,7 +11,7 @@
 # Evidence and reasoning per record: bug_scrape_2026-08-07.md.
 audited: '2026-08-11'
 bible_head: 88a48d8
-bible_entries: 268
+bible_entries: 272
 records:
 - ref: BUG_LOG.md L1022 (BUG-LOCAL-231 soak data point)
   title: A long per-clip render loop had no routine VRAM reclamation — cleanup fired only on an OOM exception, so a gradual
@@ -2226,4 +2226,24 @@ records:
   title: The wan_i2v weight resolver stopped at one hardcoded path with no folder_paths fallback, so the lane shipped DEAD -- assert_usable raised MISSING_MODEL before the first forward
   verdict: covered
   bible_id: '12.88'
+  source: handoff-log
+- ref: docs/evidence/lane_receipts/lane09-ltx23_high_video.md (OTR 77fa4dad)
+  title: The VRAM probe and receipt fields were added to the render path the CPU fixtures exercise, while the installed dev-family weight routed every real render through the sibling path that had neither
+  verdict: covered
+  bible_id: '12.93'
+  source: handoff-log
+- ref: docs/evidence/lane_receipts/lane09-ltx23_high_video.md (OTR 77fa4dad)
+  title: render_driver substituted an instantaneous vram_used_mb() sample for a missing VramPeakProbe maximum via an `or` fallback, reporting 4124 MB where the true peak was 15916 MB -- a 3.9x understatement shaped exactly like a peak
+  verdict: covered
+  bible_id: '12.94'
+  source: handoff-log
+- ref: docs/evidence/lane_receipts/lane09-ltx23_high_video.md (OTR 77fa4dad)
+  title: The 169-frame LTX decode floor was measured at 1472x832 and enforced at every canvas; swept at the declared 1024x576 the whole ladder decodes clean, so a short beat rendered 169 frames and discarded 119 to satisfy a constraint that did not exist there
+  verdict: covered
+  bible_id: '12.95'
+  source: handoff-log
+- ref: docs/LANE_BUILD_LESSONS.md lane 9 harness note (OTR 77fa4dad)
+  title: stage_into_comfy_input copied an init still onto itself when the supplied path already lived in ComfyUI's input directory, killing a live headless render with WinError 32 at the staging seam before any GPU work
+  verdict: covered
+  bible_id: '12.96'
   source: handoff-log

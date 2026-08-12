@@ -7277,3 +7277,134 @@ bugs:
     requested rather than the pin. Prove the value reaches the stage you think:
     set it, run, and check the produced segmentation, not the config file.
   tags: [config, profiles, planning, stale-comment, remote-change, tests-defend-bug]
+
+- id: "12.93"
+  phase: 12
+  area: a-fix-lands-on-the-path-the-tests-run-not-the-path-the-install-selects
+  symptom: |
+    A capability is added, reviewed, tested and shipped, and the running system
+    still behaves as if it were never added. The test suite is green and
+    exercises the new code honestly. Nothing appears in any log, because the
+    code that was fixed is genuinely correct -- it simply never executes on this
+    machine.
+  cause: |
+    The component has two or more render/execution paths and selects between
+    them IMPLICITLY at runtime, from installed assets rather than from
+    configuration a reader can see: a variant detected from a weight filename, a
+    family probe, a capability sniff, a default that differs per install. The
+    fix was applied to the path the author had open, which is usually the one
+    the CPU test fixtures instantiate; the installed assets select the other.
+    A test suite cannot catch this, because with fakes BOTH paths are equally
+    reachable and equally green. The selection is a property of the machine, not
+    of the code, so only a live run on that machine disagrees.
+  fix: |
+    For any component with more than one execution path, resolve WHICH PATH THE
+    INSTALLED CONFIGURATION SELECTS before deciding where a fix belongs, and
+    apply it to every path that can produce the artifact -- or make the paths
+    share one seam so there is only one place to fix. Treat "which branch does
+    this box take" as a fact to look up, never to assume from the code order.
+    When a change claims to enable a downstream capability ("X cannot measure
+    without this"), prove the capability on the path a live run actually takes
+    before believing the claim.
+  verify: |
+    Enumerate the component's execution paths and, for each, assert the new
+    field/guard/receipt is present. Then run ONE live job and read the produced
+    artifact -- not the test output -- for the thing the change was supposed to
+    add. A green suite is not evidence that the shipped path changed.
+  tags: [multi-path, implicit-dispatch, install-dependent, receipts, live-proof]
+
+- id: "12.94"
+  phase: 12
+  area: a-missing-measurement-silently-replaced-by-a-weaker-one
+  symptom: |
+    A metric is present, plausible, and wrong -- consistently too low or too
+    smooth. Nothing is null, nothing warns, and the number is used to calibrate
+    a budget or a limit. Later that limit admits work that then fails at
+    runtime, and the calibration data cannot be told apart from good data
+    because both are plain numbers in the same field.
+  cause: |
+    A consumer reads the strong measurement with a fallback to a weaker one in a
+    single expression -- `value = precise() or approximate()` or an equivalent
+    default-on-missing. The fallback exists for genuine reasons (an older
+    producer, an off-hardware path) but it converts ABSENCE into a DIFFERENT
+    KIND OF NUMBER rather than into a missing value. A sampled instantaneous
+    reading substituted for a windowed maximum is a LOWER BOUND, and a budget
+    derived from a lower bound under-predicts demand, which is precisely the
+    direction that admits work that then exhausts the resource.
+  fix: |
+    Never let a fallback change the KIND of a measurement. If the precise source
+    is absent, propagate absence -- null, not a substitute -- and let the
+    consumer refuse or skip explicitly. Where both kinds are genuinely useful,
+    record them in separate fields with the source named, plus a boolean saying
+    whether the row may seed a calibration; a weaker reading stays readable
+    without becoming usable.
+  verify: |
+    Assert that a result carrying no precise measurement canonicalizes to null
+    rather than to any number. Separately, assert a calibration refuses to be
+    seeded from a row whose provenance flag is unset. Diff the two sources on
+    one live job: if they differ by a large factor, the fallback was never
+    interchangeable and any historical row built on it is suspect.
+  tags: [measurement, provenance, fallback, calibration, silent-substitution]
+
+- id: "12.95"
+  phase: 12
+  area: a-constant-measured-under-one-configuration-is-not-a-property-of-the-component
+  symptom: |
+    A component enforces a magic number that looks conservative and costs far
+    more than it should -- work rounded up to a floor, a minimum batch, a forced
+    size -- with no failure to justify it. Removing it feels reckless because
+    nobody remembers what it protects, so it survives every review as prudence.
+  cause: |
+    The number was MEASURED, correctly, against a configuration the component no
+    longer uses: a different canvas, resolution, precision, batch shape or
+    backend. Constants do not carry their provenance, so a measured constraint
+    and an arbitrary guess are indistinguishable once the author has moved on --
+    and the conservative-looking one is never challenged. When the configuration
+    changed, nothing re-derived the constraint, because the constraint lived in
+    a different file from the thing that moved.
+  fix: |
+    Record the configuration each enforced constant was measured under, in the
+    constant's own comment, and state that it is UNKNOWN at any other
+    configuration. When the configuration moves, re-measure rather than
+    inheriting; treat a configuration change as invalidating every constant
+    derived from the old one, in both directions. Where a declaration and a
+    runtime constant must agree, assert one against the other so the pair cannot
+    drift silently.
+  verify: |
+    Sweep the constrained dimension at the CURRENT configuration and record
+    which values actually fail -- including the values that failed under the old
+    configuration, which are the informative ones. Assert the enforced constant
+    equals the measured boundary, and that a declaration derived from it matches
+    the runtime value rather than a copied literal.
+  tags: [constants, provenance, configuration-drift, measurement, over-conservatism]
+
+- id: "12.96"
+  phase: 12
+  area: staging-a-file-that-already-lives-in-the-staging-destination
+  symptom: |
+    A job dies at a file-staging step, before any real work, with a Windows
+    sharing violation -- "The process cannot access the file because it is being
+    used by another process" (WinError 32) -- naming a path but nothing about
+    what was being staged. No other process holds the file. On POSIX the same
+    code silently truncates the file to zero bytes instead of raising, which is
+    worse.
+  cause: |
+    A helper copies an input into a tool's working/input directory and returns
+    its basename. When the caller supplies a path that is ALREADY inside that
+    destination, source and destination resolve to the same file and the copy is
+    a self-copy. It is easy to hit precisely because the destination is a
+    natural place for such files to live -- a previous run staged one there, or
+    an operator picked an example from it.
+  fix: |
+    Compare source and destination by RESOLVED identity before copying
+    (os.path.samefile, or realpath equality when the destination may not exist
+    yet) and skip the copy when they are the same file -- the input is already
+    staged and its basename is the correct answer. Do not wrap the copy in a
+    broad try/except: that hides genuine permission and disk failures, which is
+    the same class of defect one level up.
+  verify: |
+    Stage a file that already lives in the destination directory and assert the
+    helper returns its name without raising and without changing its bytes
+    (compare a hash before and after). Assert a real permission failure still
+    propagates.
+  tags: [windows, file-staging, self-copy, winerror32, fail-loud]
