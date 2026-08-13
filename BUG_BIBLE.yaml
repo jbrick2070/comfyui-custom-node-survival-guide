@@ -7555,15 +7555,34 @@ bugs:
     into decoration the instant it is not accompanied by the deletion it
     argues for.
   fix: |
-    DELETE the row rather than correcting it, unless a fresh measurement is in
-    hand -- the documentation usually already states that empty is the correct
-    value, and empty means the surrounding plan stands unchallenged. If a
-    replacement is proposed from an existing bench or lab fit, check the
+    CHECK THE FALLBACK BEFORE YOU DELETE ANYTHING. This entry originally
+    prescribed deletion outright; that was proven a no-op the day it was
+    written. The lookup was `TABLE.get(key, DEFAULT)` and DEFAULT was the
+    byte-identical tuple, so removing both rows changed no verdict, no
+    computed ceiling and no exception -- the guard refused exactly as before,
+    and the "fix" would have shipped as a green diff that fixed nothing. A
+    disqualified row and a disqualified default are the same constant wearing
+    two names. Establish the delete-vs-gate question by running the real call
+    with the row removed, not by reading the table.
+    So: if the value survives its own deletion, deletion is not the fix. GATE
+    THE ENFORCEMENT INSTEAD. Route every refusal through one explicit
+    predicate -- "may this row REFUSE?", never "does a row exist?" -- and make
+    the disqualified value predict, log and return while refusing nothing.
+    Grep for EVERY consumer first and gate them all: the failure that produced
+    this entry was one authority wired to one of its two call sites, so the
+    same constant was inert on the reviewed path and live one call away.
+    Gate the WHOLE row, not the term you find least defensible. A row with a
+    disqualified slope and a plausible-looking fixed overhead invites keeping
+    half of it; resist that unless the evidence separates the terms, because
+    "one row, one question" is what stops a second, unevidenced authority from
+    appearing. Here the overhead looked unimpeached and was not -- it was
+    derived from an ABSOLUTE peak while the comparison ran against FREE bytes,
+    double-charging a baseline on every prediction.
+    If a replacement is proposed from an existing bench or lab fit, check the
     project's own admission rule first: a standing "no bench may substitute for
     the real lifecycle" ruling forbids adopting those numbers however much
-    closer to truth they look. When a doc block disqualifies a value, make the
-    code enforce it: an empty table, or an assertion that the entry is absent,
-    so the claim and the runtime cannot drift apart again.
+    closer to truth they look. Deletion remains right when the value has NO
+    fallback behind it and the documentation says empty is correct.
   verify: |
     Compute the guard's verdict at the EXTREMES of its input, not at the
     observed value. Here the row priced a 125-frame request at 30,125 MB on a
@@ -7571,7 +7590,18 @@ bugs:
     never the variable. A guard that refuses at every input it can ever see is
     not a guard. Assert that: for each row, at maximum plausible resource, the
     largest request the planner can emit must still be affordable, or the row
-    must not exist. Grep for consumers before trusting that a fixed sibling
+    must not refuse. Grep for consumers before trusting that a fixed sibling
     means the value is dead.
+    PIN THE NO-OP ITSELF, or the deletion gets proposed again. Assert that each
+    row equals the fallback constant, with a message telling the next reader
+    that the no-op argument must be re-derived if it ever stops being true.
+    Then assert the disqualified value's behaviour from BOTH sides: the exact
+    production inputs that were refused now return their full request, and a
+    row that IS qualified still refuses them -- otherwise the test proves the
+    guard is broken rather than gated. Keep validation OUT of the gate: a
+    malformed or negative coefficient is a configuration error and must stay
+    fatal for every engine, qualified or not. Finally, require that
+    qualification names a row that actually exists, or a typo silently promotes
+    the shared fallback into an enforcing guard.
   tags: [guards, tuned-constants, stale-config, dead-row, refusal-path, doc-vs-code-drift, cost-model, xref-12.73]
   legacy_id: "OTR-2026-08-13-frame-cost-model"
