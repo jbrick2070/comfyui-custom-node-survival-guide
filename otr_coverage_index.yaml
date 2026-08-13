@@ -33,8 +33,8 @@
 # title card -- and conflating them cost an evening; the index keeps them as
 # two records for that reason.
 audited: '2026-08-12'
-bible_head: 69ee6b2 (+07.31, 07.32 appended 2026-08-12)
-bible_entries: 275
+bible_head: 80fc358 (+12.98 appended 2026-08-13)
+bible_entries: 276
 records:
 - ref: BUG_LOG.md L1022 (BUG-LOCAL-231 soak data point)
   title: A long per-clip render loop had no routine VRAM reclamation — cleanup fired only on an OOM exception, so a gradual
@@ -2289,4 +2289,9 @@ records:
   title: The hero title card is drawn into the procgen layer and composited screen + green_only, a LIGHTEN-ONLY blend, measuring 8.96:1 over a dark ceiling but 1.13:1 over a lit monitor on the published episode -- and the operator's own suggested black outline is a mathematical no-op there because screen(A, 0) = A, so the fix has to move the text downstream of the blend rather than restyle it in place
   verdict: promoted
   bible_id: '07.32'
+  source: git-fix-history
+- ref: nodes/_otr_video_engines/motion_common.py FRAME_COST_MODEL (OTR run-6 render gate)
+  title: Two 45-word render-gate legs died on MotionBudgetError with a plausible-looking low free= figure, and the cost row that refused them was already disqualified IN WRITING in the comment block directly beneath it -- wrong in both directions, its sibling consumer already stopped reading it, and "empty is the correct value" stated outright; the row prices a 125-frame request at 30,125 MB on a 16 GB card, so it refuses on an EMPTY device and the VRAM was never the variable
+  verdict: promoted
+  bible_id: '12.98'
   source: git-fix-history

@@ -7533,3 +7533,45 @@ bugs:
     models, so a broken import cannot make it vacuously green.
   tags: [pydantic, schema, serialization, structured-output, silent-default]
   legacy_id: "PBUG-20260812-02"
+- id: "12.98"
+  phase: 12
+  area: a-constant-its-own-documentation-disqualifies-is-still-live
+  symptom: |
+    A guard refuses real, previously-shipping work. The refusal message is
+    specific and confident -- it names a budget, a measured input and a
+    computed ceiling -- so it reads as a resource problem, and the reported
+    resource figure is usually low enough to make that story plausible.
+    Investigation chases the resource. Meanwhile the comment block DIRECTLY
+    BENEATH the offending table already says the table is wrong, names the
+    production leg it previously killed, and states what the correct value is.
+    Nobody reads it, because the refusal points somewhere else.
+  cause: |
+    A tuned constant was measured once, found wrong, and documented as
+    disqualified IN PLACE -- but the row was never deleted, and one consumer
+    still reads it. A sibling consumer was already fixed ("X stopped consulting
+    it for exactly this reason"), which is what makes the survivor invisible:
+    the codebase looks like it handled the problem. The doc block is the
+    author's own analysis, written at the moment of discovery, and it degrades
+    into decoration the instant it is not accompanied by the deletion it
+    argues for.
+  fix: |
+    DELETE the row rather than correcting it, unless a fresh measurement is in
+    hand -- the documentation usually already states that empty is the correct
+    value, and empty means the surrounding plan stands unchallenged. If a
+    replacement is proposed from an existing bench or lab fit, check the
+    project's own admission rule first: a standing "no bench may substitute for
+    the real lifecycle" ruling forbids adopting those numbers however much
+    closer to truth they look. When a doc block disqualifies a value, make the
+    code enforce it: an empty table, or an assertion that the entry is absent,
+    so the claim and the runtime cannot drift apart again.
+  verify: |
+    Compute the guard's verdict at the EXTREMES of its input, not at the
+    observed value. Here the row priced a 125-frame request at 30,125 MB on a
+    16 GB card -- it refused on an empty device, which proves the resource was
+    never the variable. A guard that refuses at every input it can ever see is
+    not a guard. Assert that: for each row, at maximum plausible resource, the
+    largest request the planner can emit must still be affordable, or the row
+    must not exist. Grep for consumers before trusting that a fixed sibling
+    means the value is dead.
+  tags: [guards, tuned-constants, stale-config, dead-row, refusal-path, doc-vs-code-drift, cost-model, xref-12.73]
+  legacy_id: "OTR-2026-08-13-frame-cost-model"
