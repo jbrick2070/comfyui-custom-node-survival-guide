@@ -7645,3 +7645,78 @@ bugs:
     a non-zero exit whose message names the version gap.
   tags: [generators, codegen, evidence, append-only, silent-data-loss, doc-vs-code-drift, fail-closed, xref-12.98]
   legacy_id: "OTR-2026-08-13-evidence-manifest-generator"
+
+- id: "12.100"
+  phase: 12
+  area: a-length-ceiling-is-not-a-liveness-guard-and-can-hide-the-runaway-it-replaces
+  symptom: |
+    A schema-constrained local decode falls into a verbatim repetition loop
+    inside ONE string field and never exits. It generates until the context
+    ceiling -- measured: 13,912 tokens over 22 minutes, the same ~384-token
+    paragraph about 36 times -- and every token is discarded. Nothing looks
+    wrong while it happens: the GPU is busy, tokens flow at full rate, and
+    every liveness signal is healthy.
+    THEN the repair makes it quieter. After a max_length is added, the same
+    runaway comes back as valid JSON that passes schema validation and ships a
+    sentence cut off mid-word. And a detector built on "how long has this
+    string been open" cannot tell a legitimately long field from a loop, so it
+    is a second length cap wearing a liveness costume.
+  cause: |
+    Three separate mistakes that look like one:
+    (a) Under grammar-constrained decoding the EOS token is masked until the
+        document is complete, so the only exit from a string is its closing
+        quote. Once a repetition loop locks, nucleus/min-p sampling prunes that
+        quote to probability ZERO -- the model is not refusing to stop, it is
+        never offered the option. A repetition penalty cannot help because the
+        HF penalty is not frequency-aware: a token emitted 60 times is
+        penalised exactly as much as one emitted once.
+    (b) A grammar enforcer stops a string AT its max_length by admitting only
+        progressively shorter tokens as the limit nears, so a forced closure
+        lands anywhere within one MAX-TOKEN-LENGTH below the ceiling. An
+        exact-hit detector therefore misses most real forced closures, and the
+        truncated string sails through.
+    (c) The ceiling only terminates a decode where a grammar ENFORCES it at
+        token selection. On a post-validated lane -- schema described in the
+        prompt, parsed after the call -- a max_length stops nothing: the
+        runaway still burns the window, and the artifact is discarded
+        afterwards. That is strictly worse than no ceiling.
+  fix: |
+    DETECT REPETITION, NOT LENGTH. A runaway is a decode that is CYCLING; the
+    signal is a run of tokens repeating back to back, which is independent of
+    how long the output is allowed to be. Read TOKEN IDS, never decoded text --
+    then the guard is tokenizer-independent (no isolated-token decoding, no
+    byte-fallback or escape handling) and format-independent (it covers JSON,
+    markup and free prose identically).
+    Use a LATCHED StoppingCriteria: detect, set a flag, return True, let
+    generate() return normally, then classify and raise OUTSIDE. Raising from
+    inside a criterion skips the caller's decode/evidence construction and the
+    streamer's own teardown, and arrives unclassified.
+    Raise a DISTINCT, REROLLABLE phase. Reusing the capacity-exhausted phase
+    makes every diagnostic lie: a halted decode stops with most of its
+    allowance unspent, so "ended at the provider capacity limit" sends the next
+    reader hunting a budget defect that does not exist.
+    Keep schema ceilings, but as a STRUCTURAL backstop sized far above anything
+    real content produces, and reject at a GUARD BAND below them wider than the
+    longest single token the tokenizer can emit. Route that rejection to a
+    reroll, never to silently accepted text.
+    DO NOT reach for no-repeat-n-grams when a grammar is active: the n-gram ban
+    and the grammar mask both write -inf, prefix validation only checks that the
+    grammar returned a non-empty list rather than that a token SURVIVED the ban,
+    and the intersection can be empty -- which crashes sampling outright.
+  verify: |
+    Automatable, and the false-positive tests are the ones that matter:
+    (1) Feed the detector thousands of tokens of VARIED output and assert it
+        does NOT fire. A test whose no-halt case never crosses the threshold
+        proves nothing -- size the input far beyond any bound.
+    (2) Feed it a cycle at the measured period and assert it fires.
+    (3) Assert structural repetition is ignored: repeated keys with VARYING
+        values (a real JSON array) must not trip it, while a perfectly periodic
+        stream must.
+    (4) Assert the rejection threshold sits at least one max-token-length below
+        the schema ceiling, computed from the real tokenizer vocabulary.
+    (5) Assert the halt reaches the retry ladder as RECOVERABLE, and that a
+        deterministic prompt-side refusal stays non-recoverable.
+    (6) Assert the guard is wired into the PRODUCTION entry point, not only
+        callable in isolation -- delete the call site and the suite must go red.
+  tags: [llm, structured-json, grammar-constrained, lm-format-enforcer, degenerate-repetition, runaway-decode, stopping-criteria, liveness, silent-truncation, tokenizer-independence, no-repeat-ngram, fail-loud, xref-11.50]
+  legacy_id: "OTR-2026-08-13-writer-decode-runaway"

@@ -2300,3 +2300,8 @@ records:
   verdict: promoted
   bible_id: '12.99'
   source: live-execution
+- ref: nodes/_otr_scifi_codex.py + nodes/OTR_LedgerScriptWriter.py (OTR 2026-08-13, two live 45-word render-gate legs)
+  title: A schema-constrained P3 decode looped inside ONE JSON string for 13,912 tokens over 22 minutes and was discarded at the ceiling, then P5 did the same for 8,128 tokens in the same leg -- lm-format-enforcer masks EOS until the document closes so the closing quote is the only exit, and once the loop locked top_p/min_p priced that quote at exactly zero while repetition_penalty stayed inert because the HF penalty is not frequency-aware; the first repair (a max_length ceiling) then converted the runaway into a clean-parsing mid-word truncation, and the first guard measured open-string LENGTH, which cannot distinguish a long field from a loop
+  verdict: promoted
+  bible_id: '12.100'
+  source: live-execution
