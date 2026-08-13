@@ -2295,3 +2295,8 @@ records:
   verdict: promoted
   bible_id: '12.98'
   source: git-fix-history
+- ref: scripts/build_video_evidence_manifest.py (OTR 2026-08-13, found by running it)
+  title: The declared generator for docs/evidence/video_evidence_manifest.json still produced manifest_version 1 while the shipped JSON was at 4, because lanes 7b/8/9 and the H3 pair appended their rows to the JSON directly and never came back to the script -- so a plain re-run reported success and silently deleted 123 lines of real lane evidence, caught only by reading the git diff afterwards
+  verdict: promoted
+  bible_id: '12.99'
+  source: live-execution

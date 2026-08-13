@@ -7605,3 +7605,43 @@ bugs:
     the shared fallback into an enforcing guard.
   tags: [guards, tuned-constants, stale-config, dead-row, refusal-path, doc-vs-code-drift, cost-model, xref-12.73]
   legacy_id: "OTR-2026-08-13-frame-cost-model"
+- id: "12.99"
+  phase: 12
+  area: a-generator-gone-stale-destroys-the-artifact-it-is-named-for
+  symptom: |
+    A file carries a header naming the script that generates it, so a
+    maintainer edits the script and re-runs it. The run reports success and
+    prints a plausible summary. The artifact silently loses most of its
+    content, because contributors had been appending to the OUTPUT directly for
+    weeks and the generator never learned about any of it.
+  cause: |
+    An append-only artifact acquires two write paths: the declared generator,
+    and hand edits by whoever needed a row landed today. Hand edits are faster
+    and always win in the moment, so the generator's own data drifts into a
+    strict subset of what ships. Nothing detects this, because a generator is
+    trusted precisely by being the declared source of truth -- the header
+    saying "GENERATOR for X" is read as a guarantee rather than as an intention
+    that stopped being true. A version field that the artifact bumps and the
+    generator does not is the fingerprint, and nobody compares them because
+    running the generator is supposed to be the safe operation.
+  fix: |
+    Make the generator FAIL CLOSED against its own output: read the shipped
+    artifact's version before writing, and refuse when it is newer than the
+    version this code produces. Say what would have been lost, and name the
+    reconciliation as the work -- rows missing from the generator must be
+    re-derived from their sources, never copied back out of the artifact, or
+    the generator is laundering hand edits it cannot reproduce.
+    Do NOT "fix" it by bumping the generator's version to match. That silences
+    the guard and re-arms the trap. Do NOT delete the generator either while
+    anything still cites it; an unrunnable generator with a loud refusal is
+    strictly better than a runnable one that destroys evidence.
+  verify: |
+    Run the generator against the shipped artifact in CI and assert it either
+    reproduces the file BYTE-FOR-BYTE or exits non-zero. Those are the only two
+    honest outcomes; a generator that runs clean and produces something smaller
+    is the bug. Diff the row/key COUNT, not just the bytes, so a reader sees
+    scale ("123 lines, 9 lanes") rather than "file changed".
+    Assert the refusal itself: stamp the artifact one version ahead and require
+    a non-zero exit whose message names the version gap.
+  tags: [generators, codegen, evidence, append-only, silent-data-loss, doc-vs-code-drift, fail-closed, xref-12.98]
+  legacy_id: "OTR-2026-08-13-evidence-manifest-generator"
