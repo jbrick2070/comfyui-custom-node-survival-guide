@@ -5974,6 +5974,97 @@ bugs:
     for each.
   tags: [render-planning, combinatorial-search, objective-ordering, two-phase-search, memoization, unbounded-recursion, derived-search-window, differential-sweep, mutation-check, xref-12.73]
   legacy_id: HANDOFF-L2271, HANDOFF-L4173
+- id: "07.31"
+  phase: 7
+  area: video
+  symptom: |
+    A scrolling text panel -- credits, a transcript roll, any pre-rendered
+    canvas moved past a viewport -- reads as ABSENT to a viewer even though the
+    renderer drew it and every unit test passes. Measured by counting lit pixels
+    in the column across the finished video, the content is blank for the first
+    seconds and blank again for the last, full only in the middle, and the
+    fade-out lands on the empty end. The defect is invisible on long content and
+    obvious on short content, so it survives every full-length episode and
+    appears the first time a SHORT one is rendered.
+  cause: |
+    The scroll interpolated between CANVAS edges -- offset zero to
+    canvas_height minus viewport_height -- while the canvas deliberately
+    overstates the content at BOTH ends. The builder starts drawing a fraction
+    of a screen down for breathing room, pads below the last line, and sizes the
+    bitmap to a generous floor (at least three screens) because it cannot know
+    the final height before it lays the text out. Canvas height is therefore an
+    ALLOCATION, not a measurement, and using it as the travel span puts blank
+    panel on screen at the start and end of every roll. Duration derived from
+    the same canvas span inherits the error, so raising the scroll speed
+    lengthens the dead tail rather than removing it.
+  fix: |
+    Have the builder report the real ink span -- the top of the first drawn
+    glyph and the bottom of the last -- alongside the bitmap, and anchor both
+    the scroll offset AND the duration estimate to that span instead of the
+    canvas. Open on the first line and rest the last line on the viewport's
+    bottom edge. When the content is SHORTER than the viewport the span clamps
+    to zero and the panel HOLDS fully visible rather than drifting through
+    emptiness; that clamp is part of the fix, not an edge case. Do not "fix"
+    this by trimming the padding -- the breathing room and the generous
+    allocation are both wanted; what is wrong is treating an allocation as a
+    measurement.
+  verify: |
+    Assert the content span, not the pixels: build the panel from a fixture and
+    require ink to be on screen at the FIRST rendered frame and at the LAST, for
+    a transcript longer than the viewport and for one shorter than it. Guard the
+    fixture itself with a companion assertion that a longer script produces a
+    TALLER span -- a fixture whose items lack the key the renderer draws on
+    produces an empty panel of constant height, and "nothing moved" then looks
+    like a code defect while a test that renders nothing and asserts nothing
+    moved passes forever.
+  tags: [video, credits, scroll, canvas-vs-content, allocation-not-measurement, short-input-exposes, pil]
+  legacy_id: "OTR-f70df546"
+- id: "07.32"
+  phase: 7
+  area: video
+  symptom: |
+    Text burned into a layer that is composited with a LIGHTEN-ONLY blend is
+    legible over dark scene content and effectively invisible over bright
+    content -- measured 8.96:1 over a dark ceiling and 1.13:1 over a lit
+    monitor in the same episode. Adding a black outline, a drop shadow or a
+    scrim to the text layer changes NOTHING on the finished video, so the
+    obvious fix appears to have silently failed to apply.
+  cause: |
+    The blend is `screen` (out = A + B - A*B), often narrowed further to a
+    single channel. `screen(A, 0) = A`: a black pixel in the overlay is the
+    blend's IDENTITY, so every darkening element -- outline, shadow, matte --
+    is a mathematical no-op no matter how wide it is drawn. Contrast for the
+    glyph is then bounded by the source pixel underneath it, and over a bright
+    source there is no headroom left to separate from. Recolouring the glyph
+    does not rescue it either: white screens to full white, which is still under
+    2:1 against a bright source. The blend is also a single global operation
+    over the whole frame with no per-region and no time gating, so a targeted
+    scrim is unreachable without changing the blend node itself.
+  fix: |
+    Move the text to a layer composited AFTER the lighten-only blend, where
+    normal alpha compositing applies and an outline is real -- typically a
+    subtitle/caption burn that already carries OutlineColour, BorderStyle,
+    Outline and Shadow. Do not attempt adaptive glyph colour or per-region
+    dimming: both damage picture content to fix an overlay and neither delivers
+    a true outline. Note the transport constraint before choosing an RGBA
+    overlay between stages: yuv420p carries no alpha, so an intermediate
+    encode destroys it. When the text becomes the RESPONSIBILITY of a
+    downstream node, audit that node's passthrough exits FIRST -- a burn stage
+    that returns the input untouched when it is disabled, finds no timed source,
+    or catches its own error will now ship a title-less master with a clean log.
+  verify: |
+    Measure on the FINAL ENCODED artifact, never from blend arithmetic --
+    chroma subsampling, range conversion and compression all move edge
+    contrast. Name WHICH pixels: report the original scene, the outline/matte,
+    and the final adjacent background as three distinct surfaces, because an
+    outline can separate the glyph edge while the fill still measures its
+    original ratio. Select the BRIGHTEST underlying-source frame from a
+    title-free control render of the SAME upstream output, so a stochastic
+    scene difference cannot be mistaken for a contrast change, then require the
+    core glyph against its adjacent outline to clear 4.5:1 on every text
+    interval.
+  tags: [video, compositing, blend-mode, screen, legibility, contrast, outline-noop, yuv420p, caption-burn]
+  legacy_id: "OTR-83eb759e"
 - id: "09.07"
   phase: 9
   area: subprocess

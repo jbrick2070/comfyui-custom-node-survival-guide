@@ -24,9 +24,17 @@
 # Refs are relative to the ComfyUI-OldTimeRadio repo root, forward slashes.
 # verdict: covered = a bible entry teaches this class (see bible_id).
 # Evidence and reasoning per record: bug_scrape_2026-08-07.md.
-audited: '2026-08-11'
-bible_head: 4f56d52 (+12.97 appended 2026-08-12)
-bible_entries: 273
+# 2026-08-12 delta (45-word render gate, credits + title surfaces): 2 records
+# appended, BOTH promoted as 07.31 and 07.32. Both were measured on a PUBLISHED
+# episode, not found by review, so both clear the admission rule. Checked
+# against this index and the Bible first: no scroll/canvas-vs-content entry and
+# no lighten-only-composite legibility entry existed. They are DIFFERENT
+# SURFACES sharing one artifact -- the credits transcript roll and the hero
+# title card -- and conflating them cost an evening; the index keeps them as
+# two records for that reason.
+audited: '2026-08-12'
+bible_head: 69ee6b2 (+07.31, 07.32 appended 2026-08-12)
+bible_entries: 275
 records:
 - ref: BUG_LOG.md L1022 (BUG-LOCAL-231 soak data point)
   title: A long per-clip render loop had no routine VRAM reclamation — cleanup fired only on an OOM exception, so a gradual
@@ -2272,3 +2280,13 @@ records:
   verdict: promoted
   bible_id: '12.97'
   source: prod-bug-log
+- ref: nodes/video_engine.py _TelemetryHUDRenderer (OTR f70df546)
+  title: The credits transcript scrolled between CANVAS edges while the canvas overstates the content at BOTH ends -- a quarter-screen of breathing room above the first line, trailing pad below the last, on a bitmap sized to a >=3-screen floor -- so a 20.8 s roll showed the script for ~13 s, opened and closed on blank panel, and faded out on the empty end; operator-caught watching a live 45-word leg, invisible on full-length episodes because the margins vanish into a 1,500-word roll
+  verdict: promoted
+  bible_id: '07.31'
+  source: git-fix-history
+- ref: docs/2026-08-12-BUILD-SPEC-title-card-legibility.md section 1 (OTR 83eb759e)
+  title: The hero title card is drawn into the procgen layer and composited screen + green_only, a LIGHTEN-ONLY blend, measuring 8.96:1 over a dark ceiling but 1.13:1 over a lit monitor on the published episode -- and the operator's own suggested black outline is a mathematical no-op there because screen(A, 0) = A, so the fix has to move the text downstream of the blend rather than restyle it in place
+  verdict: promoted
+  bible_id: '07.32'
+  source: git-fix-history
