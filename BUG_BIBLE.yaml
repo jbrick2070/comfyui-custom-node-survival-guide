@@ -7681,12 +7681,36 @@ bugs:
         runaway still burns the window, and the artifact is discarded
         afterwards. That is strictly worse than no ceiling.
   fix: |
-    DETECT REPETITION, NOT LENGTH. A runaway is a decode that is CYCLING; the
+    TWO SIGNALS ARE REQUIRED, AND NEITHER SUBSUMES THE OTHER. This entry
+    originally prescribed cycle detection alone; that was written from two
+    captured specimens and a third existed. Corrected the same day.
+
+    SIGNAL 1 -- DETECT REPETITION, NOT LENGTH, for the looping runaways. The
     signal is a run of tokens repeating back to back, which is independent of
     how long the output is allowed to be. Read TOKEN IDS, never decoded text --
     then the guard is tokenizer-independent (no isolated-token decoding, no
     byte-fallback or escape handling) and format-independent (it covers JSON,
     markup and free prose identically).
+
+    SIGNAL 2 -- AN OPEN-STRUCTURE COUNTER, for the ELABORATION SPIRAL: a
+    runaway that NEVER repeats. Measured: 15,355 tokens, 83k chars, every
+    sentence new, every sentence well-formed, none of it ever arriving at an
+    end. Repetition detection is structurally blind to it -- there is no cycle
+    to find -- so the only cheap observable is that ONE structural unit (a JSON
+    string, a section, a field) has stayed OPEN without closing. That is not a
+    length cap: it does not measure the output, it measures one unit's failure
+    to terminate, so an artifact of many complete units never approaches it.
+    SCOPE IT to passes where the delimiter is STRUCTURE. A quote lexer on free
+    prose opens on the first line of dialogue and counts the rest of the scene.
+
+    STATE WHAT THE GUARD CAN AND CANNOT CLAIM. It is COST-BOUNDING, not a
+    correctness oracle: non-termination cannot be proven from a prefix, since
+    any prefix of a spiral is also a possible prefix of an output that closes
+    later. Target a low false-abort rate, short detection latency and compute
+    saved -- never "catches every runaway and nothing else".
+    And distinguish LOCAL from GLOBAL length: a 15,000-token DOCUMENT can be
+    valid while a 15,000-token single field is a runaway. Bounding the
+    structural unit is what lets the artifact grow without weakening the guard.
     Use a LATCHED StoppingCriteria: detect, set a flag, return True, let
     generate() return normally, then classify and raise OUTSIDE. Raising from
     inside a criterion skips the caller's decode/evidence construction and the
@@ -7705,6 +7729,10 @@ bugs:
     and the intersection can be empty -- which crashes sampling outright.
   verify: |
     Automatable, and the false-positive tests are the ones that matter:
+    (0) Feed it a NON-REPEATING spiral -- one unit, thousands of tokens, every
+        token new -- and assert signal 2 fires while signal 1 does not. A guard
+        tested only against loops will pass while blind to a third of the
+        known failures.
     (1) Feed the detector thousands of tokens of VARIED output and assert it
         does NOT fire. A test whose no-halt case never crosses the threshold
         proves nothing -- size the input far beyond any bound.
