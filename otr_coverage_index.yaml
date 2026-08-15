@@ -2332,3 +2332,10 @@ records:
   verdict: promoted
   bible_id: '12.105'
   source: prod-bug-log
+- ref: docs/PROD_BUG_LOG.md PBUG-20260815-09
+  title: A publication-eligibility receipt stamped at the freeze under the pending_<ts> episode id was compared against
+    the post-rename id by the terminal mux, which read the mismatch as a stale in-flight singleton and withheld the OBS
+    copy from every episode; three successful renders left otr/obs empty
+  verdict: covered
+  bible_id: '12.66'
+  source: live-execution
