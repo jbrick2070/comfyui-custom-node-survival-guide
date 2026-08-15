@@ -8167,6 +8167,24 @@ bugs:
     (`len(items) * tokens_per_item + envelope`). Leave the schema's own
     max_length guard exactly where it is -- right-size the job, never raise the
     guard.
+    THAT ALONE IS NOT ENOUGH, AND THIS IS THE HALF THAT GETS MISSED. If the job
+    SIZE is chosen by the model, sizing the request to it only moves the same
+    death behind a data condition. Measured on the same defect: the first fix
+    replaced the impossible constant with a per-job request and shipped -- but
+    the schema accepted twice the intended items per container AND the upstream
+    prompt literally instructed the model "at most <schema ceiling> items per
+    container", so a legal, actively invited draft reproduced the exact
+    unfittable number. It bites below the ceiling too: at 7/8ths of it the
+    request plus a measured prompt already exceeded the window.
+    So BOUND THE CALL, not just the estimate: split the job into chunks that fit
+    by construction, sized from the REAL topology rather than the schema
+    ceiling, and keep the full context visible in every chunk so only the
+    RETURN set narrows and the model still sees what it is reasoning about. In
+    the common case the whole job is one chunk and the behaviour is unchanged.
+    DO NOT fix it by lowering the ceiling advertised in the prompt instead. The
+    schema headroom exists precisely because models overshoot what they are
+    told, so an advertised limit is guidance where this must be a guarantee --
+    and narrowing it changes the artifact's shape for no correctness gain.
     DO NOT silently clamp the request to the context window. A clamp returns a
     truncated artifact that then fails a downstream completeness validator with
     a misleading message; a deterministic pre-flight refusal that names the
@@ -8192,9 +8210,18 @@ bugs:
     (3) Prove the sweep is not vacuous: feed it a deliberately impossible budget
     in a fixture and assert it fails.
     (4) Exercise the pass at its LARGEST legal job size, not a two-item toy --
-    the toy fits, which is why the schedule tests never noticed.
+    the toy fits, which is why the schedule tests never noticed. Walk EVERY size
+    from one to the schema ceiling and assert each one's request still fits;
+    testing only the intended size passes on a fix that leaves the defect
+    reachable by a legal draft.
+    (4b) Drive the real splitting function with an over-large job and assert
+    three things: it split, no item was lost or reordered, and every chunk still
+    carries the whole job's context. A chunker that quietly drops the tail is a
+    worse bug than the one being fixed.
+    (4c) Assert the ORDINARY job still takes exactly ONE call, so the split
+    stays invisible in production and cannot silently multiply model spend.
     (5) When a pre-flight refusal is the correct outcome, assert the message
     names input tokens, requested output AND the cap. A budget error that
     reports only one of the three sends the next reader to the wrong file.
-  tags: [token-budget, context-window, schema-ceiling-vs-request, max-new-tokens, unsatisfiable-request, test-pins-the-constant, suite-agrees-with-the-bug, arithmetic-sweep, call-journal-receipt, xref-12.86, xref-12.104, xref-12.105]
+  tags: [token-budget, context-window, schema-ceiling-vs-request, model-controlled-job-size, chunk-to-fit, max-new-tokens, unsatisfiable-request, test-pins-the-constant, suite-agrees-with-the-bug, arithmetic-sweep, call-journal-receipt, xref-12.86, xref-12.104, xref-12.105]
   legacy_id: "OTR-PBUG-20260815-10-scene-review-request-exceeds-context-window"
