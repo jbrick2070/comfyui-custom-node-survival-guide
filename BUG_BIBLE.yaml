@@ -7819,3 +7819,69 @@ bugs:
         in-memory row can be right while the normalizer that writes it is not.
   tags: [schema, normalizer, allowlist, silent-data-loss, ledger, sibling-asymmetry, golden-fixture, fail-loud, xref-12.99]
   legacy_id: "OTR-PBUG-20260814-01-ledger-speaker-drop"
+
+- id: "12.102"
+  phase: 12
+  area: a-schema-cap-must-never-sit-at-the-number-a-downstream-trim-already-enforces
+  symptom: |
+    A pipeline stage dies on a RICHER-THAN-USUAL input, and the model was
+    right. Measured: a news story naming 11 places and 14 institutions was
+    extracted correctly by the model, and the pydantic `max_length` on those
+    list fields rejected the reply three times in a row. The retry ladder
+    exhausted, the run raised, and the episode was lost -- twice, on two
+    separate attempts, because a re-roll cannot make a source poorer.
+    The tell that it is THIS bug and not a model failure: the rejected value
+    is CORRECT, the count is barely over the cap, and the error is a schema
+    violation rather than a content complaint.
+  cause: |
+    The same number was written in two places with two different meanings.
+    Downstream, a merge already trimmed each list to N deterministically --
+    that is the real, intended limit. Upstream, the parse-time schema carried
+    `max_length=N` as well, which is not a limit but a REFUSAL, and it fires
+    FIRST. So the trim that exists to handle exactly this case can never run.
+    A cap and a trim look interchangeable when you write them and are opposite
+    in effect: a trim accepts the input and shortens it, a cap rejects the
+    input entirely.
+    It hides because it only fires on inputs richer than the cap. Every test
+    fixture and every ordinary source stays under it, so the code looks
+    correct for months and fails the first time reality is generous.
+    Note the interaction with the decoding mode, because it changes the
+    SYMPTOM completely. Under a constrained/grammar decode the array ceiling
+    is enforced during generation, so the model is cut off and the artifact is
+    silently SHORT. Under parse-then-validate the same ceiling REFUSES and the
+    run dies. Same defect, one loud and one silent, and the silent one is
+    worse.
+  fix: |
+    SEPARATE THE TWO NUMBERS AND SAY WHICH IS WHICH.
+    (a) The schema ceiling becomes a BACKSTOP, sized well above anything a
+        real input produces. Its only job is to keep a degenerate decode
+        finite. It must never be reachable by legitimate content.
+    (b) The LIMIT stays exactly where it was -- in the deterministic trim that
+        already knew how to apply it.
+    (c) SWEEP THE WHOLE MODEL, not just the field that failed. One instance of
+        this is rarely the only one: the same audit found three more list
+        fields in the same schema with the same cap-equals-trim collision,
+        each one a live failure waiting for a richer input.
+    (d) Where the trim DISCARDS content, receipt what it dropped and why, so
+        the loss is auditable rather than invisible.
+    DO NOT "fix" it by raising the cap to a bigger number. That moves the
+    cliff instead of removing it, and leaves the same contradiction in place.
+    DO NOT fix it by loosening a downstream gate to tolerate the refusal --
+    that trades a real protection for an imaginary one.
+  verify: |
+    (1) Construct the model with EACH bounded list one item OVER its trim
+        limit and assert it parses. This is the regression that matters; it
+        is exactly the input that killed the run.
+    (2) Assert the trim still returns the limit for that same over-long
+        input, so the cap change did not widen the real contract.
+    (3) Assert the backstop still refuses at its own ceiling, so the guard
+        against a degenerate decode survives.
+    (4) STATICALLY DIFF the two numbers: enumerate every bounded list field in
+        the schema and every trim limit applied downstream, and fail if any
+        cap equals its trim. This is the check that catches the next one --
+        a per-field test only ever covers the fields someone remembered.
+    (5) Re-run the real pipeline on the input that failed and confirm it now
+        passes the stage. A unit test proves the parse; only the live run
+        proves the stage.
+  tags: [schema, pydantic, validation, hard-cap, silent-truncation, retry-ladder, defect-class-sweep, grammar-constrained, fail-loud, xref-12.100, xref-12.101]
+  legacy_id: "OTR-2026-08-14-dossier-cap-refuses-a-rich-source"

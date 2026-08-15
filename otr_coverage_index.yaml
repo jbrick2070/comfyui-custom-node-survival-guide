@@ -2310,3 +2310,8 @@ records:
   verdict: promoted
   bible_id: '12.101'
   source: live-execution
+- ref: nodes/_otr_scifi_fable2.py DossierLLM/NamedEntities (OTR 2026-08-14, two dead scifi_news_pro legs)
+  title: A UCLA Health story naming 11 places and 14 institutions killed the lane twice -- the model extracted them correctly and the pydantic max_length on those list fields refused the reply three times, because the cap was written at the SAME number the downstream merge already trims to, so the refusal fired in front of the trim that exists to handle exactly that case; sweeping the model found three more fields with the identical cap-equals-trim collision, each a live failure waiting for a richer source
+  verdict: promoted
+  bible_id: '12.102'
+  source: live-execution

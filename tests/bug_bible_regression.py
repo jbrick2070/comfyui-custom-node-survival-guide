@@ -2170,6 +2170,67 @@ class TestPhase07To12ProductionRegressionCatalog:
                 )
 
 
+    def test_otr_no_schema_cap_sits_at_its_own_trim_limit(self, pack_dir):
+        """BUG-12.102: a parse-time cap equal to a downstream trim REFUSES
+        the input the trim was written to shorten.
+
+        This is the static diff the entry's verify step (4) asks for, and it
+        is the check that catches the NEXT one: a per-field test only ever
+        covers the fields somebody remembered. It compares the constants a
+        bounded list field declares against the constants passed as
+        `limit=` to the deterministic trims in the same module.
+        """
+        lane = os.path.join(pack_dir, "nodes", "_otr_scifi_fable2.py")
+        if not os.path.isfile(lane):
+            pytest.skip("BUG-12.102 dossier cap guard is OTR-local")
+        with open(lane, "r", encoding="utf-8") as f:
+            source = f.read()
+        tree = ast.parse(source)
+
+        # Constants handed to a deterministic trim as its limit.
+        trim_limits = set()
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            name = getattr(func, "id", None) or getattr(func, "attr", None)
+            if not name or "balanced" not in name:
+                continue
+            for kw in node.keywords:
+                if kw.arg == "limit" and isinstance(kw.value, ast.Name):
+                    trim_limits.add(kw.value.id)
+        assert trim_limits, (
+            "BUG-12.102: found no deterministic trim to compare caps against; "
+            "the guard would pass vacuously"
+        )
+
+        # Constants used as max_length on a bounded LIST field.
+        collisions = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ClassDef):
+                continue
+            for stmt in node.body:
+                if not isinstance(stmt, ast.AnnAssign) or stmt.value is None:
+                    continue
+                if not ast.unparse(stmt.annotation).startswith("list["):
+                    continue
+                for kw in getattr(stmt.value, "keywords", []):
+                    if kw.arg != "max_length":
+                        continue
+                    if not isinstance(kw.value, ast.Name):
+                        continue
+                    if kw.value.id in trim_limits:
+                        collisions.append(
+                            f"{node.name}.{ast.unparse(stmt.target)} "
+                            f"caps at {kw.value.id}, which is also a trim limit"
+                        )
+        assert not collisions, (
+            "BUG-12.102: a schema cap sits at the same constant a downstream "
+            "trim already enforces, so a richer-than-usual input is REFUSED "
+            "before the trim can shorten it:\n  " + "\n  ".join(collisions)
+        )
+
+
 class TestPhase02BugBible0214:
     """BUG-02.14 / BUG-LOCAL-043: SD 1.5 .ckpt offline/Windows four-layer fix.
 
