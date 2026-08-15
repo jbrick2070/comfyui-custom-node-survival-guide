@@ -7962,3 +7962,69 @@ bugs:
     have caught this by construction.
   tags: [content-ownership, model-rewrite, field-authority, ledger-clean, protected-span, deterministic-fact, silent-deletion, receipt-mismatch, fixture-gap, producer-consumer-constant, xref-12.49, xref-12.54, xref-12.60, xref-12.86]
   legacy_id: "OTR-PBUG-20260815-01-clean-stage-deletes-source-attribution"
+
+- id: "12.105"
+  phase: 12
+  area: a-repair-loop-diagnostic-must-state-the-required-shape-not-only-the-offense
+  symptom: |
+    A bounded repair/retry ladder exhausts all attempts re-emitting the SAME
+    malformed token/output, even though the ladder mechanically does carry the
+    rejected draft plus its defect list into the next turn. Measured: a
+    terminal-delimiter parser required a literal `END.` (with period); the
+    model wrote bare `END` on every rung across four attempts, because the two
+    reported defects (a bad line shape, a missing terminal marker) describe
+    what is wrong with zero indication of the one-character fix that would
+    satisfy them.
+  cause: |
+    The defect/diagnostic text a repair turn receives states the OFFENSE
+    ("this line's shape is bad", "the terminal marker is missing") but never
+    states the REQUIRED SHAPE (the exact accepted string or pattern). A model
+    has no way to infer "add a period" from being told its output is malformed
+    and missing -- those are two symptoms of one omission, not two independent
+    facts it can reason its way out of. Because the repair mechanism (carrying
+    the rejected draft plus defects forward) LOOKS complete -- it does feed
+    context forward -- the missing ingredient (the target) is easy to miss in
+    review; the ladder's plumbing is not the defect, its payload is.
+    The validator half compounds it: a delimiter regex that demands ornament
+    the model has no reason to supply turns one plausible output into two
+    reported defects, which reads in the log as a bigger problem than the
+    single missing character it is.
+  fix: |
+    Every defect a repair loop reports must carry, alongside what is wrong, a
+    positive statement of what would be accepted -- the exact required
+    literal, an example of the accepted shape, or a regex/grammar description
+    a small model can pattern-match against. Where the accepted set is small
+    (a fixed terminal delimiter, a fixed enum), show the literal values
+    directly in the defect text, not merely the pattern that validates them.
+    Give the new diagnostic its OWN helper rather than adding a branch to an
+    existing repair note that answers a different question from different
+    defect data -- one function producing two unrelated diagnoses teaches the
+    next reader the wrong rule for their defect. Make each note self-silencing
+    so a repair turn carries exactly the rules its own defects call for.
+    Source the advertised literals from the validator's own grammar, and
+    assert the two cannot drift: a diagnostic that names a form its validator
+    rejects teaches a wrong target, which is worse than saying nothing.
+    Separately, widen the validator to the forms a model actually produces --
+    but only to an enumerated set. Widening a terminal delimiter into "anything
+    containing END" stops it being structural, and the parser must still be
+    able to tell the end of the script from a line of dialogue about endings.
+  verify: |
+    (1) For every accepted terminal/delimiter form the parser recognizes,
+    assert the repair-turn defect text contains that literal string verbatim,
+    and assert the parser accepts every form the note advertises -- a
+    drift test in both directions, not just one.
+    (2) Construct a fixture whose only defect is the ONE-CHARACTER gap (bare
+    `END` vs `END.`) and assert the repair ladder converges within its normal
+    budget once the defect text names the required literal -- this is the
+    regression that matters, it is exactly the input that exhausted the ladder
+    live.
+    (3) Assert the note is SILENT for unrelated defects, so it cannot pad every
+    repair turn with every rule until the one that matters is lost.
+    (4) Content-bearing, trailing-content and unpaired-bracket variants must
+    still fail loud -- the fix must not turn the validator permissive.
+    (5) BUILD THE FIXTURE FROM THE REAL DEFECT RECORD, not a hand-rolled stub.
+    A stub that invents an attribute name the producer never sets (a `.kind`
+    string where production sets a `.code` enum) lets a helper that can never
+    fire in production pass a green suite -- the test agrees with the bug.
+  tags: [repair-loop, retry-ladder, diagnostic-design, required-shape, unrepairable-by-construction, markup-parser, terminal-delimiter, defect-class-sweep, test-stub-drift, xref-11.26, xref-11.35, xref-12.103]
+  legacy_id: "OTR-PBUG-20260815-03-fable2-end-delimiter-repair-loop"

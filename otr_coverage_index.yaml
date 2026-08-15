@@ -2326,3 +2326,9 @@ records:
   verdict: promoted
   bible_id: '12.103'
   source: prod-bug-log
+- ref: docs/PROD_BUG_LOG.md PBUG-20260815-03
+  title: A markup repair ladder reported BAD_LINE_SHAPE and MISSING_END without ever stating the required literal (END.
+    with a period), so the model re-emitted bare END on all four rungs and exhausted
+  verdict: promoted
+  bible_id: '12.105'
+  source: prod-bug-log
