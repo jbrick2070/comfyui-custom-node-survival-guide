@@ -7885,3 +7885,80 @@ bugs:
         proves the stage.
   tags: [schema, pydantic, validation, hard-cap, silent-truncation, retry-ladder, defect-class-sweep, grammar-constrained, fail-loud, xref-12.100, xref-12.101]
   legacy_id: "OTR-2026-08-14-dossier-cap-refuses-a-rich-source"
+
+- id: "12.103"
+  phase: 12
+  area: a-model-rewrite-pass-must-never-hold-authority-over-a-field-another-owner-writes-deterministically
+  symptom: |
+    A voiced/spoken row ships shorter than what was composed -- a deterministic,
+    Python-owned fact appended verbatim by an earlier assembly step is silently
+    gone from the final row, even though the interpreter that produced the fact
+    was correct and the ledger still carries the original sentence elsewhere in
+    meta. Measured: a closing-announcer row that should read an authored bridge
+    plus a factual news coda shipped with only the bridge; the durable meta
+    fields that hold the true sentence (spoken_coda_source /
+    provenance_coda_line) still carry it, so the RECEIPT and the SPOKEN ROW
+    disagree. Rewrite rate measured at 9 of 14 voiced rows across three
+    episodes in one overnight gate.
+  cause: |
+    A later cleanup/"clean stage" pass judges every voiced row for "anything
+    that is not speech" and hands a MODEL the rewrite of what it flags. The pass
+    has no concept of a protected/content-owned span within a row -- it treats
+    the row as one undifferentiated block of text to judge and rewrite, not as
+    a composite of an LLM-authored bridge plus a Python-appended fact. Whatever
+    the model decides is "not speech" (or simply drops during rewrite) is gone,
+    and nothing downstream distinguishes "the model paraphrased this" from "the
+    model deleted this." It shipped unnoticed because the pass was proven safe
+    on a planted-ledger measurement rig that never runs the writer tail and
+    therefore never composes a coda -- the one row shape with a protected
+    component was never in the harness's input space.
+  fix: |
+    Mark protected/content-owned spans at the point of composition -- the same
+    call that appends the deterministic fact records that the row is now a
+    composite -- and make the clean/rewrite pass read that mark BEFORE it ever
+    hands a row to the model: rows carrying a protected span are either
+    excluded from full-row model rewrite, or the rewrite is scoped to operate
+    only on the non-protected portion and the protected substring is
+    re-appended byte-identically afterward.
+    The marker must be ONE shared constant imported by both the emitter and the
+    skip reader, and it must be stamped INDEPENDENTLY of whether the authored
+    half succeeded: a flag derived from the compose outcome is decided after
+    the point where the clean pass needs to already know to keep its hands off,
+    so it cannot identify the row in time.
+    DO NOT "fix" it by asking the model nicely to preserve facts in the prompt
+    -- an instructed model is still a model, and the guarantee must be
+    structural (the protected span physically cannot enter the model's edit
+    surface), not persuasive.
+    DO NOT fix it with a post-hoc check that only logs a warning -- the row
+    must ship correct, not merely diagnosed as wrong after the fact.
+    DO NOT scope the exemption by speaker role or row type: the sibling rows of
+    the same role are legitimately judged, and a role-keyed exemption silently
+    drops them out of the pass.
+  verify: |
+    (1) For any ledger whose meta carries a Python-owned coda/fact value,
+    assert that value appears byte-identically at least once in the
+    corresponding final row's text -- anchor on the durable meta value with a
+    substring/endswith test, never on a fixed separator string, since the
+    separator itself is conditional on other flags.
+    (2) Feed the clean stage a synthetic row built from a bridge + protected
+    coda, same shape as production, and assert the protected row is never the
+    SUBJECT of a judge call -- not merely that the text came back similar.
+    Similarity cannot distinguish "protected" from "rewritten into something
+    close", which is why the original defect survived a green suite. Assert on
+    the row under judgement, not on the whole prompt: the protected text
+    legitimately appears inside a NEIGHBOURING row's context window, and
+    banning it from the prompt entirely fails on correct behaviour.
+    (3) Prove the fixture is not self-fulfilling: run the identical ledger
+    WITHOUT the marker and assert the fact is destroyed, so the test measures
+    the guard rather than an uncleanable input.
+    (4) Assert the ordinary rows of the same speaker role ARE still judged, so
+    the guard cannot grow into a general exemption.
+    (5) Statically assert the emitter imports the shared marker constant rather
+    than hardcoding its string, walking the AST so a mention in a docstring
+    cannot satisfy it.
+    (6) Close the fixture gap directly: extend whatever measurement rig proved
+    the clean stage safe so its planted ledgers include at least one row
+    carrying a protected span -- the original miss was a rig that could not
+    have caught this by construction.
+  tags: [content-ownership, model-rewrite, field-authority, ledger-clean, protected-span, deterministic-fact, silent-deletion, receipt-mismatch, fixture-gap, producer-consumer-constant, xref-12.49, xref-12.54, xref-12.60, xref-12.86]
+  legacy_id: "OTR-PBUG-20260815-01-clean-stage-deletes-source-attribution"

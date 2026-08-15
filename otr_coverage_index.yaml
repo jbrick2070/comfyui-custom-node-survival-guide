@@ -2320,3 +2320,9 @@ records:
   verdict: already-covered
   bible_id: '12.86'
   source: live-execution
+- ref: docs/PROD_BUG_LOG.md PBUG-20260815-01
+  title: A model-owned clean-stage rewrite pass had no concept of a protected span and deleted a Python-owned news-coda
+    fact on 9 of 14 voiced rows across three episodes
+  verdict: promoted
+  bible_id: '12.103'
+  source: prod-bug-log
