@@ -8135,3 +8135,66 @@ bugs:
     fire in production pass a green suite -- the test agrees with the bug.
   tags: [repair-loop, retry-ladder, diagnostic-design, required-shape, unrepairable-by-construction, markup-parser, terminal-delimiter, defect-class-sweep, test-stub-drift, xref-11.26, xref-11.35, xref-12.103]
   legacy_id: "OTR-PBUG-20260815-03-fable2-end-delimiter-repair-loop"
+- id: "12.106"
+  phase: 12
+  area: a-generation-request-sized-from-a-schema-ceiling-can-exceed-the-models-entire-context
+  symptom: |
+    A model pass fails 100% of the time on a given model with a transport-level
+    budget error naming three numbers that do not add up -- "prompt requires
+    1203 input tokens, requested_output=8320, context_cap=8192 leaves only 6989
+    output tokens". Measured: a story lane died at 10:18 on a live headless
+    render, after the expensive upstream passes had already succeeded. The
+    prompt size in the message is a RED HERRING and sends readers off trimming
+    prompts: 8320 exceeds the 8192 context outright, so the request could not
+    have been served by an EMPTY prompt either. The suite is green throughout.
+  cause: |
+    The per-call `max_new_tokens` was a CONSTANT derived from the pass's SCHEMA
+    ceiling -- max_containers x max_items_per_container x tokens_per_item +
+    envelope -- where the schema ceiling deliberately carries a headroom
+    multiplier (here 2x) so the SCHEMA can accept more than any legal artifact
+    contains. That multiplier is correct for a GUARD and wrong for a REQUEST: it
+    asks for exactly N times the output any real job needs, and once the
+    doubled number crosses the model's context window the pass becomes
+    unsatisfiable rather than merely wasteful. Nothing in the code says
+    "request" versus "ceiling", so the same expression served both roles.
+    IT WAS INVISIBLE BECAUSE THE TESTS PINNED THE CONSTANT. Assertions of the
+    form `assert job["max_new_tokens"] == THE_CONSTANT` cannot fail when the
+    constant is impossible -- they re-assert the defect. The suite agreed with
+    the bug, so only a live render could find it.
+  fix: |
+    Size the request to the JOB IN HAND, not to the schema maximum: derive
+    `max_new_tokens` from the actual item count this call was handed
+    (`len(items) * tokens_per_item + envelope`). Leave the schema's own
+    max_length guard exactly where it is -- right-size the job, never raise the
+    guard.
+    DO NOT silently clamp the request to the context window. A clamp returns a
+    truncated artifact that then fails a downstream completeness validator with
+    a misleading message; a deterministic pre-flight refusal that names the
+    three numbers is information. If the right-sized job still does not fit,
+    that is a real capacity problem and it should say so.
+    DO NOT "fix" it by raising the model's context or swapping models -- the
+    request was wrong, not the model.
+    Record the LARGEST request the run actually made in the call journal instead
+    of the constant. A receipt naming a number no call ever used is precisely
+    how an impossible 8320 sat in every journal unread.
+    Then SWEEP THE CLASS ARITHMETICALLY rather than by inspection: enumerate
+    every generation budget in the package and compare each against the smallest
+    shipped context window. It is a two-minute computation and it converts "we
+    think this was the only one" into a measurement (it was, out of four).
+  verify: |
+    (1) Assert the PROPERTY, never the constant: the request equals the
+    job-sized formula for the items actually passed, AND is strictly less than
+    the smallest shipped context window. The second half is the assertion that
+    would have caught this; the first half alone would have been rewritten to
+    match the bug.
+    (2) Add a static sweep over every declared generation budget asserting each
+    is below that window, so a NEW pass cannot reintroduce the class.
+    (3) Prove the sweep is not vacuous: feed it a deliberately impossible budget
+    in a fixture and assert it fails.
+    (4) Exercise the pass at its LARGEST legal job size, not a two-item toy --
+    the toy fits, which is why the schedule tests never noticed.
+    (5) When a pre-flight refusal is the correct outcome, assert the message
+    names input tokens, requested output AND the cap. A budget error that
+    reports only one of the three sends the next reader to the wrong file.
+  tags: [token-budget, context-window, schema-ceiling-vs-request, max-new-tokens, unsatisfiable-request, test-pins-the-constant, suite-agrees-with-the-bug, arithmetic-sweep, call-journal-receipt, xref-12.86, xref-12.104, xref-12.105]
+  legacy_id: "OTR-PBUG-20260815-10-scene-review-request-exceeds-context-window"

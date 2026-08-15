@@ -2347,3 +2347,11 @@ records:
   verdict: promoted
   bible_id: '12.104'
   source: prod-bug-log
+- ref: docs/PROD_BUG_LOG.md PBUG-20260815-10
+  title: A scene-review pass sized its max_new_tokens from the SCHEMA ceiling (which carries a deliberate 2x headroom)
+    rather than the job in hand, producing a request of 8320 tokens against an 8192-token context window -- unsatisfiable
+    for any prompt including an empty one; it killed a live render at 10:18 and two tests asserted the impossible
+    constant, so the suite agreed with the bug
+  verdict: promoted
+  bible_id: '12.106'
+  source: live-execution
