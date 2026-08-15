@@ -2339,3 +2339,11 @@ records:
   verdict: covered
   bible_id: '12.66'
   source: live-execution
+- ref: docs/PROD_BUG_LOG.md PBUG-20260815-02
+  title: An acceptance receipt minted upstream of two later sanctioned mutators made the pre-tail audit fail on the
+    pipeline's own legitimate output -- a finished render died 13.6 minutes in at the first row the clean stage
+    repaired, while the rows it left alone passed the same audit; compounding it, the audit's only failure mode was to
+    raise, so an unreconcilable proof had no outcome except destroying completed work
+  verdict: promoted
+  bible_id: '12.104'
+  source: prod-bug-log

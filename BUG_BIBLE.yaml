@@ -7963,6 +7963,113 @@ bugs:
   tags: [content-ownership, model-rewrite, field-authority, ledger-clean, protected-span, deterministic-fact, silent-deletion, receipt-mismatch, fixture-gap, producer-consumer-constant, xref-12.49, xref-12.54, xref-12.60, xref-12.86]
   legacy_id: "OTR-PBUG-20260815-01-clean-stage-deletes-source-attribution"
 
+- id: "12.104"
+  phase: 12
+  area: a-proof-minted-before-an-authorized-mutator-must-learn-the-mutator-runs-and-reconcile-transactionally
+  symptom: |
+    A finished job dies at its own integrity audit, on its own legitimate
+    output, long after the expensive work completed. Measured: a content-owned
+    story lane raised "line receipt mismatch for l004" 13.6 minutes in --
+    script written, cast built, score composed -- and l004 was provably the
+    FIRST row a sanctioned repair pass had rewritten, while the rows that pass
+    left alone (l001, l002) sailed through the same audit. Nothing is corrupt
+    and the repair was correct; the receipt simply describes an instant that no
+    longer exists. The failure rate tracks how dirty the draft was, so the lane
+    fails intermittently and a clean draft hides the defect entirely -- which
+    is also why a green suite says nothing about it.
+  cause: |
+    An acceptance proof hashes canonical content at mint time and the audit
+    re-hashes the live content later. That contract is exact only while NOTHING
+    runs in between, and it was written when nothing did. Sanctioned passes
+    were then inserted into the window (a model-driven repair pass, and a
+    cleanup pass that can blank an item out of the covered set entirely), and
+    neither was ever taught to exist by the proof -- so every legitimate edit
+    reads as tampering.
+    THE SNAPSHOT'S VALIDITY WINDOW IS A PIPELINE FACT, NOT A CONSTANT. It
+    shortens the moment anyone inserts a stage between the mint and the check,
+    and nothing in the proof's own code changes when that happens: there is no
+    compile error, no failing test, and no reviewer signal. The proof keeps
+    asserting a contract the pipeline quietly stopped honouring.
+    The second half is a failure-mode defect rather than a proof defect: the
+    audit's only verb was "raise". A proof that could not be reconciled had no
+    outcome available to it except killing work that was already finished.
+  fix: |
+    Teach the proof that a NAMED, CLOSED SET of authorized stages may run
+    inside the window, and make the record DETECTIVE rather than permissive: a
+    transition receipt naming the stages, exactly which ids moved, and the
+    before AND after hash of each -- so an unattributed mutation still fails
+    exactly as loudly as before. Widening the audit's tolerance (fuzzy
+    matching, "close enough" comparison, skipping whatever the repair pass
+    touched) is the WRONG fix: it hides real corruption along with the false
+    positive, and the false positive is the only part that was wrong.
+    CAPTURE ONE WINDOW AROUND EVERY AUTHORIZED STAGE, never one receipt per
+    stage. Per-stage chaining is impossible by construction -- the second
+    stage's before-state is the first stage's output, so it can never equal the
+    acceptance the chain must start from. Stamp once, from one emission point,
+    and refuse a second, differing stamp.
+    Bind the chain to THIS acceptance using the parent receipt's digest, not
+    merely to content that happens to hash the same: ids repeat across runs, so
+    before-state equality alone lets a transition be lifted from one artifact
+    onto another.
+    Emit NOTHING on a no-op, so an untouched artifact keeps validating through
+    the unchanged path and the marker's presence always means something
+    happened.
+    THEN MAKE THE WINDOW A TRANSACTION. Snapshot before the first authorized
+    stage; reconcile after the last one and before anything derives from the
+    final content. If the reseal cannot be PROVED, restore the accepted state,
+    stamp a durable degradation receipt naming the cause, and CONTINUE. The
+    repair is what gets sacrificed, never the finished work.
+    Snapshot the CONTAINERS, not a hand-listed set of fields. A field list goes
+    stale the first time a stage learns to write one more key, and a partial
+    restore leaves a state that is neither the old one nor the new one. Include
+    any IN-MEMORY proof state a stage holds: a document-only copy cannot
+    restore an object attribute, and a finalizer left holding post-repair
+    content will fail a perfectly good rollback.
+    Restore IN PLACE. Callers hold aliases to those containers; rebinding them
+    leaves every later write landing in a detached copy the artifact never
+    sees -- a silent hole shaped exactly like a working artifact.
+    Do not leave a rolled-back stage's own telemetry behind: a repair receipt
+    describing edits that no longer exist tells every downstream reader that
+    items were touched which were not. Move it into the degradation receipt so
+    nothing is lost and nothing lies.
+    DO NOT re-run the reseal to verify the rollback. The reseal is usually the
+    thing that just failed, so calling it again reports the same error and
+    labels a good rollback corrupt; verify with the read-only validator
+    instead.
+  verify: |
+    (1) Mutate one item inside the window and assert the audit PASSES and the
+    artifact still carries the mutated content. The regression is the death, so
+    the test must exercise the whole mint -> mutate -> audit path, not the
+    receipt in isolation.
+    (2) Assert the transition names EXACTLY the ids that moved, in BOTH
+    directions. An under-declared change is corruption; an over-declared one is
+    a receipt that names innocent items, which is an audit trail nobody can
+    trust in detail.
+    (3) Assert an UNATTRIBUTED mutation still raises, calling the fail-loud
+    primitive directly. This is the assertion that proves the fix is not a
+    widened tolerance, and it is the one a future "simplification" will try to
+    delete.
+    (4) Assert a no-op emits no marker and leaves the artifact byte-identical.
+    (5) Force the reseal to fail and assert ALL of: no exception escapes; the
+    artifact is restored to the accepted state; the read-only validator passes
+    on the restored state; the degradation receipt names the cause; no
+    transition marker survives; and the rolled-back stage's telemetry is gone
+    from the artifact.
+    (6) Corrupt the in-memory proof state after the failure and assert the
+    rollback brings it back -- the failure mode a document-only snapshot cannot
+    even detect.
+    (7) Assert the restore keeps the SAME container objects by IDENTITY, not
+    equality, so an aliasing caller keeps writing into the live artifact.
+    (8) Assert END TO END that the pipeline actually OPENS the transaction: run
+    the real tail with a stage stubbed to mutate an item, then validate. A
+    unit-tested transaction nobody calls is dead code, and this defect's whole
+    shape is a stage that shipped and ran dormant.
+    (9) Cover the sibling lane that holds NO in-memory proof object. One shared
+    contract must cover both, or the lane without the object silently gets no
+    protection and nothing fails to say so.
+  tags: [acceptance-proof, receipt-validity-window, authorized-mutation, transition-receipt, transactional-rollback, degradation-receipt, in-memory-state, container-aliasing, detective-not-permissive, no-op-emission, dead-wiring, intermittent-failure, xref-12.49, xref-12.86, xref-12.103, xref-12.105]
+  legacy_id: "OTR-PBUG-20260815-02a-authorized-clean-window-breaks-the-acceptance-receipt"
+
 - id: "12.105"
   phase: 12
   area: a-repair-loop-diagnostic-must-state-the-required-shape-not-only-the-offense
