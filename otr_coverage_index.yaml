@@ -2315,3 +2315,8 @@ records:
   verdict: promoted
   bible_id: '12.102'
   source: live-execution
+- ref: nodes/_otr_ledger_clean.py _story_field/_where_the_story_is (OTR PBUG-20260814-04, live media_archive episode 2026-08-14)
+  title: A new post-story clean pass judged and rewrote every spoken line with an EMPTY act block -- beat_intent and arc_phase resolved on 0 of 16 rows because the pass read them off the BEAT row while the writer lane stamps both on the LINE row and leaves beats carrying transport only; the render succeeded, the log looked normal and the full suite stayed green because the unit fixtures put the fields on the beat, a shape no writer-lane ledger has, so the tests agreed with the bug
+  verdict: already-covered
+  bible_id: '12.86'
+  source: live-execution
