@@ -2305,3 +2305,8 @@ records:
   verdict: promoted
   bible_id: '12.100'
   source: live-execution
+- ref: nodes/production_ledger.py Ledger.set_lines (OTR PBUG-20260814-01, published 2026-08-13 wan_ti2v episode)
+  title: Every spoken row of the published ledger shipped speaker null while the parallel beat rows beside them named the right characters -- set_lines() rebuilds each row as a literal dict that ENUMERATES the keys it keeps and never named speaker, so any caller supplying one had it discarded, while its sibling set_beats() carried it; it stayed invisible because ONE consumer re-derives the name from char_id via the cast table, and the same method had already lost speaker_role exactly this way once before
+  verdict: promoted
+  bible_id: '12.101'
+  source: live-execution

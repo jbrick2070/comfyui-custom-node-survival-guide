@@ -7748,3 +7748,74 @@ bugs:
         callable in isolation -- delete the call site and the suite must go red.
   tags: [llm, structured-json, grammar-constrained, lm-format-enforcer, degenerate-repetition, runaway-decode, stopping-criteria, liveness, silent-truncation, tokenizer-independence, no-repeat-ngram, fail-loud, xref-11.50]
   legacy_id: "OTR-2026-08-13-writer-decode-runaway"
+
+- id: "12.101"
+  phase: 12
+  area: a-key-enumerating-normalizer-silently-drops-every-field-it-does-not-name
+  symptom: |
+    A shipped artifact carries a null identity field on EVERY row of one kind,
+    while the PARALLEL rows in the same file carry the real value. Measured:
+    all eleven spoken rows of a published episode ledger said
+    `speaker: null`, and the beat rows beside them named the right characters.
+    Nothing crashes, nothing logs, no test goes red -- the record simply does
+    not say who says each line.
+    It hides for a long time because ONE downstream consumer looks correct: it
+    re-derives the name from a foreign key (`char_id` -> cast table) and never
+    reads the dropped field, so the rendered output is right while the record
+    is wrong. Every consumer that has no such fallback -- an audit, a export,
+    a later pass reasoning about who spoke -- silently gets nothing.
+  cause: |
+    Two normalizers exist for two parallel row types, and each rebuilds its
+    rows as a literal dict that ENUMERATES the keys it keeps. The beat
+    normalizer names the field; the line normalizer does not. A caller that
+    supplies the field on a line row has it discarded at the boundary, so the
+    upstream can be entirely correct and the value still never reaches disk.
+    THE TELL IS THE ASYMMETRY, NOT THE ABSENCE. An enumerating normalizer is a
+    silent allowlist: it does not fail on an unknown key, it forgets it. That
+    is fine while one normalizer exists; the moment there are two for parallel
+    row types, any field only ONE of them names is a field the other drops.
+    In the measured case the very same method had already lost a different
+    shared field this way once before -- which is what makes this a defect
+    CLASS rather than a typo. A normalizer that has dropped one field will
+    drop the next one too.
+    The compounding factor is that the producers were ALSO not supplying the
+    field, so a reviewer looking at either half alone concludes the other half
+    is the bug.
+  fix: |
+    FIX BOTH HALVES IN ONE CHANGE, and prove the symmetry rather than the
+    field.
+    (a) Add the field to the silent normalizer, mirroring its sibling exactly
+        -- same coercion, same empty-to-null rule. Emit the key ALWAYS, with
+        an explicit null when absent, so a consumer reads a value instead of
+        guessing whether the key exists.
+    (b) Supply the field at EVERY assembly site, sourced from the row that
+        already owns it (here: the owning beat's speaker), never re-asked of a
+        model that already answered it upstream. Where a helper builds the row
+        and a sibling helper builds the parallel row, have the second READ the
+        first rather than take the value a second time -- then the two cannot
+        disagree by construction.
+    (c) Do not stop at the lane that produced the artifact. The normalizer is
+        SHARED, so a lane-only fix leaves every other producer broken.
+    (d) Regenerate any golden fixture the row schema pins, DELIBERATELY, and
+        say in the commit that the contract changed by design.
+    DO NOT "fix" it downstream with another char_id -> name fallback. A second
+    re-derivation makes the hole invisible to one more consumer and leaves the
+    record still wrong.
+  verify: |
+    Automatable, and the symmetry assertion is the one that lasts:
+    (1) Feed the same identity value to BOTH sibling normalizers and assert
+        they return the same answer. A test that only asserts the new field
+        survives one normalizer passes again the day a third row type is added
+        without it.
+    (2) Assert the key is PRESENT and null when the caller omits it -- absent
+        key and null value are different bugs downstream.
+    (3) Statically assert both normalizers enumerate the shared field. Parse
+        the module, collect the dict keys each builds, and diff the two sets:
+        this is the check that goes red when someone deletes the field again.
+    (4) Run the real assembly for each producing lane and assert every spoken
+        row's field equals its owning parent row's field -- not merely that it
+        is non-null.
+    (5) Grep the sealed on-disk artifact, not the in-memory object. The
+        in-memory row can be right while the normalizer that writes it is not.
+  tags: [schema, normalizer, allowlist, silent-data-loss, ledger, sibling-asymmetry, golden-fixture, fail-loud, xref-12.99]
+  legacy_id: "OTR-PBUG-20260814-01-ledger-speaker-drop"

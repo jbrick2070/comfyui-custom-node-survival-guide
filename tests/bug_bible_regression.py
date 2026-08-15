@@ -2084,6 +2084,91 @@ class TestPhase07To12ProductionRegressionCatalog:
         )
         assert patch_pass["seam_refs"] == ["codex_radio_score_text_patch"]
 
+    def test_otr_sibling_row_normalizers_name_the_same_speaker(self, pack_dir):
+        """BUG-12.101: two normalizers for parallel row types must not
+        disagree about a shared identity field.
+
+        The enumerated dict each one builds IS its schema, so a field only
+        one of them names is a field the other silently drops. This diffs
+        the two key sets out of the AST rather than asserting one string,
+        because the symmetry is the invariant -- the day a third row type
+        arrives without `speaker`, a string check would still be green.
+        """
+        ledger_path = os.path.join(pack_dir, "nodes", "production_ledger.py")
+        if not os.path.isfile(ledger_path):
+            pytest.skip("BUG-12.101 ledger normalizer guard is OTR-local")
+        with open(ledger_path, "r", encoding="utf-8") as f:
+            tree = ast.parse(f.read())
+
+        def _built_keys(func_name):
+            """Every literal dict key constructed inside one function."""
+            for node in ast.walk(tree):
+                if (isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                        and node.name == func_name):
+                    keys = set()
+                    for inner in ast.walk(node):
+                        if isinstance(inner, ast.Dict):
+                            for key in inner.keys:
+                                if isinstance(key, ast.Constant) and isinstance(
+                                        key.value, str):
+                                    keys.add(key.value)
+                    return keys
+            return None
+
+        beat_keys = _built_keys("set_beats")
+        line_keys = _built_keys("set_lines")
+        init_keys = _built_keys("init_lines_from_outline")
+        assert beat_keys, "BUG-12.101: set_beats not found in production_ledger"
+        assert line_keys, "BUG-12.101: set_lines not found in production_ledger"
+        assert init_keys, (
+            "BUG-12.101: init_lines_from_outline not found in production_ledger"
+        )
+        for name, keys in (
+            ("set_beats", beat_keys),
+            ("set_lines", line_keys),
+            ("init_lines_from_outline", init_keys),
+        ):
+            assert "speaker" in keys, (
+                f"BUG-12.101: {name}() does not name 'speaker' in the row it "
+                f"builds, so every caller that supplies one has it silently "
+                f"discarded. Its sibling normalizer names it; the asymmetry "
+                f"IS the bug."
+            )
+
+        # The producing lanes must SUPPLY it too -- half a fix is not a fix.
+        for relative_path, marker in (
+            ("nodes/_otr_scifi_codex.py", '"speaker": b.speaker'),
+            ("nodes/_otr_scifi_fable2.py", '"speaker": speaker'),
+        ):
+            path = os.path.join(pack_dir, *relative_path.split("/"))
+            if not os.path.isfile(path):
+                continue
+            source = open(path, encoding="utf-8").read()
+            assert marker in source, (
+                f"BUG-12.101: {relative_path} builds line rows without a "
+                f"speaker, so the normalizer has nothing to carry"
+            )
+
+        # And the OTR-side regression guards must exist by name.
+        for relative_path, test_names in (
+            ("tests/test_production_ledger.py", (
+                "test_set_lines_carries_speaker",
+                "test_line_and_beat_normalizers_agree_on_speaker",
+            )),
+            ("tests/test_phase2b_progressive_ledger.py", (
+                "test_line_row_carries_the_owning_beats_speaker",
+            )),
+        ):
+            path = os.path.join(pack_dir, *relative_path.split("/"))
+            if not os.path.isfile(path):
+                continue
+            source = open(path, encoding="utf-8").read()
+            for test_name in test_names:
+                assert f"def {test_name}(" in source, (
+                    f"BUG-12.101 executable guard missing: "
+                    f"{relative_path}::{test_name}"
+                )
+
 
 class TestPhase02BugBible0214:
     """BUG-02.14 / BUG-LOCAL-043: SD 1.5 .ckpt offline/Windows four-layer fix.
