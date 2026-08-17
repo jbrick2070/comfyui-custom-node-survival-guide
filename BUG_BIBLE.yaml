@@ -8225,3 +8225,65 @@ bugs:
     reports only one of the three sends the next reader to the wrong file.
   tags: [token-budget, context-window, schema-ceiling-vs-request, model-controlled-job-size, chunk-to-fit, max-new-tokens, unsatisfiable-request, test-pins-the-constant, suite-agrees-with-the-bug, arithmetic-sweep, call-journal-receipt, xref-12.86, xref-12.104, xref-12.105]
   legacy_id: "OTR-PBUG-20260815-10-scene-review-request-exceeds-context-window"
+- id: "12.107"
+  phase: 12
+  area: a-configured-widget-that-is-never-forwarded-is-inert-while-every-mapping-test-passes
+  symptom: |
+    An operator-facing control does nothing on the code path that matters, and
+    nothing anywhere says so. The widget exists, its choices are correct, its
+    value-to-behaviour mapping has a passing unit test, and the feature it
+    controls simply never happens. Measured: a cameo knob offering "always
+    include" produced episodes with no cameo for months, while the graph, the
+    dropdown and the mapping dict were all correct.
+    THE TELL IS A SPLIT. The control works on one path and not another: a
+    legacy in-line branch read the value directly from the entry function's
+    local variable, so anyone exercising THAT path saw it work, while every
+    dispatched lane received a resolved-inputs dict that never carried the key.
+    Which path a reader happens to test decides whether the bug appears to
+    exist.
+  cause: |
+    The value was resolved but never FORWARDED. The entry function accepted the
+    widget, a resolver built the dict every downstream consumer reads, and the
+    call site between them omitted that one keyword argument. Nothing raises:
+    the resolver has a default, the consumers use `.get()`, and a missing key
+    is indistinguishable from a deliberate "not requested".
+    IT SURVIVES UNIT TESTS BY CONSTRUCTION. The natural test asserts the
+    MAPPING -- `assert FORCE_MAP["always include"] is True` -- which is a
+    statement about a dict literal and stays green no matter who reads it. A
+    mocked resolver is worse than no test: mocks accept any keyword, so the
+    omission is invisible precisely in the test written to cover it.
+    A SECOND HAZARD RIDES ALONG, and it is why the failure is silent rather
+    than loud: the mapping was read with `.get()`, which returns None for an
+    unknown key -- and None was ALSO the encoding for "the default behaviour".
+    So a TYPO in the widget value degraded to the default while looking like an
+    explicit choice, and the two states were indistinguishable downstream.
+  fix: |
+    Resolve the control ONCE, in the resolver, and make every consumer -- the
+    legacy path included -- read it from the resolved dict rather than from the
+    entry function's local. One resolution site is what makes two paths
+    incapable of disagreeing.
+    Validate EXACT membership at that site and FAIL LOUD on an unknown value,
+    naming the legal choices. Never map unknown to the default: an
+    unrecognized input and a deliberate default must not share an encoding, or
+    a typo is unobservable.
+    Do this BEFORE any expensive work in the resolver (network fetch, model
+    load), so a mistyped widget costs a millisecond rather than a round trip.
+  verify: |
+    (1) Assert ARRIVAL, not mapping: call the resolver with each legal choice
+    and assert the resolved dict carries the expected value under the key the
+    consumers actually read. A mapping-dict assertion cannot catch this class.
+    (2) Prove the FORWARDING at the call site STRUCTURALLY rather than with a
+    mock -- parse the module and assert the argument appears in that call's
+    keywords. A mock resolver accepts anything and passes against the defect.
+    Assert there is EXACTLY ONE such call site while you are there; a second is
+    a second place to forget.
+    (3) Assert an unknown value RAISES and that the message names every legal
+    choice, so the failure is self-describing.
+    (4) Assert the default path is unchanged: omitting the control entirely
+    must behave exactly as the documented default, or an old saved graph with a
+    short widgets_values vector silently changes behaviour.
+    (5) Where the control has a live consumer, prove it END TO END on a real
+    run -- force the non-default value and assert the artifact shows the
+    effect. A green unit suite proved nothing here for months.
+  tags: [widget-reaches-nothing, inert-control, missing-forwarding, resolved-inputs, one-resolution-site, get-returns-none, typo-degrades-to-default, mock-hides-the-omission, ast-call-site-assertion, legacy-path-split, xref-12.86, xref-12.104]
+  legacy_id: "OTR-PBUG-20260811-03-lemmy-cameo-widget-inert-on-dispatched-lanes"
