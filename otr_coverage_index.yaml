@@ -2364,3 +2364,16 @@ records:
   verdict: promoted
   bible_id: '12.107'
   source: live-execution
+- ref: scripts/_otr_mirror_clone_refs.py (OTR PBUG-20260816-04, found by running it against the real bank)
+  title: A destructive generator was repaired at the ROW level and its own receipt certified the repair -- `mirrored=83
+    added=2 preserved-unmanaged=3` prints identically whether or not a FIELD is lost, because it counts rows, so the
+    surviving half of the defect passed the same proof the fix did; the run stripped `speaker_id` from all eight
+    mirrored rows (a seven-field allow-list written before the field existed, the 12.101 shape) and reverted a
+    hand-improved bootstrap row it merely owns the key for (the 12.99 shape), and only the git diff -- 37 insertions
+    against 18 DELETIONS on a change that should have been pure addition -- showed it
+  verdict: covered
+  bible_id: '12.99'
+  source: live-execution
+  note: also covered by 12.101 (an enumerated key list silently drops fields). The refinement worth carrying is that
+    a data-destroying operation's own summary counter is not proof of its repair when the counter's unit is coarser
+    than the defect's unit -- diff the artifact, which is the lesson 12.99 already records in its own narrative.
