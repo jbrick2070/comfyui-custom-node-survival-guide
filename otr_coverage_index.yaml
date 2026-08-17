@@ -2377,3 +2377,21 @@ records:
   note: also covered by 12.101 (an enumerated key list silently drops fields). The refinement worth carrying is that
     a data-destroying operation's own summary counter is not proof of its repair when the counter's unit is coarser
     than the defect's unit -- diff the artifact, which is the lesson 12.99 already records in its own narrative.
+- ref: docs/PROD_BUG_LOG.md PBUG-20260817-02 (found by an operator-directed conformance audit, live /object_info)
+  title: A hand-built inference graph wired the GENERIC text-encode node where the host ships a DEDICATED one for that
+    model family, so every render since the adapter's first commit ran out-of-distribution -- the family's tokenizer
+    applies no instruction wrapper of its own, so the caller had to supply the system line and separator token and
+    never did; nothing could go red, because the generic node is a legal correctly-typed producer for that slot and
+    the convention is a TRAINING fact rather than a schema fact, and unlike the 12.75 rewrite-regression there was no
+    good build to diff against and no operator complaint, because the output had never once been right
+  verdict: promoted
+  bible_id: '12.109'
+  source: live-execution
+  note: deliberately NOT folded into 12.75 (rewrite-dropped-quality-input, BUG-LOCAL-411). That entry's detection
+    method is "enumerate the OLD implementation's effective inputs before deleting it and diff inventories", which
+    structurally cannot find this class -- there is no previous implementation, no reference artifact from a good era,
+    and no regression moment. 12.109's method is to audit against what the RUNTIME ships, not against your own history.
+    The novel and hard-won half is the DISCRIMINATOR -- an unused dedicated node is only a defect where the family's
+    tokenizer does not self-wrap. Read the tokenizer, never the node name -- on the audit that produced this entry,
+    two of the three engines had unused dedicated nodes and were both CONFORMANT, so name-matching would have shipped
+    two false positives.

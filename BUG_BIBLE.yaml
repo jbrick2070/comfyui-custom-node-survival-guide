@@ -8363,3 +8363,95 @@ bugs:
     because below the threshold it conditioned nothing.
   tags: [engine-owned-style-constant, negative-vetoes-positive, style-blind-default, cfg-1-inert-negative, reference-image-amplifier, request-field-never-read, compose-not-precedence, known-but-optional-schema, frozen-record-hash-forbids-defaults, self-veto-resolution, phrase-not-word-matching, prompt-audit-cannot-see-pixels]
   legacy_id: "OTR-PBUG-20260817-01-image-engine-negative-vetoes-selected-visual-style"
+- id: "12.109"
+  phase: 12
+  area: hand-built-graph-never-adopted-the-family-input-convention
+  symptom: |
+    An engine/adapter that builds its inference graph in code renders
+    successfully forever and nothing ever goes red. No exception, no dangling
+    reference, no failing test -- and, unlike a regression, no operator saying
+    "it used to look better", because it never did. Output is plausible but
+    subtly off: weaker prompt adherence (a named material or subject attribute
+    the prompt asked for does not show up), occasional spurious text-like
+    marks, and background that resolves to mush where the prompt described a
+    scene. Nobody can point at a good build, because there has never been one:
+    the defect has been present since the adapter's first commit.
+    THE DISCOVERY IS ALWAYS ACCIDENTAL. It surfaces when somebody reads the
+    host framework's own node source for an unrelated reason, not from any
+    test, review or audit the project runs on itself.
+  cause: |
+    The host framework ships a DEDICATED node for that model family precisely
+    because the family needs special input handling -- most often an
+    instruction-style wrapper the checkpoint was TRAINED on (a system line plus
+    a separator token, prepended to the user prompt). A hand-built graph wires
+    the GENERIC node instead, so every generation runs out-of-distribution.
+    Nothing complains, and cannot: the generic node is a legal, correctly typed
+    producer for that slot, returns a valid conditioning, and samples cleanly.
+    The convention is a TRAINING fact, not a schema fact, so no type check,
+    graph validator or dead-reference scan can see it. The dedicated node's
+    existence is the only written record that the convention exists at all.
+    THE ASYMMETRY IS WHAT KEEPS IT HIDDEN, AND IT ALSO CREATES FALSE POSITIVES.
+    For some families the wrapper is applied INSIDE the tokenizer, so the
+    generic node is already correct and the dedicated node adds only unrelated
+    capability. An author who checks one such family concludes the generic node
+    is fine and generalizes -- and an auditor who instead flags every unused
+    dedicated node reports defects that are not there.
+  fix: |
+    Audit CONFORMANCE AGAINST THE RUNTIME, not against your own history. Read
+    the live node inventory from the running host, list the dedicated
+    per-family nodes in the conditioning space, and compare that list against
+    the node classes each of your hand-built graphs actually wires. Scope the
+    audit to the engines actually reachable in your shipped configuration;
+    auditing dormant ones spends the same effort for no live risk.
+    ADJUDICATE EACH HIT BY READING THE TOKENIZER, NEVER THE NODE NAME. Open the
+    family's text-encoder implementation and determine whether it applies the
+    wrapper itself. Wrapper inside the tokenizer -> the generic node is correct
+    and the dedicated node is not owed. No wrapper -> the caller must supply
+    it, and the generic node is a live defect. Skipping this step converts the
+    audit into a false-positive generator.
+    Prefer COMPOSING the trained string into the generic node over swapping to
+    the dedicated node when the two are otherwise equivalent -- verify that by
+    reading both implementations, which are usually the same two encoder calls
+    with a concatenation in front. Composing keeps ONE graph shape (the two
+    node classes take different input names, so supporting both forces the
+    builder to branch on which class resolved), keeps the composition unit-
+    testable with no framework import, and avoids depending on the dedicated
+    node being installed. Make the composition IDEMPOTENT so a double-composed
+    prompt cannot double-prefix.
+    Compose on EVERY conditioning branch the sampler reads, positive and
+    negative alike, whenever the dedicated node has no branch-specific mode --
+    wiring one of those nodes into each side is what conformance means. Check
+    the guidance scale first: below the threshold where an unconditional branch
+    exists, the negative conditions nothing and the question is moot.
+    KEEP THE COMPOSED STRING OUT OF ANY UPSTREAM IDENTITY. If a cache key,
+    content hash or derived seed is computed from the prompt, it must keep
+    reading the RAW request text; compose only inside the graph builder.
+    BUMP THE ENGINE/ADAPTER VERSION IN THE SAME CHANGE. The fix alters encoder
+    text, not prompt text, so every prompt-derived cache input is unchanged and
+    a cached pre-fix result stays valid by every test the cache applies. Without
+    the bump, a resumed job re-serves the out-of-distribution output forever and
+    the fix is silently retroactive to nothing.
+  verify: |
+    (1) Assert the composed string is BYTE-IDENTICAL to what the host's
+    dedicated node builds, with the framework's own system/wrapper constants
+    reproduced verbatim in the assertion. This test is the drift detector: it
+    is the only thing that will notice when the upstream constants change.
+    (2) Assert composition on BOTH the positive and negative branches, and that
+    each carries exactly ONE separator token.
+    (3) Assert idempotence -- composing an already-composed string returns it
+    unchanged -- and cover the empty-prompt edge, which must match what the
+    dedicated node emits for empty input rather than being special-cased away.
+    (4) Assert the raw request text survives in the params/request the
+    dispatcher hashes, so cache keys and derived seeds provably do not move.
+    (5) Assert the adapter version changed, or pin the cache key over a
+    known input pair so a silent revert fails.
+    (6) A/B ON PIXELS AT A FIXED SEED, and keep the pre-fix arm as a permanent
+    flag on the smoke harness rather than deleting it. Structural divergence is
+    not proof the output improved; this class is visible only in comparison.
+    Treat a single pair as evidence of MATERIAL CHANGE and direction, never as
+    a quality measurement across the lane.
+    (7) Keep any harness that claims to mirror the engine recipe importing the
+    real composition function rather than re-typing the string, or the mirror
+    quietly stops being one.
+  tags: [hand-built-graph, dedicated-family-node-unused, trained-input-convention, out-of-distribution-forever, no-good-build-to-diff, tokenizer-self-wrap-discriminator, false-positive-audit, compose-over-node-swap, idempotent-prompt-composition, raw-text-feeds-cache-key, adapter-version-bump, fixed-seed-pixel-ab, harness-must-import-not-retype]
+  legacy_id: "OTR-PBUG-20260817-02-lumina-engine-skipped-trained-prompt-start-convention"
