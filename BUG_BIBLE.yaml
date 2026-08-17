@@ -8287,3 +8287,79 @@ bugs:
     effect. A green unit suite proved nothing here for months.
   tags: [widget-reaches-nothing, inert-control, missing-forwarding, resolved-inputs, one-resolution-site, get-returns-none, typo-degrades-to-default, mock-hides-the-omission, ast-call-site-assertion, legacy-path-split, xref-12.86, xref-12.104]
   legacy_id: "OTR-PBUG-20260811-03-lemmy-cameo-widget-inert-on-dispatched-lanes"
+- id: "12.108"
+  phase: 12
+  area: an-engine-owned-negative-prompt-vetoes-the-style-the-config-selected
+  symptom: |
+    A pipeline that offers selectable visual styles renders one output that
+    contradicts its own setting, and does so INCONSISTENTLY inside a single
+    piece of work. Measured: a 74-second episode configured as "cartoon" cut
+    between an animated short, a live-action photograph and a painting --
+    bookends cartoon, one character beat photoreal, a later beat painterly.
+    THE TELL IS THAT THE PROMPTS ALL AGREE. Every generated positive prompt
+    correctly said "bright cartoon illustration", the style config was right,
+    and the images diverged anyway -- so a text-level consistency audit passes
+    while the pixels disagree. Any detector that reads prompts is blind here.
+    It looks like a gradient rather than a switch: where the positive was
+    style-worded the style won, and where the positive was dense with other
+    detail (an anatomy-heavy face description) the veto won.
+  cause: |
+    The NEGATIVE prompt lived in the ENGINE as a hardcoded house-style constant
+    and was blind to the selected style. On a cartoon render the engine sent
+    positive "bright cartoon illustration" AND negative "cartoon, illustration"
+    in the same sampler call: the engine suppressed exactly what the
+    configuration asked for. The constant was tuned when one look existed and
+    was never re-scoped when styles became selectable.
+    IT IS INVISIBLE AT cfg 1.0 AND LIVE ABOVE IT. A negative has no effect on a
+    guidance-distilled engine (no unconditional branch), so the same constant
+    is inert on one engine and decisive on another -- which is why it survives
+    review on whichever engine the reader happens to open.
+    AN AMPLIFIER TURNS ONE BAD OUTPUT INTO MANY. The engine that accepted a
+    reference image propagated the first vetoed result as the identity anchor
+    for every later related render, so a single mis-conditioned still became
+    the look of the whole work -- consistency machinery faithfully spreading
+    the wrong answer.
+    A SECOND DEFECT HID INSIDE THE FIRST: the request already carried a
+    per-object negative field, the dispatcher populated it, and NO engine read
+    it. The value was computed, merged, carried and silently discarded, so a
+    reviewer greps the field, finds it populated, and concludes it is wired.
+  fix: |
+    Move the STYLE half of the negative to whatever owns style -- the style
+    pack/profile -- and leave the engine only an anti-ARTIFACT floor with no
+    style opinion in it. The default style keeps the historical string verbatim
+    so the shipped look is byte-identical and the change is provably scoped.
+    COMPOSE the style negative with any per-object negative; never let one win.
+    They are orthogonal axes (a look versus a subject constraint), so any
+    precedence order silently drops one of them.
+    Make the new field KNOWN-but-OPTIONAL, not required, when frozen records
+    embed a copy of the config and verify it by hash: a required key fails
+    every historical record on the missing-key path, and injecting a default to
+    compensate changes the bytes and trips the hash instead.
+    Resolve SELF-CONFLICT mechanically rather than by editing one string: drop
+    any negative phrase that the same profile's own positive surfaces ask for.
+    That holds for profiles authored later and for runtime-composed ones, so
+    the class cannot return. Compare comma-separated PHRASES, not bare words --
+    "plastic skin" must not be dropped because a positive wants realistic skin.
+    Keep a fallback: an empty composed negative must fall back to the artifact
+    floor, never to nothing, or historical records lose protection they had.
+  verify: |
+    (1) Assert the engine constant carries NO style vocabulary and DOES carry
+    the artifact terms. This is the regression that makes the whole fix
+    cosmetic if it silently returns.
+    (2) For every shipped style profile, assert its negative contains no phrase
+    that its own positive surfaces request. Parametrize over the profiles
+    discovered on disk, not a hardcoded list, or a profile added later escapes
+    the check entirely.
+    (3) Assert the engine HONOURS a request-supplied negative -- pass a
+    non-empty value and assert it reaches the sampler. Grepping that the field
+    is populated proves nothing; the defect was that nobody read it.
+    (4) Assert an EMPTY composed negative falls back to the artifact floor
+    rather than to an empty string.
+    (5) Assert a profile WITHOUT the optional key still validates, and that a
+    non-string value is still type-rejected -- optional must not mean
+    unvalidated.
+    (6) Record cfg per engine alongside the negative in any receipt: a negative
+    logged without its guidance scale can be accurate and still misleading,
+    because below the threshold it conditioned nothing.
+  tags: [engine-owned-style-constant, negative-vetoes-positive, style-blind-default, cfg-1-inert-negative, reference-image-amplifier, request-field-never-read, compose-not-precedence, known-but-optional-schema, frozen-record-hash-forbids-defaults, self-veto-resolution, phrase-not-word-matching, prompt-audit-cannot-see-pixels]
+  legacy_id: "OTR-PBUG-20260817-01-image-engine-negative-vetoes-selected-visual-style"
