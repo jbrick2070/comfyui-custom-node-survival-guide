@@ -2395,3 +2395,29 @@ records:
     tokenizer does not self-wrap. Read the tokenizer, never the node name -- on the audit that produced this entry,
     two of the three engines had unused dedicated nodes and were both CONFORMANT, so name-matching would have shipped
     two false positives.
+- ref: docs/PROD_BUG_LOG.md PBUG-20260817-03 (published ledgers on disk; 28 rows across 20 of 124
+    pitch-bearing episodes, measured read-only by the driver)
+  title: |
+    An upstream generative plan NAMED the characters, the cast assigner then renamed them, and the
+    per-record description prompt was handed both with no precedence stated -- so the description
+    writer filled its free-text "story-linked role" slot with the PLAN's name and that other person's
+    whole portrait followed, shipping a male row described as a woman and copying the same string
+    verbatim into the image prompt. Every schema, length and name-shape guard passed because the value
+    is a well-formed name, and it surfaced only because an adjacent GENDER audit tripped on it.
+  verdict: promoted
+  bible_id: '11.61'
+  source: live-execution
+  note: |
+    NOT covered by 10.03 (LLM types the wrong character name in a DIALOGUE body). That entry's fix --
+    fuzzy-match stray names to the nearest roster entry and rewrite -- is actively harmful on this
+    class. It would rename LUCILLE PENNY to RICK STEINER and leave the woman's face, bearing and
+    delivery prose sitting in the man's record, turning a visible defect invisible. Also not 10.08
+    (two correlated attributes drawn independently, reconciled in Python before freeze). Here both
+    values are NAMES for one entity from two different authorities, and the leak happens inside a
+    prompt rather than between two draws.
+    The hard-won half is the CHECK SCOPE. The obvious "no record may name another record" check is
+    wrong in BOTH directions -- it flags correct relational prose ("foil to the Time Traveler") and
+    it misses this defect entirely, because the leaked name belongs to no record at all. Measured on
+    the same corpus: 47 sibling-name hits, roughly 45 of them legitimate writing, and it did not flag
+    the episode the bug was reported from. The correct scope is ensemble-foreign -- a proper name that
+    no record in the set owns.

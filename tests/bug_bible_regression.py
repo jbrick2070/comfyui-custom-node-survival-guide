@@ -866,6 +866,19 @@ class TestThreeFileContract:
     # lifecycle; same BUG-LOCAL-415 incident as BUG-12.52, whose
     # consume-once assert IS statically tested in the phase-07-to-12
     # production regression catalog below).
+    #
+    # BUG-11.61 (an upstream plan names the entities, a downstream
+    # assigner renames them, and a per-record prompt is handed both) has
+    # no executable assertion YET, deliberately. Its verify clause is an
+    # ARCHIVE SWEEP over produced record sets plus a known-bad artifact
+    # pinned by row, and neither is reachable by static file analysis --
+    # the header's maintenance rule scopes the test requirement to
+    # exactly that. The one statically-checkable half is verify step (6),
+    # asserting the per-record prompt builder receives RECONCILED
+    # upstream text; that guard cannot be asserted until the
+    # reconciliation exists, so it lands with the fix rather than with
+    # the entry. Add it there -- an entry whose static half stays
+    # unwritten is how a rule becomes decoration.
 
     def _repo_root(self):
         """Resolve the survival guide repo root (parent of tests/)."""

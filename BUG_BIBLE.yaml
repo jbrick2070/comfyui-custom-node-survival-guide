@@ -8455,3 +8455,98 @@ bugs:
     quietly stops being one.
   tags: [hand-built-graph, dedicated-family-node-unused, trained-input-convention, out-of-distribution-forever, no-good-build-to-diff, tokenizer-self-wrap-discriminator, false-positive-audit, compose-over-node-swap, idempotent-prompt-composition, raw-text-feeds-cache-key, adapter-version-bump, fixed-seed-pixel-ab, harness-must-import-not-retype]
   legacy_id: "OTR-PBUG-20260817-02-lumina-engine-skipped-trained-prompt-start-convention"
+- id: "11.61"
+  phase: 11
+  area: two-naming-authorities-let-an-upstream-plan-name-leak-into-an-assigned-record
+  symptom: |
+    A per-record generated field describes the WRONG PERSON. The record's own
+    identity is replaced by a name from an earlier planning artifact, and that
+    other person's attributes follow it -- face, build, bearing, delivery, the
+    whole portrait. Measured: a three-row cast in which two rows were
+    contaminated, one of them reading "Late 50s, Seasoned yet vulnerable
+    LUCILLE PENNY. Face: ... Voice: warm, calm urgency, like a mother in a
+    storm" on a row named RICK STEINER and typed male. Across the archive, 28
+    rows in 20 of the 124 record sets that carry an upstream named cast -- 16%
+    -- and the most recent was produced the day before the sweep, so this is
+    live behaviour and not a retired regime.
+    Nothing errors and nothing is malformed. The field is non-empty, on-format,
+    schema-valid and well written; it is simply about somebody else. The
+    contaminated string is then copied VERBATIM into the downstream image
+    prompt, so the picture is painted of the other person too, and the wrong
+    record ships to every consumer that reads either surface.
+  cause: |
+    TWO AUTHORITIES NAME THE SAME ENTITY, and the pass that must choose between
+    them is never told which one wins. An upstream generative planning step
+    (pitch, brief, treatment, outline) invents entity names as part of its
+    prose. A downstream deterministic assigner then overrides those names with
+    its own -- pool draws, roster rows, ids. The per-record generation prompt
+    is handed BOTH: the upstream text goes in as story context, the assigned
+    name goes in as a labelled field, and no precedence is stated anywhere.
+    The template makes it easy to get wrong. A format string of the shape
+    "<age band>, <story-linked role>. <attributes>" reserves a free-text slot
+    immediately after the age band, and when the surrounding context keeps
+    naming people, a NAME is an entirely plausible filler for "story-linked
+    role". The model is not malfunctioning; it is resolving an ambiguity the
+    prompt created, in the direction the context weights.
+    It survives every guard because it is a SEMANTIC mismatch wearing correct
+    syntax: name-shape validators pass (it IS a well-formed name), length and
+    schema validators pass, non-empty passes, and any per-field test passes.
+    It also hides behind adjacent audits: this was found only because a GENDER
+    audit tripped on a female-coded name inside a male-typed row, and had it
+    been repaired as the gender defect it appeared to be, the wrong-person
+    prose would have survived with the gender cue sanded off -- a visible
+    defect converted into an invisible one.
+  fix: |
+    Declare ONE naming authority and enforce it at the boundary, not in the
+    prompt. Decide which pass owns entity names. If the downstream assigner
+    owns them, then every upstream text that will be shown to a later pass must
+    have the superseded names REWRITTEN to the assigned ones (or removed)
+    before it enters any per-record prompt. Reconcile the artifact; do not ask
+    the model to arbitrate between two authorities you handed it.
+    DO NOT fix it by instructing the model harder. "Use the Name field, not
+    names in the story" is persuasion, and an instructed model is still a
+    model; the guarantee has to be structural -- the conflicting name must not
+    be in the context, or the output must be checked after.
+    DO NOT fix it with fuzzy name repair. The reflex fix for stray names in
+    generated text -- match them to the nearest roster entry and rewrite -- is
+    ACTIVELY HARMFUL here: it rewrites the foreign name to the record's own and
+    leaves that other person's face, bearing and delivery prose in place. The
+    record still describes the wrong human and now nothing points at it.
+    The structural gate is an ENSEMBLE-SCOPED FOREIGN-NAME CHECK: reject any
+    record whose generated field contains a proper name that NO record in the
+    ensemble owns. Scope matters and both obvious variants are wrong. "No
+    record may name ANOTHER record" is wrong in both directions -- it flags
+    correct relational prose ("foil to the Time Traveler", "Rosalind's
+    confidante"), which is legitimate and desirable, and it MISSES this defect
+    entirely, because the leaked name belongs to no record at all. On the
+    corpus that produced this entry the sibling-name variant returned 47 hits
+    of which roughly 45 were correct relational writing, and it did not flag
+    the record the bug was reported from.
+    Carry the repair to every DERIVED surface in the same change. The
+    contaminated string had already been copied into the image prompt, so a fix
+    that repairs only the source field leaves the rendered artifact wrong and
+    the two surfaces disagreeing.
+  verify: |
+    (1) Sweep the ARCHIVE, not only new runs. For every record set that carries
+    both an upstream named cast and an assigned roster, assert no generated
+    field contains a name from the upstream cast that no roster row owns. This
+    class ships silently for months, so a forward-only check measures nothing.
+    (2) Pin the known-bad artifact and require the check to flag EXACTLY the
+    contaminated records in it -- not the set, the rows. A detector that only
+    reports "this episode is dirty" cannot be used to repair.
+    (3) Prove the naive variant is not the fix: assert the sibling-name check
+    passes on a legitimate relational description AND fails to flag the
+    known-bad record. Without this, the cheap check gets adopted and the defect
+    keeps shipping under a green gate.
+    (4) Assert the DERIVED surface as well as the source field. Anywhere the
+    generated text is copied verbatim downstream, the same assertion applies to
+    the copy, or a green source check certifies a wrong artifact.
+    (5) Prove the guard fires: disable the name reconciliation and require the
+    sweep to go red. A check that stays green with the reconciler removed is
+    measuring the generator, not the guard.
+    (6) Statically assert the boundary. The function that builds the per-record
+    prompt must receive reconciled upstream text -- walk to the call site and
+    assert the raw upstream field is not what gets inlined, so a later refactor
+    cannot quietly restore the two-authority prompt.
+  tags: [llm, prompt-authority, two-naming-authorities, entity-identity, cross-record-contamination, upstream-plan-vs-assigner, free-text-slot, semantic-mismatch-correct-syntax, ensemble-scoped-check, relational-mention-false-positive, fuzzy-repair-launders-the-defect, derived-surface, archive-sweep, adjacent-audit-found-it, xref-10.03, xref-10.08, xref-12.103]
+  legacy_id: "OTR-PBUG-20260817-03-upstream-plan-name-pasted-into-assigned-character-record"
