@@ -8550,3 +8550,72 @@ bugs:
     cannot quietly restore the two-authority prompt.
   tags: [llm, prompt-authority, two-naming-authorities, entity-identity, cross-record-contamination, upstream-plan-vs-assigner, free-text-slot, semantic-mismatch-correct-syntax, ensemble-scoped-check, relational-mention-false-positive, fuzzy-repair-launders-the-defect, derived-surface, archive-sweep, adjacent-audit-found-it, xref-10.03, xref-10.08, xref-12.103]
   legacy_id: "OTR-PBUG-20260817-03-upstream-plan-name-pasted-into-assigned-character-record"
+
+- id: "12.110"
+  phase: 12
+  area: one-field-two-meanings-gate-the-consumer-on-the-lane-not-on-truthiness
+  symptom: |
+    A field is populated, correctly, on every lane -- and a consumer that reads
+    it produces nonsense on some of them. Nothing is null, nothing is
+    malformed, no schema complains, and the value is genuinely right for the
+    lane that wrote it. Measured: a field naming "the work this episode adapts"
+    was threaded to a narrator so it could announce the work by name. On the
+    adaptation lanes it holds a play title and the announcement is correct. On a
+    different lane the same field holds the PUBLICATION a post came from, so the
+    narrator would have announced a scene from a magazine that has no scenes --
+    on 56 of 98 live records, 57% of that lane. The consumer was new; the field
+    and both its meanings had been correct and shipping for months.
+  cause: |
+    ONE FIELD ACQUIRED TWO MEANINGS, one per lane, and each was reasonable when
+    it was added. The extractor has a per-lane branch -- lane A maps its title
+    into the field, lane B maps its publisher into the same field -- and the
+    field name describes only the first meaning. Nothing is wrong until a
+    consumer arrives that means specifically the FIRST meaning and tests the
+    field the obvious way: `if value:`. Truthiness cannot distinguish two
+    meanings; it only distinguishes present from absent, and both meanings are
+    present.
+    The trap is that the field's own name argues for the mistake. A reviewer
+    reading `work_title` reasonably concludes it holds the work's title, and the
+    second meaning is visible only in the extractor's other branch, which nobody
+    reads when wiring a new consumer.
+    It also survives review by construction: a static reviewer that follows the
+    producer finds the field always populated and declares the lane safe -- the
+    error is not in either branch, it is in the ASSUMPTION that one name means
+    one thing.
+  fix: |
+    GATE THE CONSUMER ON THE LANE, NEVER ON TRUTHINESS. Export the set of lanes
+    for which the consumer's meaning actually holds, as a NAMED CONSTANT beside
+    the extractor that creates the ambiguity, and have the consumer test
+    membership in that set instead of testing the value. The name of the
+    constant carries the distinction the field name could not.
+    Record the MEASUREMENT beside the constant -- how many live records carry
+    the other meaning -- so the next reader learns the field is overloaded
+    without having to rediscover it.
+    Do NOT rename or split the field as the first move if other consumers
+    already read it correctly for their own lane: both meanings are load-bearing
+    and a rename is a wider blast radius than the defect. Splitting is right
+    only when a second consumer needs the second meaning explicitly.
+    Do NOT special-case by matching the value's shape or content -- that is
+    name-matching, it ships false positives, and it breaks the moment either
+    lane's data changes.
+  verify: |
+    (1) Assert the gate is a MEMBERSHIP test against the exported constant, not
+    a truthiness test on the value. Walk the AST if necessary -- an `if value:`
+    reintroduced later looks harmless in review.
+    (2) POSITIVE CONTROL, and this is the one that matters: assert a record from
+    a lane where the meaning DOES hold passes the gate. Without it the gate is
+    satisfied by a predicate that is false for everything, which is green and
+    useless.
+    (3) NEGATIVE CONTROL from real data: construct the other lane's record with
+    its field populated, and assert the consumer declines it. Use the actual
+    shape from the corpus, not an invented one -- the defect is that the value
+    looks legitimate.
+    (4) Sweep the corpus for how many records carry the second meaning and put
+    that number in the test's message, so a future reader sees the blast radius
+    without re-measuring.
+    (5) Prove the consumer end to end on a real run of BOTH lanes. A static
+    reviewer cleared the affected lane here by reading the producer module and
+    finding nothing that wrote the field; the live records disagreed, and only
+    the artifact settled it.
+  tags: [overloaded-field, per-lane-meaning, truthiness-gate, named-constant, positive-control, static-audit-cannot-prove-behaviour, corpus-measurement, xref-11.61, xref-12.89]
+  legacy_id: "OTR-item-F-work-title-means-two-things-across-lanes"

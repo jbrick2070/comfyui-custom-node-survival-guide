@@ -2421,3 +2421,23 @@ records:
     the same corpus: 47 sibling-name hits, roughly 45 of them legitimate writing, and it did not flag
     the episode the bug was reported from. The correct scope is ensemble-foreign -- a proper name that
     no record in the set owns.
+- ref: docs/GO_FORWARD_PLAN.md item F + live acceptance legs 2026-08-17 (shakespeare PASS, public_domain FAIL)
+  title: |
+    One field acquired TWO MEANINGS, one per lane -- "the work this episode adapts" on the adaptation
+    lanes, "the publication a post came from" on another -- and a new consumer that meant only the
+    first tested it with plain truthiness. Every value was correct and non-empty, so nothing errored;
+    the narrator would simply have announced a scene from a magazine that has no scenes, on 56 of 98
+    live records of that lane. A static reviewer cleared the lane by reading the producer and finding
+    nothing that wrote the field; the corpus disagreed.
+  verdict: promoted
+  bible_id: '12.110'
+  source: live-execution
+  note: |
+    Distinct from 12.89 (a receipt and the runtime reading ONE meaning through two different rules,
+    disagreeing only on the token that means "off"). Here both readings are correct for their own
+    lane and the consumer simply cannot tell which meaning it received -- truthiness distinguishes
+    present from absent, never meaning from meaning. Also distinct from 11.61 (two separate
+    AUTHORITIES naming one entity); this is one authority whose single field is overloaded.
+    The generalisable half is the FIX SHAPE: gate the consumer on an exported set of lanes, never on
+    the value, and carry a positive control so the gate cannot be satisfied by a predicate that is
+    false for everything.
