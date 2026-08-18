@@ -8840,6 +8840,15 @@ bugs:
     running on 4% of real traffic. Neither the proposal builder nor its validator
     knew reserved ids existed, so the leak walked around a guard that was, in its
     own path, working perfectly.
+    AND THERE WAS A THIRD PATH, WHICH THE FIRST FIX ALSO MISSED: the
+    gender-agnostic FALLBACK used when the normal lookup cannot serve a row. It
+    drew UNIFORMLY with no reserved filter and no quality filter at all -- a
+    fallback is written to always return something, so it tends to be authored
+    with fewer guards than the path it backs up, not more. What made it high
+    traffic rather than a rare edge: a canonical category ("other") is 20% of
+    every roll and the catalogue carries NO rows for it, so every one of those
+    rows fell through to the unfiltered fallback. A category with no inventory
+    silently promotes a fallback into a main path.
   fix: |
     Derive the reserved set FROM the authority that grants the identity, and
     apply it as a deterministic PRE-FILTER on the candidate pool -- never a score
@@ -8869,6 +8878,11 @@ bugs:
     demographic branch that no reserved asset is ever returned for an ordinary
     subject. Tests that only check the reserved LIST prove the list is right and
     say nothing about the pool, which is where the defect lives.
+    (1b) Count the traffic on each path before trusting any of them. The path
+    whose name says it selects may carry a small minority of real assignments;
+    measure from the corpus, not from reading the code. And test the FALLBACK
+    explicitly -- it is the path least likely to carry the guard and most likely
+    to be reached by a category the catalogue cannot serve.
     (2) Prove the test has teeth: assert the reserved asset IS present in the
     unfiltered candidate pool. If it is absent for some unrelated reason, the
     sweep passes for the wrong reason and keeps passing if the guard is deleted.
@@ -8894,5 +8908,5 @@ bugs:
     timestamps: that argument is available for both explanations and selects the
     comfortable one. Corpus silence is not proof either -- a defect at a ~1%
     assignment rate is absent from most samples while remaining fully live.
-  tags: [reserved-identity, general-pool-leak, deterministic-pre-filter, derived-not-hand-kept, owns-versus-borrows, selector-not-helper, test-has-teeth, role-aware-corpus-count, uncovered-second-path, guard-at-one-chokepoint, post-fix-sighting-two-explanations, reproduce-on-fresh-import, low-rate-defect-hides-in-corpus]
+  tags: [reserved-identity, general-pool-leak, deterministic-pre-filter, derived-not-hand-kept, owns-versus-borrows, selector-not-helper, test-has-teeth, role-aware-corpus-count, uncovered-second-path, guard-at-one-chokepoint, unguarded-fallback-path, empty-category-routes-to-fallback, post-fix-sighting-two-explanations, reproduce-on-fresh-import, low-rate-defect-hides-in-corpus]
   legacy_id: "OTR-2026-08-17-lemmy-cameo-voice-cast-on-ordinary-character"
