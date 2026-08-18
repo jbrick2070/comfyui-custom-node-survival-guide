@@ -33,8 +33,8 @@
 # title card -- and conflating them cost an evening; the index keeps them as
 # two records for that reason.
 audited: '2026-08-18'
-bible_head: 02e8bcb (+12.111 appended 2026-08-18)
-bible_entries: 290
+bible_head: <pending-commit> (+12.112, +12.113 appended 2026-08-18)
+bible_entries: 292
 records:
 - ref: BUG_LOG.md L1022 (BUG-LOCAL-231 soak data point)
   title: A long per-clip render loop had no routine VRAM reclamation — cleanup fired only on an OOM exception, so a gradual
@@ -2462,3 +2462,42 @@ records:
     reference hash) INSIDE the artifact so the citation is checkable without trusting a second file.
     The defect class travels -- a sibling instrument in the same repo writes a manifest cited by
     sha256 in three provisional records with no guard at all, tracked separately.
+- ref: 2026-08-18 emotion-ceiling audition arms (live render, otr/episodes/lemmy_production_audition_ceiling_2026-08-18)
+  title: |
+    A blinded three-arm audition looped `os.environ[key] = value` over each arm's override dict, so an
+    arm meaning "use the code's defaults" (an empty or partial dict) silently inherited whatever the
+    PREVIOUS arm in the shuffled order had left set. Caught by a panel review before it shipped, then
+    proven live: the "shipped" arm rendered immediately after a "ceiling disabled" control arm resolved
+    the control's leftover setting, not its own defaults -- a qualification built from that arm would
+    have certified a build that was never rendered. Non-deterministic across runs, since the shuffle
+    decides which arm runs first.
+  verdict: promoted
+  bible_id: '12.112'
+  source: live-execution
+  note: |
+    The generalisable half is INCREMENTAL vs TOTAL state reset in a sequential loop: each arm's dict,
+    read alone, looks complete and correct, and the bug is only visible against the EXECUTION ORDER --
+    exactly what a blinded/shuffled harness deliberately hides from the reader. Fix shape: pop every
+    key ANY arm controls before applying THIS arm's overrides, so the reset is total by construction
+    rather than reordering arms or memoizing a diff, which both leave the underlying bug for the next
+    added arm or shuffle seed.
+- ref: 2026-08-18 scifi_news_pro coda fix, kibitz r3 antigravity (live render, otr/obs signal_lost_the_borrowed_voice_20260818_115506 vs signal_lost_the_last_reading_20260818_122159)
+  title: |
+    A four-iteration live chase (two attempts disproved before the fix landed): a script-writing pass
+    was told "never state a real-world fact in the outro or CODA, a separate factual note is appended
+    by the producer after you" -- while the SAME prompt-assembly code dumped the full state object,
+    INCLUDING that already-generated factual note, into the writer's own context, because a later pass
+    had already run and written its result onto the shared state object before the writer's prompt was
+    built. The writer echoed the note almost word for word. Found by a scoped kibitz review (antigravity)
+    after two solo fix attempts missed it; proven both ways on real renders (leaked, then clean).
+  verdict: promoted
+  bible_id: '12.113'
+  source: live-execution
+  note: |
+    The generalisable half is that a NEGATIVE instruction ("never state X") and a POSITIVE leak (X is
+    sitting in the model's own context) are added by independent code paths, so nothing forces them to
+    be checked against each other -- the contradiction exists only in their runtime combination, which
+    neither reading the prompt text nor reading the state-passing code in isolation reveals. Fix shape:
+    exclude the forbidden field from the ONE prompt-build call's serialization, not from the shared
+    state object itself, and not by further strengthening the instruction alone (already tried, does
+    not hold on a small local model once the fact is visible).

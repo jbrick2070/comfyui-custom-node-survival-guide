@@ -8685,3 +8685,119 @@ bugs:
     the instrument drives the production entry point, not a private shortcut.
   tags: [evidence-by-hash, append-only-artifact, overwrite-guard, partial-guard-reads-as-complete, sibling-instrument, audition-record, provenance-in-artifact, byte-identical-is-not-confirmation]
   legacy_id: "OTR-2026-08-18-audition-overwrites-cited-evidence"
+- id: "12.112"
+  phase: 12
+  area: sequential-arm-loop-must-reset-total-state-not-assign-a-delta
+  symptom: |
+    A test harness or audition instrument runs N configurations ("arms") in
+    sequence inside ONE process, blinded so the order is randomized. One arm
+    means "use the defaults" and is written as an empty or partial override
+    dict -- it names no keys, meaning to inherit whatever the code's own
+    defaults are. Instead it silently inherits whatever the PREVIOUS arm in
+    the shuffled order left set in process-global state (an env var, a module
+    global, a singleton config). Because the shuffle decides which arm runs
+    first, the contamination is non-deterministic across runs of the same
+    harness -- it does not even fail the same way twice.
+    Measured: a blinded audition rendered a "shipped defaults" arm
+    immediately after a "ceiling disabled" control arm. The shipped arm's
+    resolved settings matched the control's leftover value, not the code's
+    actual defaults, and the qualification record built from that arm would
+    have certified a build that was never rendered.
+  cause: |
+    The per-arm loop ASSIGNS only the keys the current arm's dict names:
+    `for key, value in arm_env.items(): os.environ[key] = value`. An arm
+    meaning "inherit the defaults" is naturally written by OMITTING those
+    keys from its dict -- and omission does nothing to a key a PRIOR
+    iteration already set. The loop is incremental (only ADDs), while the
+    intended semantics are total (each arm's environment should be exactly
+    what its own dict says, no more).
+    This is invisible in code review because each arm's dict, read on its
+    own, looks correct and complete -- the bug is only visible against the
+    EXECUTION ORDER, which is exactly the thing a blinded/shuffled harness
+    deliberately hides from the reader.
+  fix: |
+    Before applying an arm's overrides, POP every key any arm in the set is
+    allowed to control -- not just the keys THIS arm happens to name -- then
+    apply this arm's overrides on top of the now-clean state. Maintain the
+    full set of controlled keys as one explicit constant the loop reads, so
+    adding a new controllable variable to any arm's dict is impossible without
+    also adding it to the reset list.
+    Do NOT fix this by reordering arms, by re-running a specific arm first, or
+    by memoizing "the previous arm's settings" to diff against -- all three
+    leave the underlying incremental-assignment bug in place for the next
+    added arm or the next shuffle seed.
+  verify: |
+    (1) Run the harness with a FIXED, non-default shuffle order that places
+    the "inherit defaults" arm immediately after an arm with a NON-default
+    override, and assert the inheriting arm's resolved/observed settings
+    equal the code's actual defaults, not the preceding arm's values.
+    (2) Repeat with the reverse order (defaults arm first) and assert the
+    SAME result -- order-independence is the actual property being protected,
+    not just one ordering.
+    (3) If the harness records what it resolved (a manifest, a receipt), assert
+    the recorded value for each arm matches what a fresh, isolated process
+    would resolve for that arm's dict alone.
+    (4) Grep every dict in the arm set for keys used by ANY arm; assert the
+    reset list is a superset. A newly added controllable key that is not in
+    the reset list reintroduces the bug silently.
+  tags: [sequential-state, blinded-harness, env-contamination, incremental-vs-total-reset, shuffle-order-dependent, non-deterministic-across-runs, audition-instrument]
+  legacy_id: "OTR-2026-08-18-audition-arm-env-contamination"
+- id: "12.113"
+  phase: 12
+  area: a-downstream-passs-finished-output-fed-back-as-context-to-an-earlier-pass-forbidden-from-producing-it
+  symptom: |
+    A multi-pass LLM pipeline runs pass B (produces a short, factual,
+    validated field) BEFORE pass A (writes a large free-text document, e.g.
+    a whole script), then folds B's finished OUTPUT into A's INPUT context
+    because A's prompt happens to serialize "everything known so far." A's
+    system prompt separately instructs it never to produce content of B's
+    kind ("a separate factual note is appended by the producer, you do not
+    write it") -- but A can now SEE that exact content sitting in its own
+    context. A small local model does not reliably honor "do not repeat this"
+    when the thing not to repeat is right there to copy.
+    Measured: pass A's output (a fictional bridge line) echoed pass B's
+    output (a real-world fact) almost verbatim, word for word on the shared
+    clause, even though pass A's prompt explicitly forbade stating any
+    real-world fact.
+  cause: |
+    The prompt-assembly code does the generically correct thing --
+    "serialize the full accumulating state object into the next prompt" --
+    without asking whether every field in that state object is something
+    THIS prompt wants the model to see. A field that is a LATER pass's
+    finished, protected output looks, to the generic serializer, identical to
+    every other field the model legitimately needs (cast, setting, premise).
+    The negative instruction ("never state X") and the positive leak (X is
+    sitting right there) are added independently, by different code paths, so
+    nothing forces them to be checked against each other. A reviewer reading
+    either the prompt TEXT or the state-passing CODE in isolation sees nothing
+    wrong; the contradiction only exists in their combination at runtime.
+  fix: |
+    At the ONE call site that builds the forbidden pass's prompt, explicitly
+    EXCLUDE the field(s) the model must not see from the serialized state
+    (e.g. `model.model_dump(exclude={"the_field"})`), rather than trying to
+    make the model resist a temptation you chose to put in front of it. Leave
+    the field intact on the state object for every OTHER consumer (downstream
+    assembly, receipts, audits) -- the exclusion is scoped to the one prompt
+    that must not see it, not a deletion.
+    Do NOT rely on strengthening the "never state X" instruction alone
+    (already the first fix reached for, and it does not hold under a small
+    local model once X is visible in context); do NOT rely on a downstream
+    parser catching the leak after the fact (structural grammar checks do not
+    inspect semantic content, so a leak of this shape parses as perfectly
+    valid output).
+  verify: |
+    (1) Unit test: build the forbidden pass's prompt with a DISTINCTIVE marker
+    string planted in the field that must be excluded, and assert the marker
+    never appears anywhere in the built prompt.
+    (2) Assert every OTHER field on the same state object DOES still reach the
+    prompt, so the exclusion is proven scoped rather than accidentally wiping
+    the whole object.
+    (3) Assert the empty/not-yet-populated case (the excluded field's default)
+    produces a byte-identical prompt to before the fix, so passes that never
+    populate the field are unaffected.
+    (4) On a live render, diff the forbidden pass's actual output against the
+    other pass's output for shared substrings above a trivial length -- an
+    echoed phrase is the concrete, observable symptom, not an inference from
+    reading the prompt.
+  tags: [prompt-contamination, pipeline-ordering, state-object-serialization, small-local-model, negative-instruction-not-sufficient, context-exclusion, live-echo-symptom, multi-pass-llm]
+  legacy_id: "OTR-2026-08-18-scifi-news-pro-coda-leaks-the-news-read"
