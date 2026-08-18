@@ -33,7 +33,7 @@
 # title card -- and conflating them cost an evening; the index keeps them as
 # two records for that reason.
 audited: '2026-08-18'
-bible_head: <pending-commit> (+12.112, +12.113 appended 2026-08-18)
+bible_head: 34fddc1 (+12.112, +12.113 appended 2026-08-18)
 bible_entries: 292
 records:
 - ref: BUG_LOG.md L1022 (BUG-LOCAL-231 soak data point)
