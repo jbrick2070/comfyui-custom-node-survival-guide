@@ -32,9 +32,9 @@
 # SURFACES sharing one artifact -- the credits transcript roll and the hero
 # title card -- and conflating them cost an evening; the index keeps them as
 # two records for that reason.
-audited: '2026-08-12'
-bible_head: 80fc358 (+12.98 appended 2026-08-13)
-bible_entries: 276
+audited: '2026-08-18'
+bible_head: 02e8bcb (+12.111 appended 2026-08-18)
+bible_entries: 290
 records:
 - ref: BUG_LOG.md L1022 (BUG-LOCAL-231 soak data point)
   title: A long per-clip render loop had no routine VRAM reclamation — cleanup fired only on an OOM exception, so a gradual
@@ -2441,3 +2441,24 @@ records:
     The generalisable half is the FIX SHAPE: gate the consumer on an exported set of lanes, never on
     the value, and carry a positive control so the gate cannot be satisfied by a predicate that is
     false for everything.
+- ref: 2026-08-18 emotion-ceiling re-qualification (live render, otr/episodes/lemmy_production_audition_ceiling_2026-08-18)
+  title: |
+    A qualification record cited its audition MANIFEST.json BY SHA256 while the audition script
+    defaulted to that same directory, so re-running the instrument to refresh the evidence destroyed
+    the bytes the record named -- green run, files present, citation silently unverifiable. The first
+    re-audition attempt also produced BYTE-IDENTICAL clips under changed code, which looked like
+    confirmation and proved nothing: the instrument was bypassing the code path that had changed. A
+    partial guard (refuse only when MANIFEST.json exists) left the WAVs and the whole _KEY directory
+    -- the blinding map that says which arm a human approved -- unprotected.
+  verdict: promoted
+  bible_id: '12.111'
+  source: live-execution
+  note: |
+    The generalisable half is that an INSTRUMENT and a RECORD have different lifetimes and nothing
+    states the dependency: an audition script is written to be re-run, a qualification is written to
+    be permanent, and the moment the record cites the output by hash that output became append-only.
+    Fix shape: refuse any non-empty output location including every sibling directory, render to a
+    NEW dated directory per run, and put the runtime (live fingerprint, resolved params PER ARM,
+    reference hash) INSIDE the artifact so the citation is checkable without trusting a second file.
+    The defect class travels -- a sibling instrument in the same repo writes a manifest cited by
+    sha256 in three provisional records with no guard at all, tracked separately.

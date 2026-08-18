@@ -8619,3 +8619,69 @@ bugs:
     the artifact settled it.
   tags: [overloaded-field, per-lane-meaning, truthiness-gate, named-constant, positive-control, static-audit-cannot-prove-behaviour, corpus-measurement, xref-11.61, xref-12.89]
   legacy_id: "OTR-item-F-work-title-means-two-things-across-lanes"
+- id: "12.111"
+  phase: 12
+  area: an-instrument-that-overwrites-the-evidence-its-own-record-cites-by-hash
+  symptom: |
+    A qualification, approval or acceptance record cites an artifact BY SHA256 --
+    a manifest, a key, a set of clips -- and the tool that produced that artifact
+    writes to the same path every time it runs. Re-running it to refresh the
+    evidence destroys the bytes the existing record names, so the record now
+    points at a hash nothing on disk has. Nobody sees an error: the re-run is
+    green, the files are present, and the citation is silently unverifiable.
+    Measured: a voice-route qualification cited
+    `<audition_dir>/MANIFEST.json` by sha256; the audition script defaulted to
+    that directory and rewrote it. A second instrument in the same repo wrote a
+    manifest cited by sha256 in THREE separate provisional records with no
+    overwrite guard at all.
+    The near-miss variant is worse than the miss: a re-run under CHANGED code
+    can also produce BYTE-IDENTICAL artifacts, which looks like confirmation and
+    is actually proof of nothing -- the instrument was bypassing the very code
+    path that changed.
+  cause: |
+    THE INSTRUMENT AND THE RECORD HAVE DIFFERENT LIFETIMES AND NOBODY SAID SO.
+    An audition script is written to be re-run; a qualification record is written
+    to be permanent. The moment a record cites the script's output by hash, that
+    output became an append-only archive, and the script's default output path
+    became a destructive one. Nothing in either file states the dependency.
+    A partial guard reads as a complete one. Refusing only when a specific file
+    (`MANIFEST.json`) exists leaves every sibling artifact unprotected: the WAVs
+    in a manifest-less directory, and -- the one that actually matters -- the
+    separate `_KEY` directory holding the blinding map, which is what says which
+    arm a human approved. A guard that names one filename teaches readers the
+    hazard is handled.
+  fix: |
+    Make the instrument REFUSE to write into any non-empty output location, and
+    make "output location" include every directory it touches, not just the one
+    holding the file you thought of. Reject a path that exists and is not a
+    directory; reject a directory that has any entry in it.
+    Render to a NEW, dated or otherwise distinct directory per run, and let the
+    record cite that directory. A new run is a new artifact; refreshing evidence
+    in place is never the operation you want.
+    Put the runtime INSIDE the artifact. A manifest a record cites by hash must
+    carry the facts the record claims -- the live code fingerprint, the resolved
+    parameters PER ARM, the reference id and its hash -- so the citation can be
+    checked without trusting a second file that may have moved on.
+    Do NOT solve this with a backup-before-overwrite step, a timestamp suffix
+    bolted on inside the writer, or a `--force` that defaults on. The first two
+    still destroy the cited path; the third makes the safe case opt-in.
+  verify: |
+    (1) Run the instrument twice against the SAME output directory and assert
+    the second run exits non-zero and writes nothing. Assert on the exit code
+    and on file mtimes, not on stdout text.
+    (2) Assert the refusal covers a directory containing ONLY the sibling
+    artifacts -- no manifest present, just clips -- and separately a
+    key/secondary directory that exists while the primary does not. These are
+    the two states a partial guard lets through.
+    (3) Grep the repo for every writer of the cited filename and check each one
+    has the guard. The defect class travels: fixing the instrument that bit you
+    while its sibling stays unguarded is how the same outage recurs under a
+    different name.
+    (4) Re-hash every artifact a record cites and assert it still matches. This
+    is the cheap standing check that catches a citation that has already rotted.
+    (5) Prove that a re-run under CHANGED code produces DIFFERENT bytes. If the
+    artifacts are byte-identical after a real code change, the instrument is
+    bypassing the changed path and its output cannot qualify anything -- assert
+    the instrument drives the production entry point, not a private shortcut.
+  tags: [evidence-by-hash, append-only-artifact, overwrite-guard, partial-guard-reads-as-complete, sibling-instrument, audition-record, provenance-in-artifact, byte-identical-is-not-confirmation]
+  legacy_id: "OTR-2026-08-18-audition-overwrites-cited-evidence"
