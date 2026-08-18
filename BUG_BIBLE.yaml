@@ -8831,6 +8831,15 @@ bugs:
     associated with sweeps in shared catalogue entries the identity merely
     borrows, and pulling those out of the general pool trades one defect for
     another (a preferred announcer voice, a house style, a stock portrait).
+    THE DEEPER CAUSE, AND THE ONE THAT SURVIVED THE FIRST FIX: the guard was
+    installed at ONE chokepoint -- the deterministic selector -- while production
+    reached the same assignment through a SECOND path that never touches it.
+    Measured: an LLM-proposed assignment was validated and stamped directly,
+    skipping the selector entirely on 1871 of 1953 assignments (82 fell back).
+    The scoring selector everyone reads as "the code that assigns voices" was
+    running on 4% of real traffic. Neither the proposal builder nor its validator
+    knew reserved ids existed, so the leak walked around a guard that was, in its
+    own path, working perfectly.
   fix: |
     Derive the reserved set FROM the authority that grants the identity, and
     apply it as a deterministic PRE-FILTER on the candidate pool -- never a score
@@ -8848,6 +8857,13 @@ bugs:
     Confirm the reserved identity can still receive its own asset: the grant path
     must stamp it directly, never come through the filtered selector, or the fix
     starves the identity of the very thing being protected.
+    ENUMERATE EVERY PATH THAT CAN ASSIGN THE ASSET BEFORE CHOOSING WHERE THE
+    GUARD GOES, and put it on all of them or at the join below them. A guard on
+    the path you happened to read is not a guard on the system. Grep for every
+    writer of the assignment field, not just the function whose name says it
+    selects -- an LLM-proposed or cached or operator-pinned assignment typically
+    validates and stamps on its own path, and a validator that does not know
+    about reservations will happily approve a reserved id.
   verify: |
     (1) Sweep the SELECTOR, not the helper. Assert across many seeds and every
     demographic branch that no reserved asset is ever returned for an ordinary
@@ -8864,12 +8880,19 @@ bugs:
     A pinned role (an announcer, a narrator) legitimately repeats one asset in
     every output and will dominate a naive frequency count, hiding or faking a
     pool problem in the rows that actually vary.
-    (6) A POST-FIX SIGHTING IS NOT PROOF THE FIX FAILED -- check process age
-    first. Measured: the defect was observed again SIXTEEN HOURS after the fix
-    was committed, and the fix was correct the whole time; the harness boots one
-    long-running server and never tears it down, so the evening run was still
-    executing the module the process imported that morning. Rebuild the guard's
-    inputs from the fixed commit and compare against the run's start time before
-    reopening anything.
-  tags: [reserved-identity, general-pool-leak, deterministic-pre-filter, derived-not-hand-kept, owns-versus-borrows, selector-not-helper, test-has-teeth, role-aware-corpus-count, stale-resident-process, post-fix-sighting]
+    (6) A POST-FIX SIGHTING HAS TWO EXPLANATIONS AND THEY LOOK IDENTICAL FROM
+    THE OUTSIDE: a STALE PROCESS still running the pre-fix module, or an
+    UNCOVERED PATH the fix never touched. Measured: the defect reappeared SIXTEEN
+    HOURS after a correct fix, and the first diagnosis -- a long-running server
+    that never tears down, holding the old import -- was plausible, consistent
+    with the timeline, and WRONG. The real cause was a second assignment path
+    that skipped the guarded selector entirely.
+    Tell them apart by REPRODUCING ON A FRESHLY IMPORTED MODULE through the path
+    production actually takes. A live call at HEAD either reproduces it (uncovered
+    path -- the fix is incomplete) or does not (stale process -- the fix is fine).
+    Do not settle this by reasoning about process start times against commit
+    timestamps: that argument is available for both explanations and selects the
+    comfortable one. Corpus silence is not proof either -- a defect at a ~1%
+    assignment rate is absent from most samples while remaining fully live.
+  tags: [reserved-identity, general-pool-leak, deterministic-pre-filter, derived-not-hand-kept, owns-versus-borrows, selector-not-helper, test-has-teeth, role-aware-corpus-count, uncovered-second-path, guard-at-one-chokepoint, post-fix-sighting-two-explanations, reproduce-on-fresh-import, low-rate-defect-hides-in-corpus]
   legacy_id: "OTR-2026-08-17-lemmy-cameo-voice-cast-on-ordinary-character"

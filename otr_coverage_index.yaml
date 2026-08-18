@@ -2519,11 +2519,16 @@ records:
     Two generalisable halves, and the second cost more time than the first. (1) A reservation that
     exists as a CONVENTION in one subsystem is invisible to a different subsystem that enumerates the
     same catalogue; the coupling has to be mechanical, derived from the granting authority, or a
-    hand-kept exclusion list drifts the first time somebody adds a grant. (2) A POST-FIX SIGHTING IS
-    NOT PROOF THE FIX FAILED: the defect was seen again SIXTEEN HOURS after the correct fix was
-    committed, because the harness boots one long-running server and never tears it down, so the
-    evening run still executed the module imported that morning. Rebuilding the guard's inputs from
-    the fixed commit and comparing against the run's start time is what separated "the fix is wrong"
-    from "the process is stale". Also recorded: count a corpus by ROLE before concluding anything
-    about pool concentration -- a pinned announcer legitimately repeats one asset in every episode and
-    dominates a naive frequency count.
+    hand-kept exclusion list drifts the first time somebody adds a grant. (2) CORRECTED 2026-08-18,
+    and the correction is the more valuable half: the defect reappeared SIXTEEN HOURS after a correct
+    fix, and this row first recorded that as a stale-resident-server artifact. THAT DIAGNOSIS WAS
+    WRONG. The guard sat inside the deterministic selector, and production reached the same assignment
+    through an LLM-proposal path that validated and stamped on its own -- skipping the selector on
+    1871 of 1953 assignments. The leak walked around a guard that worked perfectly in its own path.
+    A stale process and an uncovered path look identical from the outside; the way to separate them is
+    to reproduce on a FRESHLY IMPORTED module through the path production actually takes, never by
+    reasoning about process start times against commit timestamps -- that argument fits both stories
+    and picks the comfortable one. Corpus silence proved nothing either: at a ~1% assignment rate the
+    defect is absent from most samples while fully live. Also recorded: count a corpus by ROLE before
+    concluding anything about pool concentration -- a pinned announcer legitimately repeats one asset
+    in every episode and dominates a naive frequency count.
