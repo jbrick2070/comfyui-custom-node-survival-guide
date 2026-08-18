@@ -34,7 +34,7 @@
 # two records for that reason.
 audited: '2026-08-18'
 bible_head: 34fddc1 (+12.112, +12.113 appended 2026-08-18)
-bible_entries: 292
+bible_entries: 293
 records:
 - ref: BUG_LOG.md L1022 (BUG-LOCAL-231 soak data point)
   title: A long per-clip render loop had no routine VRAM reclamation — cleanup fired only on an OOM exception, so a gradual
@@ -2501,3 +2501,29 @@ records:
     exclude the forbidden field from the ONE prompt-build call's serialization, not from the shared
     state object itself, and not by further strengthening the instruction alone (already tried, does
     not hold on a small local model once the fact is visible).
+- ref: 2026-08-17 PBUG-20260817-08 Lemmy cameo voice cast on an ordinary character (live published episodes signal_lost_rivers_embrace_20260817_233013 and signal_lost_kinetic_motion_clause_live_test_20260817_050130); fixed 8f3c7615, verified and closed 2026-08-18
+  title: |
+    The cameo character's operator-qualified voice reference sat in the general char_voice pool like
+    any other row, so the seeded draw handed his signature Cockney to ordinary characters in episodes
+    whose cast contained no cameo at all. Nothing errored -- the reference is valid and the pick is
+    deterministic and auditable -- but a voice can only mean "this is him" while it is the only place
+    it is ever heard. Operator ruling: "only Lemmy should get Lemmy voice". Fixed by deriving the
+    reserved set FROM the voice policy (every local_wav route on any engine) and dropping those ids
+    from the candidate pool as a deterministic pre-filter; only clones of his own recording are
+    reserved, never the shared catalogue voices he merely borrows, and the policy path stamps his
+    entry directly so reserving cannot starve him of it.
+  verdict: promoted
+  bible_id: '12.114'
+  source: live-execution
+  note: |
+    Two generalisable halves, and the second cost more time than the first. (1) A reservation that
+    exists as a CONVENTION in one subsystem is invisible to a different subsystem that enumerates the
+    same catalogue; the coupling has to be mechanical, derived from the granting authority, or a
+    hand-kept exclusion list drifts the first time somebody adds a grant. (2) A POST-FIX SIGHTING IS
+    NOT PROOF THE FIX FAILED: the defect was seen again SIXTEEN HOURS after the correct fix was
+    committed, because the harness boots one long-running server and never tears it down, so the
+    evening run still executed the module imported that morning. Rebuilding the guard's inputs from
+    the fixed commit and comparing against the run's start time is what separated "the fix is wrong"
+    from "the process is stale". Also recorded: count a corpus by ROLE before concluding anything
+    about pool concentration -- a pinned announcer legitimately repeats one asset in every episode and
+    dominates a naive frequency count.

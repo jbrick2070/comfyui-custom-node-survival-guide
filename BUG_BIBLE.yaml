@@ -8801,3 +8801,75 @@ bugs:
     reading the prompt.
   tags: [prompt-contamination, pipeline-ordering, state-object-serialization, small-local-model, negative-instruction-not-sufficient, context-exclusion, live-echo-symptom, multi-pass-llm]
   legacy_id: "OTR-2026-08-18-scifi-news-pro-coda-leaks-the-news-read"
+- id: "12.114"
+  phase: 12
+  area: a-reserved-identity-asset-is-reachable-from-the-general-selection-pool
+  symptom: |
+    An asset that MEANS one specific named identity -- a signature voice, a
+    signature portrait, a character's theme, a branded style -- is handed to an
+    ordinary subject who is not that identity. Nothing errors: the asset is
+    valid, the selection is deterministic and auditable, and the output plays or
+    renders normally. The damage is semantic and cumulative: an asset can only
+    mean "this is X" while it is the only place it is ever encountered, so every
+    wrong assignment quietly spends the identity that a qualification, audition
+    or design decision established.
+    Measured: a cameo character's operator-qualified voice reference was
+    assigned to an ordinary character in an episode whose cast contained no such
+    cameo, and that character spoke in the cameo's signature accent for the whole
+    episode. The reference simply sat in the general character pool like any
+    other row, so the seeded draw could hand it to anybody.
+  cause: |
+    THE RESERVATION EXISTS AS A CONVENTION, NOT AS A FILTER. The asset was
+    qualified FOR one identity in one subsystem (a route, a policy, a casting
+    record), and a DIFFERENT subsystem -- the general selector -- enumerates the
+    same catalogue and never learns that some rows are spoken for. Both are
+    individually correct; the coupling between them was never written down.
+    The near-miss shape is a hand-kept exclusion list. It works the day it is
+    written and drifts the first time somebody adds a route, because the list
+    and the thing it describes have no mechanical relationship.
+    The over-correction is equally real: reserving EVERY asset the identity is
+    associated with sweeps in shared catalogue entries the identity merely
+    borrows, and pulling those out of the general pool trades one defect for
+    another (a preferred announcer voice, a house style, a stock portrait).
+  fix: |
+    Derive the reserved set FROM the authority that grants the identity, and
+    apply it as a deterministic PRE-FILTER on the candidate pool -- never a score
+    reweight, which only makes the wrong answer less likely rather than
+    impossible.
+    Reserve only assets the identity OWNS (a clone of its own recording, a
+    bespoke asset), never the shared catalogue entries it is merely pointed at.
+    Distinguish those by the KIND recorded in the grant, not by name matching.
+    Make the reservation free to extend: adding a new grant must reserve its
+    asset with no second edit, because a list maintained in parallel is a list
+    that drifts.
+    Fail SOFT in the helper (an unreadable authority reserves nothing and
+    selection behaves exactly as before) and keep strictness where the grant is
+    claimed. A helper that raises breaks every render on an import error.
+    Confirm the reserved identity can still receive its own asset: the grant path
+    must stamp it directly, never come through the filtered selector, or the fix
+    starves the identity of the very thing being protected.
+  verify: |
+    (1) Sweep the SELECTOR, not the helper. Assert across many seeds and every
+    demographic branch that no reserved asset is ever returned for an ordinary
+    subject. Tests that only check the reserved LIST prove the list is right and
+    say nothing about the pool, which is where the defect lives.
+    (2) Prove the test has teeth: assert the reserved asset IS present in the
+    unfiltered candidate pool. If it is absent for some unrelated reason, the
+    sweep passes for the wrong reason and keeps passing if the guard is deleted.
+    (3) Assert the reserved identity still gets its own asset through the grant
+    path, so the guard cannot starve what it protects.
+    (4) Assert the shared/borrowed assets are NOT reserved, pinning the
+    over-correction.
+    (5) Count the corpus by ROLE before concluding anything about concentration.
+    A pinned role (an announcer, a narrator) legitimately repeats one asset in
+    every output and will dominate a naive frequency count, hiding or faking a
+    pool problem in the rows that actually vary.
+    (6) A POST-FIX SIGHTING IS NOT PROOF THE FIX FAILED -- check process age
+    first. Measured: the defect was observed again SIXTEEN HOURS after the fix
+    was committed, and the fix was correct the whole time; the harness boots one
+    long-running server and never tears it down, so the evening run was still
+    executing the module the process imported that morning. Rebuild the guard's
+    inputs from the fixed commit and compare against the run's start time before
+    reopening anything.
+  tags: [reserved-identity, general-pool-leak, deterministic-pre-filter, derived-not-hand-kept, owns-versus-borrows, selector-not-helper, test-has-teeth, role-aware-corpus-count, stale-resident-process, post-fix-sighting]
+  legacy_id: "OTR-2026-08-17-lemmy-cameo-voice-cast-on-ordinary-character"
