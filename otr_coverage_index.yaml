@@ -32,9 +32,9 @@
 # SURFACES sharing one artifact -- the credits transcript roll and the hero
 # title card -- and conflating them cost an evening; the index keeps them as
 # two records for that reason.
-audited: '2026-08-18'
-bible_head: 34fddc1 (+12.112, +12.113 appended 2026-08-18)
-bible_entries: 293
+audited: '2026-08-19'
+bible_head: 1da7cfd (+12.114 appended and amended twice 2026-08-18; +12.115 appended 2026-08-19)
+bible_entries: 294
 records:
 - ref: BUG_LOG.md L1022 (BUG-LOCAL-231 soak data point)
   title: A long per-clip render loop had no routine VRAM reclamation — cleanup fired only on an OOM exception, so a gradual
@@ -2532,3 +2532,11 @@ records:
     defect is absent from most samples while fully live. Also recorded: count a corpus by ROLE before
     concluding anything about pool concentration -- a pinned announcer legitimately repeats one asset
     in every episode and dominates a naive frequency count.
+- ref: PROD_BUG_LOG.md PBUG-20260815-06 (media_archive retells the newest feed post forever)
+  title: A live RSS lane selected entries[configured_index() % len(entries)] with the index defaulting to 0; feeds are
+    newest-first, so absent an operator env var the lane adapted the newest post on every run, with no dedup, ranking or
+    history anywhere in the module - and no test on the selection path at all. A sibling lane (science news) already kept a
+    shared used-URL history with a TTL and the two were never joined up
+  verdict: promoted
+  bible_id: '12.115'
+  source: prod-bug-log

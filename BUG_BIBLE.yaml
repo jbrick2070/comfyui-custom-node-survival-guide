@@ -8910,3 +8910,72 @@ bugs:
     assignment rate is absent from most samples while remaining fully live.
   tags: [reserved-identity, general-pool-leak, deterministic-pre-filter, derived-not-hand-kept, owns-versus-borrows, selector-not-helper, test-has-teeth, role-aware-corpus-count, uncovered-second-path, guard-at-one-chokepoint, unguarded-fallback-path, empty-category-routes-to-fallback, post-fix-sighting-two-explanations, reproduce-on-fresh-import, low-rate-defect-hides-in-corpus]
   legacy_id: "OTR-2026-08-17-lemmy-cameo-voice-cast-on-ordinary-character"
+- id: "12.115"
+  phase: 12
+  area: a-live-feed-is-consumed-at-a-constant-index-so-the-newest-item-is-adapted-forever
+  symptom: >-
+    A lane that reads a live feed (RSS/Atom, an API listing, a directory scan)
+    produces output about the SAME source item run after run, indefinitely.
+    Nothing errors: the fetch succeeds, the feed is healthy, entries are fresh,
+    and every artifact is well-formed. The repetition is only visible to a human
+    who watches several outputs in a row and notices the subject never changes,
+    which is why it survives green pipelines for weeks. Reading the code makes it
+    look intentional -- there IS a selection expression, it just cannot vary.
+  cause: >-
+    SELECTION IS PARAMETERISED BUT THE PARAMETER NEVER MOVES. The selector is
+    something like `entries[configured_index() % len(entries)]`, where the index
+    comes from config or an environment variable and DEFAULTS TO 0. Feeds are
+    conventionally newest-first, so the default silently means "always the newest
+    item". There is no history, no dedup, no ranking, and nothing per-run in
+    scope: the fetcher's signature often has no seed, no run id and no episode
+    identity at all, so it is not merely unused variety -- the function has no
+    input that could vary even in principle.
+    A sibling lane in the same codebase frequently already solved this and the
+    two were never joined up, so the defect is not "nobody built dedup" but
+    "dedup exists one module over and this consumer does not use it".
+  fix: >-
+    Give the selector a reason to move, and prefer REUSING the mechanism a
+    sibling lane already has over writing a second one -- a second history is a
+    second thing to drift. A shared used-item record keyed on a stable identity
+    (URL, guid, content hash) with a rolling cap and a TTL is enough: the TTL
+    lets an item recycle once it has aged out, so the pool does not exhaust.
+    Order the precedence deliberately and write it down: (a) an EXPLICIT operator
+    override wins outright, because dedup must not fight a human who named an
+    item; (b) otherwise prefer items not in the recent record; (c) otherwise fall
+    back to the full list rather than raising -- a repeat is worse than nothing,
+    but failing the run is worse still. Keep the whole mechanism ADVISORY: any
+    failure reading or writing the record must leave selection exactly as it was,
+    because a feed lane must never fail a render over a state file. Do NOT record
+    the override path's choice; an explicit index is a deliberate repeat, and
+    recording it lets a debugging run consume an item for the automatic path.
+    Sharing one record across lanes is only free while their sources cannot
+    collide -- assert that, do not assume it.
+  verify: >-
+    (1) THE CORE CHECK IS TWO CONSECUTIVE RUNS AGAINST A STABLE FEED SELECTING
+    DIFFERENT ITEMS. Stub the feed so no network is involved.
+    (2) Prove it walks the whole feed before repeating. Two runs differing is
+    also satisfied by alternating between two items forever; assert N runs over
+    an N-item feed yield N distinct selections.
+    (3) TEST THE OVERRIDE GATE ON PARSEABILITY, NOT ON EMPTINESS -- this is the
+    hole most likely to survive the fix, and it silently restores the exact
+    default the fix removed. If the code asks "was the variable set?" by testing
+    for a NON-EMPTY string, then a junk value ("abc", "2.5", "-") takes the
+    override branch, the index helper swallows its own ValueError and returns 0,
+    and the lane is back to always-newest with no error and no log line.
+    Separate "did the operator choose?" from "which index should I use?" as two
+    functions, warn on an unusable value, and parametrize the test over several
+    kinds of junk.
+    (4) Assert an exhausted record FALLS BACK rather than raising, and that a
+    record that fails to load or save does not block the run.
+    (5) Assert the record stays SHARED with the sibling lane rather than becoming
+    a private copy -- inspect the source for the shared loader AND recorder.
+    Reading a history nothing writes to is a no-op that looks like a feature, so
+    check both halves.
+    (6) If two lanes share one record, PIN THAT THEIR SOURCES CANNOT COLLIDE
+    (disjoint feed domains, disjoint id namespaces) with a test that fails when
+    the source lists start to overlap -- that is the moment sharing stops being
+    free and one lane can consume an item out from under the other.
+    (7) Grep for a test on the selection path before assuming one exists. This
+    class is usually found in a module whose selector had NO coverage at all.
+  tags: [feed-selection, constant-index-default, newest-first-convention, shared-used-record, ttl-recycles-pool, advisory-never-blocking, override-parseable-not-nonempty, silent-default-restoration, reuse-sibling-mechanism, disjoint-sources-assertion, untested-selection-path]
+  legacy_id: "OTR-2026-08-15-media-archive-retells-newest-post-forever"
