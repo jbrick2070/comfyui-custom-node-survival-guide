@@ -2550,3 +2550,17 @@ records:
   verdict: promoted
   bible_id: '12.116'
   source: prod-bug-log
+
+- bug: OTR-LTX25-20260820 encoder reloaded on every shot
+  date: 2026-08-20
+  summary: >-
+    the LTX 2.5 lane re-read its 8.86 GiB Gemma text encoder from disk once per
+    shot -- 31 loads for 31 renders on a live published leg, ratio 1.00. The
+    cache could not live on the adapter (a registry singleton, so it would never
+    end) and every engine-level release hook fires more often than the lifetime
+    being cached. Fixed as episode-scoped ownership in the driver with a
+    generation token; proven at 34 renders / 1 read / 33 hits, 33.5% faster per
+    render
+  verdict: promoted
+  bible_id: '12.117'
+  source: live-leg

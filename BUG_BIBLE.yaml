@@ -9060,3 +9060,80 @@ bugs:
     became invisible to readers in the first place.
   tags: [inert-widget, declared-and-accepted-never-read, default-equals-hardcode, invisible-in-the-shipped-configuration, work-moved-control-left-behind, rationalising-comment, ast-parameter-load-check, positional-widgets-values, explicit-call-site-argument, xref-12.107]
   legacy_id: "OTR-PBUG-20260819-01-normalize-dbfs-widget-does-nothing"
+
+- id: "12.117"
+  phase: 12
+  area: cached-handle-outlives-its-owner-because-the-release-hook-runs-more-often-than-the-lifetime
+  symptom: |
+    A heavy artifact -- a multi-gigabyte text encoder, a checkpoint, a tokenizer
+    -- is re-read from disk on EVERY unit of work, even though the work is a
+    long run of near-identical units that all want the same handle. The obvious
+    cache is added and one of two things happens, both quiet.
+    Either the cache never hits: every unit still reloads, the wall clock is
+    unchanged, and the logs look perfect because the render is CORRECT -- a
+    cache that misses degrades to exactly the pre-cache path, so nothing errors
+    and nothing is slower than before. Or the cache never ENDS: the handle is
+    still resident hours later, across unrelated runs and after the pipeline has
+    switched to a different engine entirely, because nothing ever released it.
+    A third, rarer shape: a documented "turn it off" escape hatch clears the
+    cache, and the NEXT run then starts cold for no visible reason.
+  cause: |
+    The cache was placed on the object that was convenient rather than the
+    object whose LIFETIME matches the reuse. Adapter registries commonly build
+    each adapter ONCE at import and hand back that same instance forever, so
+    "cache it on self" is not per-run scoping -- it is process-scoped, and there
+    is no later moment at which it ends.
+    The fix reflex is then to release in an existing per-unit hook, and every
+    such hook is measurably WRONG because it fires more often than the lifetime
+    being cached: a pre-load residue-freer runs per unit of work, a
+    teardown/unload runs per group, a residency lease is taken and released per
+    group. Releasing on any of them drops the cache immediately before the thing
+    that needed it, which is the "never hits" shape -- and it is invisible
+    precisely because the result is still correct.
+    The ABA variant has no concurrency in it at all. If ownership is a bare
+    flag or a plain counter and a global "release now" path zeroes it, an
+    owner's still-outstanding close can land on a scope opened AFTERWARDS by
+    somebody else. Add real concurrency -- worker threads serving requests -- and
+    the counter also loses updates, because `owners += 1` is load/add/store.
+  fix: |
+    Put the cache where the LIFETIME is, not where the object is. Enumerate
+    every candidate release hook and MEASURE how often each one actually fires
+    against how long the handle must live; pick the one that matches and reject
+    the rest by frequency, in a comment, so the next reader does not
+    "simplify" it back onto the convenient object.
+    Usually that boundary is one layer UP, in the driver that owns the run,
+    rather than in the adapter that owns the handle. Open there, and release in
+    a `finally` so a failed run cannot strand the memory -- the failure path is
+    where a leak is most likely and least noticed.
+    Make ownership a TOKEN, not a flag or a bare count. `begin` returns an
+    opaque generation; the caller hands that exact token back to `end`; a global
+    release BUMPS the generation so every outstanding token goes stale and a
+    late close becomes a logged no-op. Guard the whole lifecycle with a lock if
+    any request path is threaded.
+    Do NOT escalate a failed close into a GLOBAL release as a belt-and-braces
+    cure. A global release drops the cache for every owner, so one run's failing
+    close destroys another run's live cache: losing your own share of a cache is
+    a slow run, taking someone else's is a broken one. Leak the one claim, log
+    it loudly, and move on.
+  verify: |
+    (1) The acceptance instrument must count the LOADER'S OWN evidence -- the
+    line the loading library prints when it opens the file -- never the cache's
+    own "HIT" line. A cache that believes it hit is not evidence that a file was
+    not read.
+    (2) Correlate PER SCOPE, not in aggregate. Summing every event in a log lets
+    a healthy scope subsidise a broken one, and lets an unrelated diagnostic run
+    in the same log fail a perfectly good one. Attribute events to the
+    open..close interval they occurred in; an empty scope grants no allowance.
+    (3) Require POSITIVE evidence of reuse before passing: a non-zero load
+    count, a scope actually opened, at least two units of work, and at least one
+    hit. A gate whose only check is "loads <= N" passes a log with ZERO matched
+    lines, which is how a renamed log line or the wrong file reads as a receipt.
+    (4) Assert the ABA case directly and WITHOUT threads: begin(A), global
+    release, begin(B), end(A) -- then assert B's scope is still open. This is
+    deterministic and is the failure most likely to be reintroduced.
+    (5) Prove it on a real run, not only in unit tests. The question a unit test
+    cannot answer is whether the cached handle SURVIVES the pipeline's own
+    teardown between units -- a structurally valid but internally unusable
+    handle passes every shape check and then fails at use.
+  tags: [cache-lifetime, ownership-boundary, registry-singleton, release-hook-fires-too-often, silent-degradation-to-the-old-path, aba-stale-close, generation-token, global-release-evicts-other-owners, acceptance-gate-fails-open, per-scope-correlation, loader-evidence-not-self-report, xref-12.87, xref-12.110]
+  legacy_id: "OTR-LTX25-encoder-reloaded-every-shot-cache-needs-episode-scoped-ownership"
