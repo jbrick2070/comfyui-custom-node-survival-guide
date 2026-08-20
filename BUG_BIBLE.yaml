@@ -8979,3 +8979,61 @@ bugs:
     class is usually found in a module whose selector had NO coverage at all.
   tags: [feed-selection, constant-index-default, newest-first-convention, shared-used-record, ttl-recycles-pool, advisory-never-blocking, override-parseable-not-nonempty, silent-default-restoration, reuse-sibling-mechanism, disjoint-sources-assertion, untested-selection-path]
   legacy_id: "OTR-2026-08-15-media-archive-retells-newest-post-forever"
+- id: "12.116"
+  phase: 12
+  area: an-exposed-widget-the-body-never-reads-whose-default-equals-the-hardcode-it-lost-to
+  symptom: |
+    A node exposes a control with a plausible range and a tooltip that promises
+    what it does. Moving it changes nothing. No error, no warning, no log line
+    saying the value was ignored -- every setting produces byte-identical
+    output. Measured: an audio node offered `normalize_dbfs` from -12.0 to 0.0
+    tooltipped "Peak normalization target dBFS", and the rendered episode was
+    identical at every value.
+    THIS IS NOT THE FORWARDING GAP OF 12.107. There the value never reached
+    the consumer. Here the plumbing is COMPLETE: INPUT_TYPES declares it, the
+    entry function accepts it by name, and the function BODY simply never
+    references the parameter. Every wiring test passes because the wiring is
+    genuinely correct.
+  cause: |
+    The work the control names was moved elsewhere and the control was left
+    behind. In the measured case a comment in the body recorded the move --
+    "peak normalize skipped, moved to EpisodeAssembler" -- while the widget
+    stayed on the original node, and the real value became a hardcoded default
+    in the function that inherited the work.
+    THE REASON IT SURVIVED FOR MONTHS IS THE PART WORTH LEARNING, AND IT
+    GENERALISES: the saved/default value of the dead control was EQUAL to the
+    hardcode that superseded it. Both were -1.0. So the one configuration
+    anybody ever shipped is precisely the configuration in which the defect
+    produces no observable difference. A defect whose only invisible case is
+    the default case cannot be found by using the product; it can only be found
+    by reading the body or by deliberately moving the control and diffing.
+    A rationalising comment can also form on the dead parameter -- here, that
+    it was "consumed by the graph runtime, not the body" -- which reads as an
+    explanation and is not one.
+  verify: |
+    AST, no runtime needed. For each node class, take every key of
+    INPUT_TYPES (required + optional) and each parameter name of the execution
+    method; for any name present in BOTH, assert the method body contains at
+    least one Load of that name. A parameter that is declared, accepted, and
+    never loaded is inert. Report it even when the default "looks right" --
+    especially then, because a default equal to the superseding constant is
+    what makes it invisible.
+    Second, cheaper check for the same family: grep the body for a comment
+    saying the work moved ("moved to", "deferred to", "now handled by") and
+    confirm the control that named that work moved with it.
+  fix: |
+    Decide which of the two the control is, and never leave it a third thing:
+    (1) WIRE IT -- pass the value through to whatever now does the work, so the
+    tooltip becomes true. Prefer this when the knob is genuinely wanted; at the
+    default value the output is unchanged, so it ships without altering any
+    existing product.
+    (2) REMOVE IT -- delete the declaration and the parameter. Note that
+    widgets_values is POSITIONAL in saved workflows, so only a TRAILING widget
+    can be removed without shifting every saved value beneath it.
+    Do NOT "fix" it by correcting the tooltip to describe the inert behaviour:
+    that documents the defect instead of removing it.
+    And when wiring it, pass the value EXPLICITLY at the call site rather than
+    relying on the inherited default -- a silent default is how the number
+    became invisible to readers in the first place.
+  tags: [inert-widget, declared-and-accepted-never-read, default-equals-hardcode, invisible-in-the-shipped-configuration, work-moved-control-left-behind, rationalising-comment, ast-parameter-load-check, positional-widgets-values, explicit-call-site-argument, xref-12.107]
+  legacy_id: "OTR-PBUG-20260819-01-normalize-dbfs-widget-does-nothing"

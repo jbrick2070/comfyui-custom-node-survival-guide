@@ -2540,3 +2540,13 @@ records:
   verdict: promoted
   bible_id: '12.115'
   source: prod-bug-log
+- bug: OTR-PBUG-20260819-01 normalize_dbfs widget is inert
+  date: 2026-08-19
+  summary: >-
+    an OTR_AudioEnhance widget was declared, accepted by the entry function and
+    never read by its body; the work had moved to EpisodeAssembler and the
+    control stayed behind. Invisible for months because the shipped default
+    (-1.0) equalled the hardcode that superseded it
+  verdict: promoted
+  bible_id: '12.116'
+  source: prod-bug-log
