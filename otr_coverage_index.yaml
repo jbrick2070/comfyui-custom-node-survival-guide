@@ -32,9 +32,9 @@
 # SURFACES sharing one artifact -- the credits transcript roll and the hero
 # title card -- and conflating them cost an evening; the index keeps them as
 # two records for that reason.
-audited: '2026-08-19'
-bible_head: 1da7cfd (+12.114 appended and amended twice 2026-08-18; +12.115 appended 2026-08-19)
-bible_entries: 294
+audited: '2026-08-20'
+bible_head: 9a08b08 (+12.115, +12.116 appended 2026-08-19; 07.17 amended and +12.117 appended 2026-08-20)
+bible_entries: 296
 records:
 - ref: BUG_LOG.md L1022 (BUG-LOCAL-231 soak data point)
   title: A long per-clip render loop had no routine VRAM reclamation — cleanup fired only on an OOM exception, so a gradual
