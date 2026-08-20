@@ -3124,6 +3124,29 @@ bugs:
     explicitly so the same offload isn't re-attempted blind on a future
     VRAM-ceiling rip -- re-derive the actual peak-VRAM contributor before
     trying an "obvious" fix.
+
+    AMENDED 2026-08-20 -- SCOPE THE DISPROOF, IT IS NOT UNIVERSAL. The "no
+    effect" result above is real for the case it was measured in: the peak
+    was in SAMPLING, so moving the encoder changed nothing. On a lane where
+    the OOM happens AT THE ENCODE NODE ITSELF the same offload is decisive.
+    Measured on ltx25_video (Gemma-4 12B Q5 GGUF): a GPU encode transiently
+    demands ~15.6GB (weights to card + GGML dequant scratch) and OOMs at
+    `node 'neg' (encode)` with 13.76GB allocated / 1.88GB requested on a
+    15.92GB limit; pinning the encoder to CPU took that encode's VRAM cost
+    from ~13,760MB to ~0MB and the OOM stopped.
+
+    THE DISTINGUISHING TEST, and it is one line of the traceback: read WHICH
+    NODE raised. Encoder offload helps iff the OOM is at the encode. If the
+    OOM is in the sampler, this entry's original disproof stands and the
+    offload is a waste of a fix.
+
+    AND THE OFFLOAD HAS A TRAP OF ITS OWN: `initial_device` alone does NOT
+    pin an encoder to CPU. ComfyUI-GGUF's CLIPLoaderGGUF already passes
+    `initial_device = text_encoder_offload_device()`, so "the loader loads
+    to CPU" reads TRUE while `load_models_gpu` still pulls the patcher to
+    `patcher.load_device` at encode time. Pinning requires `load_device`
+    AND `offload_device` too. That false signal cost three wrong diagnoses
+    before anyone checked what the loader actually does with the flag.
   verify: |
     Full-episode soak reports peak VRAM; assert the measured peak matches
     the currently-accepted (reverted) architecture, not the offloaded one.
