@@ -34,7 +34,7 @@
 # two records for that reason.
 audited: '2026-08-20'
 bible_head: 9a08b08 (+12.115, +12.116 appended 2026-08-19; 07.17 amended and +12.117 appended 2026-08-20)
-bible_entries: 296
+bible_entries: 297
 records:
 - ref: BUG_LOG.md L1022 (BUG-LOCAL-231 soak data point)
   title: A long per-clip render loop had no routine VRAM reclamation — cleanup fired only on an OOM exception, so a gradual
@@ -2564,3 +2564,13 @@ records:
   verdict: promoted
   bible_id: '12.117'
   source: live-leg
+- ref: 2026-08-20 lab defect hunt (LTX 2.5 grid), five single-variable renders
+  title: 'Inverted metric: a spectral lattice score read 2.2-2.3 on every arm of every
+    test including the control, and scored a visibly CLEAN image HIGHER (7.2) than a
+    visibly gridded one (4.8). Peak-over-median is a ratio, so denoising raised it;
+    and a 2-D lattice was measured with 1-D row transforms. Five renders and five
+    "eliminated" candidates were void until the detector was validated against a
+    known-good pair and replaced with a 2-D absolute measure carrying a --selftest'
+  verdict: promoted
+  bible_id: '12.118'
+  source: headless-lab-runs

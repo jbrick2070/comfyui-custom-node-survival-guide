@@ -9137,3 +9137,86 @@ bugs:
     handle passes every shape check and then fails at use.
   tags: [cache-lifetime, ownership-boundary, registry-singleton, release-hook-fires-too-often, silent-degradation-to-the-old-path, aba-stale-close, generation-token, global-release-evicts-other-owners, acceptance-gate-fails-open, per-scope-correlation, loader-evidence-not-self-report, xref-12.87, xref-12.110]
   legacy_id: "OTR-LTX25-encoder-reloaded-every-shot-cache-needs-episode-scoped-ownership"
+
+- id: "12.118"
+  phase: 12
+  area: the-metric-is-inverted-and-a-value-that-never-moves-is-not-a-negative-result
+  symptom: |
+    A quality or defect metric returns the SAME NUMBER on every arm of every
+    experiment -- control included -- and each run is written up as "no effect".
+    Nothing errors. The instrument runs, prints a plausible figure, and the
+    figure is stable to two significant figures across changes that were
+    expected to matter. Measured: a spectral "lattice score" read 2.2-2.3 on
+    five consecutive single-variable renders (sampler eta, negative prompt, an
+    input compression knob, a replacement sigma schedule, decoder tile
+    geometry) and 1.6-2.8 on every prior measurement across the whole archive.
+    Five renders were spent, five candidates were recorded as eliminated, and
+    the operator kept reporting that he could still SEE the artifact.
+    The instrument was then pointed at two images the operator could tell apart
+    by eye -- one with the artifact clearly visible, one with it visibly gone --
+    and scored the CLEAN one HIGHER: 7.2 against 4.8. It was not insensitive.
+    It was INVERTED, and every conclusion drawn from it was void.
+  cause: |
+    TWO INDEPENDENT DESIGN ERRORS, and the second is the fatal one.
+    First, DIMENSIONALITY: the artifact was a two-dimensional lattice, which
+    appears in a 2-D transform as an isolated PAIR OF POINTS. The metric
+    averaged one-dimensional row transforms, which smears that pair into a band
+    and discards the very structure that made it a lattice.
+    Second, and decisively, IT REPORTED A RATIO -- peak divided by the median
+    of its band. Any smoothing lowers the median floor, so the ratio RISES when
+    texture is removed. The metric was really answering "how noisy is
+    everything else", so a change that removed the defect improved the picture
+    and worsened the score at the same time.
+    The reason it survived so long is that BOTH failure modes look like a
+    negative result. An inverted metric and a metric measuring nothing both
+    produce "unchanged", and "unchanged" is exactly what a team hunting a cause
+    expects to see most of the time. Each individual run looked like honest
+    elimination; only the SEQUENCE was suspicious.
+    A plausible mechanism was proposed and was WRONG: that a 9-pixel high-pass
+    kernel was cancelling a ~9.5-pixel artifact. Kernels from 9 down to 1 were
+    tested and every one stayed inverted. The kernel was never the problem, and
+    fixing it would have produced a metric that was still inverted and now
+    carried a story explaining why it was trustworthy.
+  fix: |
+    VALIDATE EVERY DETECTOR AGAINST A KNOWN-POSITIVE AND A KNOWN-NEGATIVE
+    BEFORE TRUSTING ONE READING FROM IT. Two artifacts a human can tell apart
+    are enough. If the metric does not separate them, in the right direction,
+    it is not measuring the thing and no amount of care in the experiment
+    design rescues it.
+    TREAT AN UNMOVING NUMBER AS A DEFECT IN THE INSTRUMENT, NOT AS EVIDENCE.
+    A metric that returns the same value across every arm of every experiment
+    has failed a smell test that costs nothing to apply. State the rule as a
+    threshold: after N arms with no movement, stop running arms and go validate
+    the instrument.
+    PREFER AN ABSOLUTE MEASURE TO A RATIO whenever a treatment can change the
+    denominator. Denoising, blurring, sharpening and rescaling all move a noise
+    floor, so any peak-over-floor statistic is confounded by exactly the
+    interventions being tested.
+    MEASURE IN THE ARTIFACT'S OWN DIMENSIONALITY. A 2-D structure needs a 2-D
+    transform; collapsing an axis to make the maths convenient throws away the
+    signal.
+    SHIP THE VALIDATION WITH THE INSTRUMENT. The replacement carries a
+    `--selftest` that re-scores the known ladder and REFUSES TO PASS unless the
+    ordering still matches the human's, so it cannot silently rot back into a
+    blind metric.
+  verify: |
+    (1) Score a known-positive and a known-negative artifact. Require the
+    positive to score higher by a stated margin. A metric that cannot pass this
+    is not permitted to produce a number in a report.
+    (2) Rank a LADDER, not a pair. Three or more samples of increasing severity
+    must come out monotonic. A pair can be separated by luck; an ordering
+    cannot.
+    (3) Assert a minimum dynamic range across that ladder. A metric that
+    separates the extremes by a few percent will drown any real effect in
+    scene-to-scene variation.
+    (4) Make the validation EXECUTABLE and part of the tool, not a note in a
+    document. A self-test that fails loudly is the only thing that survives the
+    next person picking the instrument up.
+    (5) Re-read every prior conclusion the broken metric produced. They are not
+    "probably still right" -- they are unevaluated. Re-score the artifacts that
+    already exist before spending anything new.
+    (6) Prove the replacement disagrees with the original where it matters:
+    assert that the old metric ranks the known pair backwards. Without that,
+    nobody can tell whether the instrument changed or only its scale did.
+  tags: [instrument-not-evidence, inverted-metric, unmoving-value-is-a-smell, ratio-confounded-by-denominator, peak-over-median, wrong-dimensionality, validate-against-known-positive-and-negative, monotonic-ladder, dynamic-range-floor, selftest-ships-with-the-tool, plausible-mechanism-was-wrong, re-read-prior-conclusions, xref-11.61, xref-12.87]
+  legacy_id: "OTR-LTX25-grid-detector-was-inverted-five-renders-spent-on-a-blind-metric"
