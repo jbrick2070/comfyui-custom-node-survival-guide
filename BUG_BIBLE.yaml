@@ -9337,3 +9337,48 @@ bugs:
     model-specific-admission, matched-pixel-ab, capability-deny-by-default,
     cache-version-bump, false-green-graph, checkpoint-sha256, approval-receipt]
   legacy_id: "PBUG-20260820-01"
+- id: "12.121"
+  phase: 12
+  area: an-uncontrolled-second-variable-sends-every-arm-of-a-visual-ab-to-the-same-wrong-verdict
+  symptom: |
+    A visual A/B (or a whole elimination campaign) returns the same verdict on
+    every arm, and the verdict is about the wrong stage. Two live instances in
+    one week on one project. (1) Six single-variable knob tests on a video lane
+    all reported "grid clearly visible" -- because the GRID WAS IN THE
+    CONDITIONING STILL, minted by the upstream image engine; an I2V lane is a
+    preservation machine, so every arm faithfully reproduced the defect it was
+    being tested for removing. Months of renders chased knobs that could never
+    have worked. (2) An identity-drift probe swapped the conditioning still to
+    a portrait but kept the recipe's text prompt describing a different scene;
+    BOTH arms obediently walked away from the portrait to the prompted scene,
+    and scoring it as written would have condemned a refine stage for
+    executing its prompt correctly.
+  cause: |
+    The contrast was impure: the arms differed by the intended knob, but the
+    SUBJECT carried a second uncontrolled variable that dominated the outcome
+    -- an upstream-minted defect in instance (1), a prompt/conditioning
+    mismatch in instance (2). A consuming stage cannot be isolated while its
+    input already contains the effect (or a stronger conflicting instruction).
+    Single-variable discipline is usually applied to the GRAPH DELTA between
+    arms and forgotten for the INPUTS shared by both arms.
+  fix: |
+    Before any A/B on a consuming stage: (1) prove the defect ABSENT at the
+    minting stage by inspecting the raw conditioning input at native pixels
+    (eye or vision model) -- if the defect rides in, fix upstream first and
+    rerun; (2) align every shared input with the test's question -- the prompt
+    must describe the conditioning still when the question is preservation;
+    (3) verify arm purity mechanically: diff the two staged graphs and assert
+    the delta set equals exactly the intended knobs, nothing else -- a
+    deterministic script, not a model pass.
+  verify: |
+    (1) A pre-A/B receipt exists showing the conditioning input was inspected
+    and the defect under test is absent from it.
+    (2) The staged arms carry a machine diff whose changed-parameter set
+    equals the declared contrast set exactly.
+    (3) If every arm of a campaign returns the same verdict, treat that as
+    evidence of an uncontrolled shared variable and audit the inputs before
+    spending another render.
+  tags: [ab-contrast-purity, upstream-minted-defect, conditioning-still,
+    prompt-conditioning-mismatch, i2v-preserves-defects, shared-input-variable,
+    elimination-campaign-void, xref-12.118, xref-12.119, xref-12.120]
+  legacy_id: "OTR-2026-08-21-grid-rode-in-on-the-stills-and-the-drift-probe-obeyed-its-prompt"

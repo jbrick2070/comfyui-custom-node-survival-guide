@@ -2598,3 +2598,5 @@ records:
   verdict: promoted
   bible_id: '12.120'
   source: live-execution
+- record: OTR 2026-08-21 grid-inherited-from-stills + confounded drift probe (GO_FORWARD_PLAN QUALITY PROGRAM RULINGS 2026-08-21; HANDOFF_LOG 2026-08-20 evening)
+  bible_id: "12.121"
