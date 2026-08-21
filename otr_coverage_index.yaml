@@ -33,8 +33,8 @@
 # title card -- and conflating them cost an evening; the index keeps them as
 # two records for that reason.
 audited: '2026-08-20'
-bible_head: 9a08b08 (+12.115, +12.116 appended 2026-08-19; 07.17 amended and +12.117 appended 2026-08-20)
-bible_entries: 297
+bible_head: 3b00512 (+12.115, +12.116 appended 2026-08-19; 07.17 amended and +12.117 through +12.119 appended 2026-08-20)
+bible_entries: 298
 records:
 - ref: BUG_LOG.md L1022 (BUG-LOCAL-231 soak data point)
   title: A long per-clip render loop had no routine VRAM reclamation — cleanup fired only on an OOM exception, so a gradual
@@ -2573,4 +2573,15 @@ records:
     known-good pair and replaced with a 2-D absolute measure carrying a --selftest'
   verdict: promoted
   bible_id: '12.118'
+  source: headless-lab-runs
+- ref: OTR-2026-08-20-three-instruments-reported-success-while-doing-nothing
+  title: >-
+    A replacement LTX 2.5 grid metric passed a one-directional smoothing
+    self-test yet ranked the visibly better matched-resolution frame worse,
+    while a graph differ silently parsed six of eight targets as empty and
+    reported zero differences. The validation set never forced wanted detail
+    and the defect to move in opposite directions, and the differ never
+    required positive evidence that it consumed its input.
+  verdict: promoted
+  bible_id: '12.119'
   source: headless-lab-runs
