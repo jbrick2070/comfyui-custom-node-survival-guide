@@ -33,8 +33,8 @@
 # title card -- and conflating them cost an evening; the index keeps them as
 # two records for that reason.
 audited: '2026-08-20'
-bible_head: 3b00512 (+12.115, +12.116 appended 2026-08-19; 07.17 amended and +12.117 through +12.119 appended 2026-08-20)
-bible_entries: 298
+bible_head: 3ca1760 (+12.120 appended 2026-08-20)
+bible_entries: 299
 records:
 - ref: BUG_LOG.md L1022 (BUG-LOCAL-231 soak data point)
   title: A long per-clip render loop had no routine VRAM reclamation — cleanup fired only on an OOM exception, so a gradual
@@ -2585,3 +2585,16 @@ records:
   verdict: promoted
   bible_id: '12.119'
   source: headless-lab-runs
+- ref: docs/PROD_BUG_LOG.md PBUG-20260820-01
+  title: >-
+    Z-Image Turbo exposed reference-image conditioning because the generic
+    ReferenceLatent node existed, validated and executed, but matched live
+    native-pixel A/B evidence showed the unreferenced arm clean while the
+    referenced arm acquired a material square/noise lattice. Structural graph
+    and tensor compatibility did not prove that the exact checkpoint had been
+    trained for that semantic path. The capability was disabled, the separate
+    portrait-derived identity seed was retained, and engine/cache version 1 was
+    bumped to 2 so corrupted cached artifacts could not survive the rejection.
+  verdict: promoted
+  bible_id: '12.120'
+  source: live-execution
