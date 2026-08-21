@@ -9220,3 +9220,56 @@ bugs:
     nobody can tell whether the instrument changed or only its scale did.
   tags: [instrument-not-evidence, inverted-metric, unmoving-value-is-a-smell, ratio-confounded-by-denominator, peak-over-median, wrong-dimensionality, validate-against-known-positive-and-negative, monotonic-ladder, dynamic-range-floor, selftest-ships-with-the-tool, plausible-mechanism-was-wrong, re-read-prior-conclusions, xref-11.61, xref-12.87]
   legacy_id: "OTR-LTX25-grid-detector-was-inverted-five-renders-spent-on-a-blind-metric"
+- id: "12.119"
+  phase: 12
+  area: a-validation-set-with-one-direction-of-change-cannot-validate-a-metric
+  symptom: |
+    A hand-built quality metric ships with a self-test that PASSES, and the
+    metric is backwards. Measured three times on one project in one month.
+    A first detector scored the visibly CLEAN image HIGHER than the degraded
+    one (7.2 against 4.8); five renders were spent on its readings before
+    anyone pointed it at a pair a human could separate by eye. Its replacement
+    shipped a `--selftest` that ranked a five-rung ladder monotonically and
+    still called the visibly BETTER frame worse (6.724 against 6.260) on
+    matched-resolution inputs. A third instrument, a graph differ, silently
+    returned an EMPTY parse for six of eight targets and printed
+    "0 differences" -- a clean bill of health for subjects it never examined.
+  cause: |
+    THE VALIDATION SET ONLY MOVED IN ONE DIRECTION. Every rung of the detector's
+    ladder was progressive SMOOTHING, so the defect and the real detail fell
+    together on every rung. A metric that conflates "removed the artifact" with
+    "removed all detail" cannot be caught by a ladder where those two always
+    co-vary. The first sample that moved them in OPPOSITE directions -- more
+    real detail, less artifact -- broke it instantly.
+    The deeper error is framing: the defect was PERCEPTUAL and was attacked as a
+    signal-processing problem. A scalar also cannot show its reasoning, so a
+    wrong one is unfalsifiable; the differ's empty parse and the detector's
+    inverted score are the same failure wearing different clothes -- an
+    instrument reporting success while doing nothing.
+  fix: |
+    Add a fixture pair to the validation set where the defect and the wanted
+    signal move in OPPOSITE directions, and make the self-test FAIL if the
+    metric cannot separate that pair -- a ladder of progressive smoothing can
+    never catch a metric that conflates artifact with detail. Make the
+    instrument assert it actually consumed its input: fail on an empty parse or
+    a zero-length comparison set instead of printing "0 differences". For a
+    perceptual defect, keep the scalar only for stability over time and let a
+    vision model POLICE it -- when the two disagree, a human looks.
+  verify: |
+    (1) The validation set must contain at least one pair where the defect and
+    the wanted signal move in OPPOSITE directions; if every fixture degrades
+    both together, the self-test proves nothing.
+    (2) Assert the instrument actually consumed its input -- a non-empty parse,
+    a non-zero compared-item count -- and FAIL when the comparison set is empty
+    rather than reporting zero differences.
+    (3) For a perceptual defect, cross-check the scalar against a vision model
+    on matched NATIVE-PIXEL crops (full frames get downscaled by chat/vision
+    transports, erasing the very acuity under test), asking COUNTABLE questions
+    rather than "which is better", and sending the pair in both orders because
+    vision models carry a position bias.
+    (4) When scalar and vision judge disagree, a human looks. Do not ship the
+    scalar's number as evidence until that disagreement is resolved.
+  tags: [metric-inverted, selftest-passes-while-wrong, one-directional-validation-set,
+    false-green-instrument, empty-parse-reports-clean, perceptual-defect-needs-perceptual-judge,
+    vlm-as-metric-police, position-bias, native-pixel-crop, unfalsifiable-scalar]
+  legacy_id: "OTR-2026-08-20-three-instruments-reported-success-while-doing-nothing"
