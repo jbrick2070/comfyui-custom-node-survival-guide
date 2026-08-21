@@ -9273,3 +9273,67 @@ bugs:
     false-green-instrument, empty-parse-reports-clean, perceptual-defect-needs-perceptual-judge,
     vlm-as-metric-police, position-bias, native-pixel-crop, unfalsifiable-scalar]
   legacy_id: "OTR-2026-08-20-three-instruments-reported-success-while-doing-nothing"
+
+- id: "12.120"
+  phase: 12
+  area: structural-support-does-not-prove-model-semantic-compatibility
+  symptom: |
+    A reference-conditioning branch exists, every named node is installed, the
+    graph validates, and the executor runs it without an exception -- yet the
+    referenced outputs are materially corrupted while otherwise matched
+    unreferenced outputs are clean. In the live case, every character scene
+    using one clean portrait acquired a square/noise lattice across clothing
+    and walls; unreferenced scenes, portraits, and music cards did not. The
+    generic conditioning node had therefore produced the strongest possible
+    false green: structural support, successful execution, and bad pixels.
+  cause: |
+    NODE AVAILABILITY IS NOT A TRAINING CLAIM. A generic node can construct a
+    tensor shape that a model architecture accepts, and checkpoint headers can
+    contain compatible projection or padding keys, without the exact checkpoint
+    ever having been trained to interpret that tensor as a reference identity.
+    The capability was admitted from graph reachability and weight shape rather
+    than from checkpoint-specific evidence. Validation could prove only that
+    the path was executable; it could not prove what the path meant to the
+    denoiser. Because the branch was advertised as a capability, the dispatcher
+    then selected it automatically and cached its corrupted products under the
+    same engine identity as the previously clean path.
+  fix: |
+    DENY SEMANTIC CAPABILITIES BY DEFAULT. A shipping engine must not set
+    `accepts_reference_image = True` merely because a generic reference node is
+    installed or its graph executes. Admit the capability only for an exact
+    model artifact whose identity is pinned and whose approval record cites a
+    matched-pixel A/B: same checkpoint, prompt, negative, seed, dimensions and
+    delivery path, with only the reference branch changing. Keep the diagnostic
+    graph/harness available even after rejection so a future checkpoint can be
+    evaluated without silently re-enabling production routing.
+    When evidence rejects a previously advertised capability, turn the public
+    capability off, preserve any separately proven identity mechanism such as a
+    portrait-derived seed, and bump the engine/cache version. Otherwise already
+    cached corrupt artifacts survive the code fix and make the disabled path
+    appear to remain live.
+  verify: |
+    (1) Static admission gate: scan class-level capability declarations. Every
+    literal `accepts_reference_image = True` must be accompanied by a literal
+    `reference_image_approval` mapping containing the exact checkpoint SHA-256
+    and the repository-contained, tracked path to a matched-pixel A/B approval
+    receipt. The receipt must repeat the checkpoint hash, identify the model
+    filename and reference hash, record SUCCESS for both arms, prove OFF lacks
+    and ON consumes the branch, hold a complete match signature equal across
+    arms, record distinct graph and native-output pixel hashes, and carry an
+    attributed APPROVED pixel verdict. Malformed, dynamic, missing, untracked,
+    unmatched or negative evidence is a release failure; the presence of
+    `ReferenceLatent` or an equivalent node is never sufficient evidence.
+    (2) Pixel gate: run reference OFF and ON on separate fresh boots with every
+    generation parameter and the delivered crop held equal. Record both graphs,
+    model identity, seeds, native-pixel outputs, and an explicit human or
+    perceptual verdict in the approval artifact.
+    (3) Rejection gate: if ON loses, assert the shipping engine advertises the
+    capability as false and the dispatcher does not supply the reference, while
+    any independent proven identity seed still resolves.
+    (4) Cache gate: assert the engine/cache version differs from the rejected
+    version and an old cache key cannot hit. A clean fresh render is not enough
+    if stale corrupted media can still be returned.
+  tags: [reference-conditioning, semantic-compatibility, structural-support-is-not-training,
+    model-specific-admission, matched-pixel-ab, capability-deny-by-default,
+    cache-version-bump, false-green-graph, checkpoint-sha256, approval-receipt]
+  legacy_id: "PBUG-20260820-01"

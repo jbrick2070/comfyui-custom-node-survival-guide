@@ -2,7 +2,7 @@
 
 **By Jeffrey A. Brick** · April–May 2026
 
-An AI-agent QA harness for ComfyUI custom-node authoring. v2.1 — 298 bible entries + LLM round-robin consult addon.
+An AI-agent QA harness for ComfyUI custom-node authoring. v2.1 — 299 bible entries + LLM round-robin consult addon.
 
 ---
 
@@ -26,7 +26,7 @@ The "AI agent confidently shipped a broken fix" failure mode. Static analysis ca
 
 ## What's in the kit
 
-1. **`BUG_BIBLE.yaml` + `tests/bug_bible_regression.py`** — a 298-entry, machine-readable bug bible plus an automated pytest suite that turns the bible's `verify` fields into executable assertions. Point the suite at any custom-node pack and get a pass/fail report in under 2 seconds. No ComfyUI runtime, no model downloads, no manual grepping.
+1. **`BUG_BIBLE.yaml` + `tests/bug_bible_regression.py`** — a 299-entry, machine-readable bug bible plus an automated pytest suite that turns the bible's `verify` fields into executable assertions. Point the suite at any custom-node pack and get a pass/fail report in under 2 seconds. No ComfyUI runtime, no model downloads, no manual grepping.
 
 2. **`llm_round_robin/`** — a drop-in addon that lets your AI agent call ChatGPT, Gemini, and NVIDIA NIM for second opinions, with probe-first ladder pruning, endpoint-aware dispatch, and capability-tag routing so the agent never silently lands on a stale fallback model. See [`docs/llm_round_robin_explainer.md`](./docs/llm_round_robin_explainer.md).
 
@@ -191,7 +191,7 @@ entries. Exits non-zero on issues so it's easy to wire into a pre-commit hook.
 
 ## What the regression suite checks
 
-298 bible entries across 12 phases; the pytest suite encodes the static-
+299 bible entries across 12 phases; the pytest suite encodes the static-
 analysis-checkable subset as executable assertions.
 
 Entries may carry additive `xref-XX.YY` tags (cross-reference to an
@@ -211,7 +211,7 @@ ids are immutable), added by the 2026-07-12 consistency audit.
 | 09 Subprocess & Network         | Pipe deadlocks, asyncio, offline fallbacks, cloud-API contracts; process identity, Windows portability | 09.02, 09.05–09.08 |
 | 10 Safety, Pools, RNG           | Content filters, pool sizing, RNG correctness; seed provenance, cast coherence | 10.01–10.09 |
 | 11 LLM-Specific                 | Token budgets, prompt-detector contracts, format normalisers, three-tier resilience, typed repair ladders, schema-grammar compatibility | 11.01–11.60 |
-| 12 Regression, Git, Handoff     | Repo hygiene, AST parse, workflow JSON link integrity, dedup foreign keys, ledger write-back, stale-LLM-API ladder, assembled-surface validation, identity classification, artifact-tree rename transactions, canonical derived-metric ownership, explicit requested-length delivery; rewrite parity, multi-window git discipline, test isolation | 12.02, 12.06, 12.07, 12.35, 12.39, 12.52, 12.60, 12.61, 12.66, 12.67, 12.70, 12.75–12.85 |
+| 12 Regression, Git, Handoff     | Repo hygiene, AST parse, workflow JSON link integrity, dedup foreign keys, ledger write-back, stale-LLM-API ladder, assembled-surface validation, identity classification, artifact-tree rename transactions, canonical derived-metric ownership, explicit requested-length delivery; rewrite parity, multi-window git discipline, test isolation, model-specific semantic-capability admission | 12.02, 12.06, 12.07, 12.35, 12.39, 12.52, 12.60, 12.61, 12.66, 12.67, 12.70, 12.75–12.85, 12.120 |
 
 ## How an AI coding agent uses this kit
 

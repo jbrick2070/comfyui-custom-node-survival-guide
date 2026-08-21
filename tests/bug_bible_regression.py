@@ -45,6 +45,7 @@ import ast
 import json
 import os
 import re
+import subprocess
 import sys
 
 import pytest
@@ -2286,6 +2287,398 @@ class TestPhase02BugBible0214:
                "BUG-02.14 layer 4a: disable_progress_bar missing"
         assert "set_progress_bar_config" in src, \
                "BUG-02.14 layer 4b: pipe.set_progress_bar_config missing"
+
+
+# ---------------------------------------------------------------------------
+# A graph that accepts a tensor does not prove the checkpoint learned its
+# meaning.  This is deliberately AST-only: capability admission must be
+# inspectable before ComfyUI, a model, or a GPU is available.
+# ---------------------------------------------------------------------------
+
+class TestModelSpecificReferenceAdmission:
+    """BUG-12.120: semantic capabilities require model-specific evidence."""
+
+    _NON_LITERAL = object()
+    _SHA256 = re.compile(r"[0-9a-f]{64}")
+    _APPROVAL_SCHEMA = "reference-image-semantic-approval.v1"
+    _MATCH_KEYS = {"prompt", "negative", "seed", "width", "height",
+                   "delivery_path"}
+
+    @classmethod
+    def _literal_class_attributes(cls, path):
+        with open(path, "r", encoding="utf-8-sig", errors="replace") as fh:
+            tree = ast.parse(fh.read(), filename=path)
+        found = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ClassDef):
+                continue
+            attrs = {}
+            for stmt in node.body:
+                name = None
+                value = None
+                if (isinstance(stmt, ast.Assign) and len(stmt.targets) == 1
+                        and isinstance(stmt.targets[0], ast.Name)):
+                    name = stmt.targets[0].id
+                    value = stmt.value
+                elif (isinstance(stmt, ast.AnnAssign)
+                      and isinstance(stmt.target, ast.Name)):
+                    name = stmt.target.id
+                    value = stmt.value
+                if name is None or value is None:
+                    continue
+                try:
+                    attrs[name] = ast.literal_eval(value)
+                except (ValueError, TypeError):
+                    # A dynamic declaration is not statically provable.  Keep
+                    # it visible so a capability opt-in fails closed below.
+                    attrs[name] = cls._NON_LITERAL
+            if attrs:
+                found.append((node.name, attrs))
+        return found
+
+    @classmethod
+    def _approval_violations(cls, pack_dir, label, approval):
+        violations = []
+        if not isinstance(approval, dict):
+            return [
+                f"{label} advertises accepts_reference_image=True without a "
+                "literal reference_image_approval mapping"
+            ]
+
+        checkpoint = approval.get("checkpoint_sha256")
+        receipt = approval.get("matched_pixel_ab_receipt")
+        if not (isinstance(checkpoint, str)
+                and cls._SHA256.fullmatch(checkpoint)):
+            violations.append(
+                f"{label} has no exact lowercase checkpoint_sha256"
+            )
+        if not isinstance(receipt, str) or not receipt.strip():
+            violations.append(f"{label} has no matched_pixel_ab_receipt")
+            return violations
+
+        pack_root = os.path.realpath(pack_dir)
+        receipt_path = os.path.realpath(os.path.join(pack_root, receipt))
+        try:
+            contained = os.path.commonpath((pack_root, receipt_path)) == pack_root
+        except ValueError:
+            contained = False
+        if os.path.isabs(receipt) or not contained:
+            violations.append(
+                f"{label} cites a receipt outside the checked-in pack: {receipt!r}"
+            )
+            return violations
+        if not os.path.isfile(receipt_path):
+            violations.append(
+                f"{label} cites missing matched pixel A/B receipt {receipt!r}"
+            )
+            return violations
+        try:
+            in_worktree = subprocess.run(
+                ["git", "-C", pack_root, "rev-parse", "--is-inside-work-tree"],
+                capture_output=True, text=True, check=False,
+            )
+        except OSError:
+            in_worktree = None
+        if in_worktree is not None and in_worktree.returncode == 0:
+            tracked = subprocess.run(
+                ["git", "-C", pack_root, "ls-files", "--error-unmatch",
+                 "--", receipt],
+                capture_output=True, text=True, check=False,
+            )
+            if tracked.returncode != 0:
+                violations.append(
+                    f"{label} cites an untracked matched pixel A/B receipt "
+                    f"{receipt!r}"
+                )
+        try:
+            with open(receipt_path, "r", encoding="utf-8-sig") as fh:
+                evidence = json.load(fh)
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            violations.append(
+                f"{label} cites unreadable matched pixel A/B receipt "
+                f"{receipt!r}: {exc}"
+            )
+            return violations
+        if not isinstance(evidence, dict):
+            return violations + [f"{label} receipt root is not an object"]
+        if evidence.get("schema") != cls._APPROVAL_SCHEMA:
+            violations.append(
+                f"{label} receipt has no {cls._APPROVAL_SCHEMA!r} schema"
+            )
+        if evidence.get("checkpoint_sha256") != checkpoint:
+            violations.append(
+                f"{label} receipt checkpoint_sha256 does not match the engine"
+            )
+        if not isinstance(evidence.get("checkpoint_filename"), str) \
+                or not evidence["checkpoint_filename"].strip():
+            violations.append(f"{label} receipt has no checkpoint_filename")
+        reference_sha = evidence.get("reference_sha256")
+        if not (isinstance(reference_sha, str)
+                and cls._SHA256.fullmatch(reference_sha)):
+            violations.append(f"{label} receipt has no exact reference_sha256")
+
+        if evidence.get("verdict") != "APPROVED":
+            violations.append(
+                f"{label} receipt has no explicit APPROVED pixel verdict"
+            )
+        review = evidence.get("pixel_review")
+        if not (isinstance(review, dict)
+                and isinstance(review.get("reviewer"), str)
+                and review["reviewer"].strip()
+                and isinstance(review.get("finding"), str)
+                and review["finding"].strip()):
+            violations.append(
+                f"{label} receipt has no attributed pixel-review finding"
+            )
+
+        arms = evidence.get("arms")
+        signatures = {}
+        graph_hashes = {}
+        output_hashes = {}
+        if not isinstance(arms, dict):
+            violations.append(f"{label} receipt has no OFF/ON arms")
+            return violations
+        for arm, expected_branch in (("off", False), ("on", True)):
+            arm_data = arms.get(arm)
+            if not isinstance(arm_data, dict):
+                violations.append(f"{label} receipt has no {arm.upper()} arm")
+                continue
+            if arm_data.get("status") != "SUCCESS":
+                violations.append(
+                    f"{label} receipt {arm.upper()} arm is not SUCCESS"
+                )
+            if arm_data.get("reference_branch") is not expected_branch:
+                violations.append(
+                    f"{label} receipt {arm.upper()} arm does not prove its "
+                    "reference-branch state"
+                )
+            signature = arm_data.get("match_signature")
+            if not (isinstance(signature, dict)
+                    and cls._MATCH_KEYS <= set(signature)):
+                violations.append(
+                    f"{label} receipt {arm.upper()} arm has an incomplete "
+                    "match_signature"
+                )
+            else:
+                signatures[arm] = signature
+            for field, bucket in (("graph_sha256", graph_hashes),
+                                  ("native_output_sha256", output_hashes)):
+                value = arm_data.get(field)
+                if not (isinstance(value, str)
+                        and cls._SHA256.fullmatch(value)):
+                    violations.append(
+                        f"{label} receipt {arm.upper()} arm has no exact {field}"
+                    )
+                else:
+                    bucket[arm] = value
+
+        if set(signatures) == {"off", "on"} \
+                and signatures["off"] != signatures["on"]:
+            violations.append(f"{label} receipt OFF/ON arms are not matched")
+        if len(set(graph_hashes.values())) != len(graph_hashes):
+            violations.append(f"{label} receipt OFF/ON graph hashes are equal")
+        if len(set(output_hashes.values())) != len(output_hashes):
+            violations.append(f"{label} receipt OFF/ON native pixels are equal")
+        return violations
+
+    def test_reference_image_capability_requires_checkpoint_and_pixel_proof(
+            self, py_files, pack_dir):
+        """A generic ReferenceLatent-style node is structural evidence only.
+
+        A literal opt-in must name the exact checkpoint and a checked-in matched
+        pixel A/B receipt.  The OTR-local tail pins the live rejection, including
+        the cache-version bump and the independent identity seed.
+        """
+        violations = []
+        for path in py_files:
+            relative = os.path.relpath(path, pack_dir).replace("\\", "/")
+            if any(part in {".claude", "tmp", "scratch", "kibitz",
+                            "otr", "otr_soak_receipts"}
+                   for part in relative.split("/")):
+                continue
+            with open(path, "r", encoding="utf-8-sig",
+                      errors="replace") as fh:
+                if "accepts_reference_image" not in fh.read():
+                    continue
+            for class_name, attrs in self._literal_class_attributes(path):
+                capability = attrs.get("accepts_reference_image")
+                label = f"{os.path.relpath(path, pack_dir)}::{class_name}"
+                if capability is self._NON_LITERAL:
+                    violations.append(
+                        f"{label} has a dynamic accepts_reference_image; "
+                        "shipping capability declarations must be literal"
+                    )
+                    continue
+                if capability is not True:
+                    continue
+                approval = attrs.get("reference_image_approval")
+                violations.extend(
+                    self._approval_violations(pack_dir, label, approval)
+                )
+
+        assert not violations, "BUG-12.120: " + "; ".join(violations)
+
+        # OTR-specific executable receipt.  Other packs stop at the generic
+        # admission scan above.
+        zimage_path = os.path.join(
+            pack_dir, "nodes", "_otr_image_engines", "z_image_turbo.py"
+        )
+        if not os.path.isfile(zimage_path):
+            return
+        zimage_attrs = dict(self._literal_class_attributes(zimage_path)).get(
+            "ZImageTurboEngine", {}
+        )
+        assert zimage_attrs.get("accepts_reference_image") is False
+        assert zimage_attrs.get("engine_version") == "2", (
+            "BUG-12.120: disabling the rejected reference path must invalidate "
+            "v1 cached grids"
+        )
+
+        engine_tests = os.path.join(pack_dir, "tests", "test_image_engine_c2.py")
+        seed_tests = os.path.join(pack_dir, "tests", "test_still_spine_helpers.py")
+        harness = os.path.join(pack_dir, "scripts", "otr_zimage_reference_ab.py")
+        for required in (engine_tests, seed_tests, harness):
+            assert os.path.isfile(required), (
+                f"BUG-12.120: required rejection evidence missing: {required}"
+            )
+        with open(engine_tests, "r", encoding="utf-8") as fh:
+            assert "test_no_shipping_image_engine_advertises_unproven_reference_conditioning" in fh.read()
+        with open(seed_tests, "r", encoding="utf-8") as fh:
+            assert "test_zimage_reference_rejection_keeps_the_identity_seed" in fh.read()
+
+        dispatcher = os.path.join(pack_dir, "nodes", "otr_image_gen_dispatcher.py")
+        with open(dispatcher, "r", encoding="utf-8-sig") as fh:
+            dispatcher_tree = ast.parse(fh.read(), filename=dispatcher)
+        cache_functions = [
+            node for node in ast.walk(dispatcher_tree)
+            if isinstance(node, ast.FunctionDef)
+            and node.name == "request_cache_key"
+        ]
+        assert len(cache_functions) == 1
+        cache_function = cache_functions[0]
+        assert "engine_version" in {
+            arg.arg for arg in cache_function.args.args
+        }, "BUG-12.120: cache key API lost engine_version"
+        assert any(
+            isinstance(node, ast.Name)
+            and isinstance(node.ctx, ast.Load)
+            and node.id == "engine_version"
+            for node in ast.walk(cache_function)
+        ), "BUG-12.120: request_cache_key no longer consumes engine_version"
+
+    def test_unproved_opt_in_fails_and_a_pinned_receipt_passes(self, tmp_path):
+        """Mutation proof for the generic half of BUG-12.120."""
+        engine = tmp_path / "engine.py"
+        checkpoint = "0" * 64
+        receipt = tmp_path / "evidence" / "matched-reference-ab.json"
+        receipt.parent.mkdir()
+
+        def write_engine(capability="True"):
+            engine.write_text(
+                "class Engine:\n"
+                f"    accepts_reference_image = {capability}\n"
+                "    reference_image_approval = {\n"
+                f"        'checkpoint_sha256': {checkpoint!r},\n"
+                "        'matched_pixel_ab_receipt': "
+                "'evidence/matched-reference-ab.json',\n"
+                "    }\n",
+                encoding="utf-8",
+            )
+
+        def write_receipt(**updates):
+            signature = {
+                "prompt": "subject", "negative": "artifact", "seed": 7,
+                "width": 1024, "height": 1024, "delivery_path": "native",
+            }
+            payload = {
+                "schema": self._APPROVAL_SCHEMA,
+                "checkpoint_filename": "model.safetensors",
+                "checkpoint_sha256": checkpoint,
+                "reference_sha256": "1" * 64,
+                "verdict": "APPROVED",
+                "pixel_review": {
+                    "reviewer": "operator", "finding": "identity preserved",
+                },
+                "arms": {
+                    "off": {
+                        "status": "SUCCESS", "reference_branch": False,
+                        "match_signature": signature,
+                        "graph_sha256": "2" * 64,
+                        "native_output_sha256": "3" * 64,
+                    },
+                    "on": {
+                        "status": "SUCCESS", "reference_branch": True,
+                        "match_signature": dict(signature),
+                        "graph_sha256": "4" * 64,
+                        "native_output_sha256": "5" * 64,
+                    },
+                },
+            }
+            for dotted_key, value in updates.items():
+                target = payload
+                parts = dotted_key.split("__")
+                for part in parts[:-1]:
+                    target = target[part]
+                target[parts[-1]] = value
+            receipt.write_text(
+                json.dumps(payload, indent=2) + "\n", encoding="utf-8"
+            )
+
+        def assert_rejected(match):
+            with pytest.raises(AssertionError, match=match):
+                self.test_reference_image_capability_requires_checkpoint_and_pixel_proof(
+                    [str(engine)], str(tmp_path)
+                )
+
+        engine.write_text(
+            "class Engine:\n"
+            "    accepts_reference_image = True\n",
+            encoding="utf-8",
+        )
+        assert_rejected("reference_image_approval")
+
+        write_engine("bool(os.environ.get('ENABLE_REFERENCE'))")
+        assert_rejected("dynamic accepts_reference_image")
+
+        write_engine()
+        receipt.write_text("{not-json}\n", encoding="utf-8")
+        assert_rejected("unreadable matched pixel A/B receipt")
+
+        write_receipt(checkpoint_sha256="f" * 64)
+        assert_rejected("checkpoint_sha256 does not match")
+
+        write_receipt(arms__on__match_signature={"prompt": "drifted"})
+        assert_rejected("incomplete match_signature")
+
+        write_receipt(arms__on__reference_branch=False)
+        assert_rejected("does not prove its reference-branch state")
+
+        write_receipt(arms__off__status="FAILED")
+        assert_rejected("OFF arm is not SUCCESS")
+
+        write_receipt(verdict="REJECTED")
+        assert_rejected("no explicit APPROVED pixel verdict")
+
+        write_receipt(pixel_review={})
+        assert_rejected("no attributed pixel-review finding")
+
+        subprocess.run(
+            ["git", "init", "--quiet"], cwd=tmp_path, check=True,
+            capture_output=True, text=True,
+        )
+        subprocess.run(
+            ["git", "add", "engine.py"], cwd=tmp_path, check=True,
+            capture_output=True, text=True,
+        )
+        write_receipt()
+        assert_rejected("untracked matched pixel A/B receipt")
+        subprocess.run(
+            ["git", "add", "evidence/matched-reference-ab.json"],
+            cwd=tmp_path, check=True, capture_output=True, text=True,
+        )
+        self.test_reference_image_capability_requires_checkpoint_and_pixel_proof(
+            [str(engine)], str(tmp_path)
+        )
 
 
 # ---------------------------------------------------------------------------
