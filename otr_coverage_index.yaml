@@ -2600,3 +2600,7 @@ records:
   source: live-execution
 - record: OTR 2026-08-21 grid-inherited-from-stills + confounded drift probe (GO_FORWARD_PLAN QUALITY PROGRAM RULINGS 2026-08-21; HANDOFF_LOG 2026-08-20 evening)
   bible_id: "12.121"
+- record: OTR 2026-08-21 lane 2 nested DYNAMICCOMBO killed all 12 API legs; runtime CPU-pin swap invisible in graph JSON; ltx_video local sigma class unbuildable (basline-models c8c0ddb/ec2830c; HANDOFF_LOG 2026-08-21 midday)
+  bible_id: "12.122"
+  verdict: promoted
+  source: live-execution

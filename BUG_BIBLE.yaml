@@ -9382,3 +9382,50 @@ bugs:
     prompt-conditioning-mismatch, i2v-preserves-defects, shared-input-variable,
     elimination-campaign-void, xref-12.118, xref-12.119, xref-12.120]
   legacy_id: "OTR-2026-08-21-grid-rode-in-on-the-stills-and-the-drift-probe-obeyed-its-prompt"
+
+- id: "12.122"
+  phase: 12
+  area: an-in-process-graph-authoring-form-is-not-the-http-prompt-form
+  symptom: |
+    Every leg of an API-submitted campaign dies in seconds with
+    "TypeError: <Node>.execute() missing 1 required positional argument"
+    on one node, even though the graph came verbatim from a shipping
+    engine that runs the same node in-process every day, and /prompt
+    accepted the submission without complaint.
+  cause: |
+    The engine's builder output is an AUTHORING form for the in-process
+    bridge, not an HTTP prompt. Three translation gaps hide in it.
+    (1) V3 dynamic inputs (COMFY_DYNAMICCOMBO_V3, autogrow): the builder
+    authors one nested dict, but the prompt format addresses sub-inputs
+    by dot-joined prefixes ("resize_type": "scale dimensions" plus
+    "resize_type.width": 832 as SIBLING keys -- finalize_prefix in
+    comfy_api/latest/_io.py joins with "."). The nested dict validates,
+    queues, then leaves the argument unmapped at execution.
+    (2) Runtime class swaps (classes["x"] = subclass(...) inside
+    render_clip) never serialize, so the API run silently executes the
+    stock class with different device placement or behavior.
+    (3) Nodes implemented as local Python classes are not registered and
+    cannot be submitted at all.
+  fix: |
+    Translate, never transplant. Flatten dynamic dict inputs into
+    dot-prefixed leaf keys (an inner key equal to the input's own name is
+    the selector and keeps the bare name); fail LOUD on an empty dict
+    rather than dropping the argument. Re-declare every runtime class
+    swap as a registered equivalent applied identically to every arm and
+    record it as a deliberate adaptation. Fail closed on local classes.
+    Sweep BEFORE rendering: census every buildable engine graph for
+    dict-valued inputs, grep render paths for class-map mutations, and
+    the wall shows up one lane early instead of at the first dead leg.
+  verify: |
+    (1) Submitting the translated graph executes the formerly failing
+    node (asset in /history), where the untranslated dict form raised
+    TypeError.
+    (2) A census script exists that enumerates dynamic inputs from
+    /object_info and dict-valued literals across engine builders, and its
+    receipt is committed.
+    (3) Any graph-conversion helper raises on an empty dict input instead
+    of emitting nothing.
+  tags: [api-vs-inprocess, dynamic-inputs, dot-flattening, prompt-format,
+    runtime-class-swap, local-class-fail-closed, unmapped-argument,
+    xref-09.06, xref-12.121]
+  legacy_id: "OTR-2026-08-21-lane2-nested-dynamiccombo-killed-all-twelve-legs"
