@@ -33,8 +33,8 @@
 # title card -- and conflating them cost an evening; the index keeps them as
 # two records for that reason.
 audited: '2026-08-21'
-bible_head: 8b194d3 (+12.124, 12.125 appended 2026-08-21)
-bible_entries: 304
+bible_head: 7872f8a (+12.126 appended 2026-08-21 evening)
+bible_entries: 305
 records:
 - ref: BUG_LOG.md L1022 (BUG-LOCAL-231 soak data point)
   title: A long per-clip render loop had no routine VRAM reclamation — cleanup fired only on an OOM exception, so a gradual
@@ -2614,5 +2614,9 @@ records:
   source: live-execution
 - record: OTR 2026-08-21 Ideogram 4 safety filter refused 6 of 6 real production card lines by returning a VALID non-black PNG at correct dimensions with host status SUCCESS; every generic guard passed it (OTR 4ce5d269; docs/2026-08-21-ideogram4-verdict.md, docs/2026-08-21-ideogram4-probe-receipt.json)
   bible_id: "12.125"
+  verdict: promoted
+  source: live-execution
+- record: OTR 2026-08-21 Ideogram 4 round 4-5 -- a foreign "negative_instruction" key added to the structured caption was PAINTED onto the card as lettering ("NO MISCOS" = "no logos"); the vendor's real 3-key schema was found embedded in the template's magic-prompt subgraph, and conforming to it removed the refusals and most invented text (OTR 68e4c051+; docs/2026-08-21-ideogram4-verdict.md ROUND 4-5)
+  bible_id: "12.126"
   verdict: promoted
   source: live-execution

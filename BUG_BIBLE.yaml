@@ -9581,3 +9581,54 @@ bugs:
     probe-before-you-classify, test-with-real-content,
     fail-closed-path, xref-12.121]
   legacy_id: "OTR-2026-08-21-ideogram4-safety-filter-returns-a-valid-image"
+
+- id: "12.126"
+  phase: 12
+  area: a-foreign-key-in-a-structured-prompt-schema-is-rendered-not-ignored
+  symptom: |
+    A structured JSON prompt is extended with extra fields by analogy with
+    other APIs -- a trailing "negative_instruction" guard, a
+    "style_description" block -- and the model PAINTS the extra field's
+    words into the picture. Measured: a title card whose guard read "no
+    logos, no captions" came back with "NO MISCOS," rendered as gold
+    corner lettering, on three of three renders. The main quoted line was
+    spelled perfectly; only the invented furniture betrayed the defect.
+  cause: |
+    The text encoder consumes the WHOLE prompt string as conditioning.
+    There is no parser and no schema validator between the JSON and the
+    model, so an unknown key is not skipped -- it is more caption. The
+    schema that IS honoured was never guessed at correctly because it was
+    never looked up: the vendor's authoritative statement of it shipped
+    INSIDE the workflow template, as a magic-prompt system text in a
+    hidden subgraph, stating exactly three top-level keys in a fixed
+    order, single-line minified output, and bbox normalized 0-1000.
+    The probe payload violated all three (five keys, indent=2, pixel
+    bboxes out of range) and additionally invented a negative field for
+    a topology that has no text-negative input at all -- the guider's
+    negative is wired from ConditioningZeroOut, the zeroed positive.
+  fix: |
+    Before authoring any structured prompt, EXTRACT the vendor's own
+    schema statement -- open the shipped template's subgraph definitions
+    and read the embedded magic-prompt/system text, which is the contract
+    the checkpoint was tuned against. Byte-diff the payload against it:
+    carry exactly the documented keys in the documented order and form,
+    and express suppression ("nothing else appears") through the
+    documented prose fields' own vocabulary rather than through an
+    invented negative field. Check the graph before assuming a negative
+    channel exists; in a zeroed-negative topology there is nowhere for
+    negative TEXT to act. When an output defect appears, isolate ONE
+    variable per rerun -- this failure was first misread as a content
+    refusal because prompt shape and canvas moved together.
+  verify: |
+    (1) The conforming payload renders with no invented text where the
+    foreign-key payload demonstrably painted its guard words.
+    (2) The payload's top-level keys are pinned by test to the schema the
+    template's embedded system text states, so a drive-by "helpful"
+    field cannot return.
+    (3) Any claim that the model refuses or degrades on some content
+    names the single variable that was isolated to show it.
+  tags: [structured-prompt-schema, foreign-key-rendered, magic-prompt-subgraph,
+    schema-lives-in-the-template, zeroed-negative-topology,
+    no-text-negative-channel, single-variable-isolation,
+    prompt-shape-not-content, xref-12.125, xref-12.121]
+  legacy_id: "OTR-2026-08-21-ideogram4-guard-field-painted-onto-the-card"
