@@ -9650,3 +9650,60 @@ bugs:
     no-text-negative-channel, single-variable-isolation,
     prompt-shape-not-content, xref-12.125, xref-12.121]
   legacy_id: "OTR-2026-08-21-ideogram4-guard-field-painted-onto-the-card"
+- id: "12.127"
+  phase: 12
+  area: an-optional-input-fixture-only-tests-the-path-where-the-option-is-present
+  symptom: |
+    A budget, cap or trim rule is covered by a large, parameterised,
+    entirely-green test suite -- and it fails on the first live run, on
+    ordinary content, at a value the tests never produced. The failure is
+    LOUD and correct (the code refuses rather than shipping a bad result),
+    which is the only reason it is cheap: it fires before any expensive
+    stage. Re-running the same tests after the failure still shows green.
+  cause: |
+    Every fixture supplied the OPTIONAL input, and supplying it
+    SHORT-CIRCUITS the branch under test. Production leaves that input
+    absent by default, so production takes the other branch -- the one that
+    falls back to large config-authored values -- and no test ever composed
+    it. Measured: a prompt composer capped at 320 characters was tested with
+    an authored motion clause in every case; the authored clause bypasses
+    the style pack's own register entirely. With the optional pass OFF (the
+    default), the composer instead pulled the pack's subject surface
+    (163-178 chars across nine packs) AND its motion register (130-209,
+    budgeted at 240 by the loader) and composed 474 characters.
+    A SECOND defect hid behind the first and is the mechanical half: the
+    trimmer dropped whole COMMA-SEPARATED phrases, and the config surfaces
+    are long comma-FREE prose. On those the trimmer is a NO-OP -- it finds
+    one phrase, cannot drop it, and returns the text at its original length.
+    A trimmer that cannot shrink its most likely input is not a trimmer.
+  fix: |
+    Parameterise the budget tests over the OPTION-ABSENT path explicitly,
+    and over every shipped config value rather than one convenient default:
+    role x pack x register key, with the optional input withheld. A fixture
+    that always supplies an optional input is testing the caller, not the
+    default. State the arithmetic in the test's own failure message (which
+    surface contributed how many characters) so the next failure names its
+    cause instead of only its total.
+    For the trimmer: make it fall back from phrase boundaries to WORD
+    boundaries so it can shrink comma-free prose, and never let a cut end on
+    a dangling function word ("...and a", "...of the") -- a trailing
+    fragment reads to a downstream model as an unfinished list. Then decide
+    explicitly which fields are PROTECTED (never shrunk) and which are
+    config-derived and therefore shrinkable, shrink the latter
+    proportionally with a floor, and keep failing loudly if the protected
+    set alone exceeds the budget. Runtime truncation must not become the
+    preservation mechanism for the fields the feature exists to guarantee.
+  verify: |
+    (0) A test exists that composes with the optional input WITHHELD, over
+    every shipped config value, and it fails on the pre-fix code.
+    (1) The trimmer, given comma-free prose longer than the ceiling, returns
+    something at or under the ceiling -- and the pre-fix trimmer returns it
+    unchanged, which is the regression in one assertion.
+    (2) No trimmed output ends on a function word from a checked-in list.
+    (3) The protected fields survive every trim, and a protected set that
+    cannot fit still raises rather than truncating.
+  tags: [optional-input-fixture-hides-the-default-path, short-circuiting-input,
+    budget-cap, trimmer-noop-on-its-likeliest-input, comma-free-prose,
+    parameterise-over-shipped-config, loud-refusal-is-cheap,
+    dangling-function-word, protected-vs-shrinkable-fields,
+    truncation-is-not-a-preservation-mechanism]

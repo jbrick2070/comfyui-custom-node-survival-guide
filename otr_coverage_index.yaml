@@ -2624,3 +2624,7 @@ records:
   bible_id: "12.126"
   verdict: covered
   source: live-execution
+- record: OTR 2026-08-22 Ghost Signal first live leg died at cast-time preflight -- an announcer beat composed 344 chars against a 320 ceiling because every unit budget test had supplied an AUTHORED motion clause, which short-circuits the visual-style pack's own register; with the optional motion pass OFF (the production default) the composer pulls the pack subject (163-178) plus its register (130-209), ~474 on recur_frac. _trim_to was additionally a NO-OP on both because they are comma-free prose and it only dropped comma phrases (OTR d0b3a65b/80be3529; docs/2026-08-22-ghost-signal-publish-receipt.md)
+  bible_id: "12.127"
+  verdict: promoted
+  source: live-execution
