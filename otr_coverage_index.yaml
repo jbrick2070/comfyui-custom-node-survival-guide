@@ -2628,3 +2628,15 @@ records:
   bible_id: "12.127"
   verdict: promoted
   source: live-execution
+- record: OTR 2026-08-22 Ghost v3 domain-adapter PEER lane refused a byte-perfect motion module -- the subclass overrode the module FILENAME but silently inherited the parent's byte floor, which was sized for an artifact 144 MB larger; live leg FAILED at 389s naming the file, the size and the floor (OTR ed3ae2c7; docs/VIDEO_LANE_PREFLIGHT.md G1.3)
+  bible_id: "12.128"
+  verdict: promoted
+  source: live-execution
+- record: OTR 2026-08-22 haunted lane leg FAILED at 428s reporting v3_sd15_adapter.ckpt missing while the file sat on disk with a matching hash -- it was under a root the headless model-paths config does not name, and folder_paths caches its listing at boot; fixed with an /object_info visibility gate before submit, same failure now costs 5s (OTR 92317a7d)
+  bible_id: "12.129"
+  verdict: promoted
+  source: live-execution
+- record: OTR 2026-08-22 two render legs killed mid-flight (one at 837s, one at 51s) by a second queue whose wait polled for process ABSENCE -- the gap between one leg exiting and the next booting satisfied the predicate; the orphaned server left behind then starved a third leg into a 53-minute run. Get-Process also populates neither CommandLine nor .Path, so the filter matched nothing and fell through on the first poll (OTR 36187675)
+  bible_id: "12.130"
+  verdict: promoted
+  source: live-execution

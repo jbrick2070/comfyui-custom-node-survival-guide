@@ -9707,3 +9707,134 @@ bugs:
     parameterise-over-shipped-config, loud-refusal-is-cheap,
     dangling-function-word, protected-vs-shrinkable-fields,
     truncation-is-not-a-preservation-mechanism]
+- id: "12.128"
+  phase: 12
+  area: a-per-artifact-constant-a-sibling-silently-inherits
+  symptom: |
+    A newly added sibling lane/adapter refuses a PERFECT artifact. The error
+    is specific and confident -- "X is only 1673262583 bytes (< the
+    1700000000 floor) -- that is a truncated or wrong file, re-fetch it" --
+    and re-downloading changes nothing because the file was never wrong. The
+    parent lane runs fine with the identical code path.
+  cause: |
+    When the sibling was created, the obviously-varying constant (the model
+    FILENAME) was correctly moved to a class attribute, and a second
+    constant sized for the SAME artifact -- a byte floor, a quant token, a
+    recipe receipt id -- was left as a module-level constant read from
+    inside a method. The subclass therefore overrides one and silently
+    inherits the other. The inherited value is not merely stale, it is
+    calibrated for a DIFFERENT file, so it is a false accusation against
+    every artifact except the parent's.
+    The same shape has the opposite failure mode when the constant is a
+    recipe rather than a guard: the sibling renders with the PARENT's recipe
+    and stamps its OWN receipt -- wrong output under a confident label, with
+    nothing raising at all.
+  fix: |
+    Any per-artifact constant travels WITH the lane that owns it, as a class
+    attribute a sibling can override -- never a module-level constant read
+    inside a method. Audit by asking, for each new sibling: what ELSE was
+    sized, named or tuned for the parent?
+    For a size guard, state BOTH directions or you produce the opposite bug:
+    the floor must sit BELOW its own artifact (or it refuses a perfect file)
+    and within ~15% of it (or a badly truncated fetch slips through -- a
+    floor of 1 byte passes everything and guards nothing).
+  verify: |
+    (1) A test asserts, per lane, that the guard value sits below that
+    lane's real artifact size, and a second asserts it is within 15% of it.
+    Both fail on the pre-fix code for the sibling.
+    (2) A test proves each lane resolves its OWN artifact token through
+    `self`, and greps the render path for any module-level read of the same
+    constant.
+    (3) Each lane stamps a receipt naming its own recipe, and the set of
+    receipts across siblings is distinct.
+  tags: [per-artifact-constant, subclass-inherits-parents-calibration,
+    byte-floor, guard-calibrated-for-one-artifact, false-accusation,
+    wrong-output-under-a-confident-label, state-both-directions,
+    class-attribute-not-module-constant]
+
+- id: "12.129"
+  phase: 12
+  area: a-weight-on-disk-is-not-a-weight-the-server-can-see
+  symptom: |
+    A render fails deep into a long run -- after the script pass, the whole
+    voice pass, and into the video pass -- reporting a model file missing.
+    The file is unambiguously present on disk with a correct hash. Copying
+    it again changes nothing, and the same weight loads fine for a different
+    tool on the same machine.
+  cause: |
+    Two independent traps, and they compound.
+    (a) A headless/managed server is launched with its OWN model-paths
+    configuration naming specific roots. A weight dropped under the "obvious"
+    models directory is invisible if that root is not the one the server was
+    started with. Auditing the filesystem cannot detect this, because the
+    file really is there.
+    (b) `folder_paths` caches its filename listings at boot, so even placing
+    the file under a correct root does not help a server that is already
+    running.
+    The failure surfaces late because artifact presence is checked at first
+    USE -- correctly, and loudly -- rather than before the job is submitted.
+  fix: |
+    Gate the run on artifact visibility BEFORE submitting, and ask the
+    RUNNING SERVER what it can see rather than asking the filesystem: walk
+    /object_info and collect every filename offered in any node's combo.
+    That needs no knowledge of the paths config or of which category a weight
+    belongs to. Refuse with a message naming the missing file, the paths
+    config to check, and the fact that the listing is cached at boot so a
+    restart is required.
+    Keep the deep guard as well. It is the thing that stops a silent wrong
+    render; the preflight only makes it cheap.
+  verify: |
+    (1) With the weight moved outside every configured root, the run refuses
+    in seconds and names the file; pre-fix it fails minutes in.
+    (2) The refusal names the model-paths config and the boot-cache
+    requirement, not just the filename.
+    (3) A run whose weights are all visible logs the checked set, so a
+    passing preflight is auditable rather than silent.
+  tags: [model-paths-config, folder_paths-caches-at-boot, headless-server,
+    present-on-disk-invisible-to-the-server, gate-before-submit,
+    ask-the-server-not-the-filesystem, late-failure-is-expensive]
+
+- id: "12.130"
+  phase: 12
+  area: waiting-on-process-absence-reads-the-gap-between-jobs-as-done
+  symptom: |
+    A queued job starts while an earlier one is still running and resets
+    shared state out from under it. The victim dies with a killed-process
+    exit code and NO verdict line, minutes or tens of minutes in, having
+    been perfectly healthy. It looks like a crash in the victim; nothing is
+    wrong with the victim.
+  cause: |
+    The waiting queue polls for the ABSENCE of a process ("no runner is
+    running, therefore the other queue has finished"). Between one job
+    exiting and the next booting there is a gap of seconds in which that
+    predicate is TRUE and the queue is not finished. The waiter starts,
+    performs its own environment reset, and kills the next job.
+    A second, compounding trap: killing the runner does not kill the SERVER
+    it booted. The orphaned server stays resident holding GPU/host memory
+    and starves whatever runs next -- which presents as the next job being
+    mysteriously slow rather than as a leak.
+    On Windows the naive predicate is often broken anyway: `Get-Process`
+    does not populate CommandLine, and `.Path` is blank for a half-booted
+    process, so a filter on those matches NOTHING and the wait falls
+    straight through on the first poll.
+  fix: |
+    Wait on a SENTINEL THE OTHER QUEUE WRITES -- a completion token appended
+    to its results file exactly once, after its last job. A sentinel cannot
+    appear during a gap; an absence can.
+    Prefer one queue over two coordinating queues. When a job must be
+    cancelled, kill the runner AND the server it booted, identified by port
+    or command line, then confirm the memory came back.
+    If a process predicate is unavoidable, filter on CommandLine via the
+    OS process table (`Win32_Process`), never on a field the process
+    enumerator does not populate.
+  verify: |
+    (1) With one queue mid-run between jobs, the waiter is provably still
+    blocked -- its output directory is absent or empty.
+    (2) After a cancellation, the count of resident servers returns to
+    baseline and free memory returns to baseline.
+    (3) The wait predicate is exercised against a real running job and
+    matches it, proving the filter is not silently matching nothing.
+  tags: [queue-coordination, absence-is-not-completion, sentinel-not-predicate,
+    gap-between-jobs, orphaned-server-holds-memory,
+    kill-the-runner-and-its-server, get-process-lacks-commandline,
+    one-queue-beats-two]
