@@ -2604,3 +2604,7 @@ records:
   bible_id: "12.122"
   verdict: promoted
   source: live-execution
+- record: OTR 2026-08-21 lane 3 screened the TEXT-ONLY path for 12 live legs while OTR_ENABLE_LTX_I2V defaults to "1" and production conditions on an image; the differ hardcoded _build_graph (basline-models 54fe68e/d90d747; verdicts/lane3_ltx_video.md, lane5_ltx_i2v_official.md)
+  bible_id: "12.123"
+  verdict: promoted
+  source: live-execution

@@ -9429,3 +9429,48 @@ bugs:
     runtime-class-swap, local-class-fail-closed, unmapped-argument,
     xref-09.06, xref-12.121]
   legacy_id: "OTR-2026-08-21-lane2-nested-dynamiccombo-killed-all-twelve-legs"
+
+- id: "12.123"
+  phase: 12
+  area: a-harness-that-hardcodes-one-graph-builder-measures-the-path-production-does-not-use
+  symptom: |
+    An A/B campaign runs clean end to end -- every leg succeeds, purity
+    passes, the null is receipted -- and only afterwards does someone
+    notice the staged graphs are missing a node class that production
+    renders with every day. The verdict is not wrong about what it
+    measured; it measured the wrong configuration, and the whole lane has
+    to be re-bounded or re-run.
+  cause: |
+    An engine may ship SEVERAL graph builders for one model, chosen at
+    runtime by a flag, and the harness introspects only the conventionally
+    named one. Two things then conspire. (1) The flag's DEFAULT decides
+    what production actually renders, and a default of "on" means the
+    non-default builder is the real shipping path -- so the obvious
+    builder name is the wrong one. (2) The fixture that feeds the builder
+    happily satisfies both signatures, so nothing raises: the alternate
+    builder needs one extra argument the fixture already supplies, and
+    the wrong graph builds silently. Node-count and purity checks pass
+    because they compare the two ARMS against each other, never the arm
+    against production.
+  fix: |
+    Name the builder at the call site instead of defaulting to it. Make
+    the harness take an explicit builder argument, and have the lane
+    receipt record which builder it used alongside the engine id. Then
+    assert the staged graph against the CONFIGURATION, not only against
+    the sibling arm: if the shipping flag implies image conditioning,
+    require the conditioning node classes to be present and fail the
+    staging when they are absent. Read the flag's default from the source
+    rather than assuming the unflagged path is the shipped one.
+  verify: |
+    (1) Staging through the alternate builder produces a graph whose node
+    set differs from the default builder's (the conditioning wrapper and
+    its image loader are present), and the receipt names the builder.
+    (2) A staging assertion fails loudly when the required nodes for the
+    declared configuration are missing.
+    (3) The flag's default is quoted from source in the lane receipt, so
+    "which path does production use" is answered by evidence rather than
+    by the builder's name.
+  tags: [multiple-builders, runtime-flag-default, wrong-path-measured,
+    harness-introspection, silent-fallback, ab-validity,
+    xref-12.121, xref-12.122]
+  legacy_id: "OTR-2026-08-21-lane3-screened-text-only-while-i2v-default-on"
