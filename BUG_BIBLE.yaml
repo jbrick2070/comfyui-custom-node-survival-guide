@@ -9474,3 +9474,110 @@ bugs:
     harness-introspection, silent-fallback, ab-validity,
     xref-12.121, xref-12.122]
   legacy_id: "OTR-2026-08-21-lane3-screened-text-only-while-i2v-default-on"
+
+- id: "12.124"
+  phase: 12
+  area: a-vram-compromise-frozen-without-a-quality-test-can-be-painting-an-artifact-into-every-render
+  symptom: |
+    A memory-saving mode is enabled by default, has been for the life of
+    the recipe, and is assumed free because it is "just" a memory
+    technique with no picture consequence. Then a side-by-side against
+    the same content decoded the other way shows a discrete visible
+    defect -- measured: a soft blue blob, thousands of pixels, flaring for
+    a few frames and fading, present ONLY in the memory-saving arm. It had
+    been in every clip that engine had ever produced. Nobody had looked,
+    because the mode was chosen for VRAM and never scored for quality.
+    Worse, it looked deliberate: the operator's first reading was "I was
+    thinking the blobs were an animated test feature."
+  cause: |
+    THREE THINGS COMPOUND, and the third is why it survives review.
+    (1) The compromise was frozen on evidence from a DIFFERENT engine.
+    The recipe comment cited a sibling tier's measurement and said so
+    honestly -- "that is context for a future sweep and not a claim about
+    these numbers" -- and the sweep was never run.
+    (2) Because it was on by default, EVERY render carried it, so it
+    appeared in both arms of every prior A/B. A defect present in both
+    arms is invisible to a comparison and reads as the content's own
+    texture. Earlier lanes were scored over it.
+    (3) The obvious failure mode was looked for and is absent. Tiled
+    decode is expected to leave SEAMS on the tile lattice; there were
+    none -- the strongest lattice concentration was 1.09 against a 1.15
+    threshold and the arms were 98% identical spatially. Checking for the
+    textbook artifact and finding it absent is easily mistaken for
+    "the mode is clean".
+  fix: |
+    Treat "chosen for memory" as UNTESTED FOR QUALITY, not as neutral.
+    When a compromise is frozen on a sibling's evidence, record it as an
+    owed measurement rather than a settled choice. Score the compromise
+    against its own alternative on the same content, and do not let the
+    absence of the textbook artifact stand in for a quality result --
+    look for what is actually there, including with a human eye, because
+    a defect that looks intentional is exactly the one instruments framed
+    around the expected artifact will miss. When the comparison lands,
+    prefer a discrete visible defect over an aggregate statistic as the
+    justification for changing it.
+  verify: |
+    (1) Render identical content in both modes and diff them; a defect
+    present in one arm only is countable (pixel-region excess, frames
+    affected) without a judge.
+    (2) Sweep the archive: if the defect appears in EVERY prior render of
+    that engine and in none from a different engine, the mode is the
+    cause and the card/content is not.
+    (3) Show a human a blind side-by-side with sides alternating per
+    cell. An eye that picks the defective arm unprompted, and ties where
+    the instruments say tie, is the confirmation an aggregate cannot give.
+    (4) Re-read the frozen comment's own justification against the new
+    measurement; a justification borrowed from another engine may simply
+    not hold.
+  tags: [vram-compromise-untested-for-quality, defect-in-both-arms,
+    absent-textbook-artifact-mistaken-for-clean, borrowed-justification,
+    operator-eye-beats-the-aggregate, looks-deliberate,
+    tiled-vae-decode, recipe-freeze, xref-12.121, xref-12.118]
+  legacy_id: "OTR-2026-08-21-lane6-tiled-decode-blue-blob-in-every-wan-render"
+
+- id: "12.125"
+  phase: 12
+  area: a-model-refusal-can-arrive-as-a-successful-render-and-pass-every-generic-guard
+  symptom: |
+    A generation request is refused by a model's built-in content filter,
+    and NOTHING in the pipeline notices. The job reports success, a real
+    multi-megabyte image file is written at exactly the requested
+    dimensions, and the frame is not black. Opening it shows a flat
+    placeholder card carrying the refusal message as rendered lettering.
+    Measured: six of six real production lines refused this way, across
+    two different prompt shapes, with the host reporting SUCCESS every
+    time.
+  cause: |
+    The refusal is produced by the MODEL, not by the wrapper, so there is
+    no exception, no error field and no status to inspect -- the refusal
+    IS the output. Every generic integrity check therefore passes: exit
+    status, file existence, file size, array shape, and the usual
+    "is it all black" degenerate-output guard, since a placeholder card
+    is mid-grey rather than empty. On a pipeline where a missing asset is
+    a hard failure by design, this is worse than a crash: the crash would
+    have been caught.
+  fix: |
+    Do not attempt to classify a refusal before you have SEEN one.
+    Deliberately trigger it, capture the artifact, and derive the
+    detector from its measured statistics rather than from a guessed
+    string match -- there is no string to match. A placeholder card is
+    flat and floor-lifted: measured, min 69-80 and std 10.1-10.7 against
+    min 0 and std 22-41 for a real render, so "low standard deviation AND
+    high minimum" separates them cleanly. Arm that detector before any
+    candidate output is accepted, and treat a refusal as a named failure
+    rather than as an image. Test with the pipeline's OWN content: a
+    synthetic probe string may render fine where every real line refuses.
+  verify: |
+    (1) A deliberately refused request is classified as a refusal, not as
+    a successful render, and raises the pipeline's named error.
+    (2) The detector is derived from a captured refusal artifact and its
+    thresholds are recorded, not guessed.
+    (3) The all-black / empty-output guard is shown to MISS the refusal,
+    so the new detector is demonstrably not redundant.
+    (4) Refusal rate is measured on real production text, not on a
+    hand-written probe.
+  tags: [model-side-refusal, success-shaped-failure, placeholder-artifact,
+    all-black-guard-insufficient, pixel-statistic-detector,
+    probe-before-you-classify, test-with-real-content,
+    fail-closed-path, xref-12.121]
+  legacy_id: "OTR-2026-08-21-ideogram4-safety-filter-returns-a-valid-image"

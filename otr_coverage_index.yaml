@@ -32,9 +32,9 @@
 # SURFACES sharing one artifact -- the credits transcript roll and the hero
 # title card -- and conflating them cost an evening; the index keeps them as
 # two records for that reason.
-audited: '2026-08-20'
-bible_head: 3ca1760 (+12.120 appended 2026-08-20)
-bible_entries: 299
+audited: '2026-08-21'
+bible_head: 8b194d3 (+12.124, 12.125 appended 2026-08-21)
+bible_entries: 304
 records:
 - ref: BUG_LOG.md L1022 (BUG-LOCAL-231 soak data point)
   title: A long per-clip render loop had no routine VRAM reclamation — cleanup fired only on an OOM exception, so a gradual
@@ -2606,5 +2606,13 @@ records:
   source: live-execution
 - record: OTR 2026-08-21 lane 3 screened the TEXT-ONLY path for 12 live legs while OTR_ENABLE_LTX_I2V defaults to "1" and production conditions on an image; the differ hardcoded _build_graph (basline-models 54fe68e/d90d747; verdicts/lane3_ltx_video.md, lane5_ltx_i2v_official.md)
   bible_id: "12.123"
+  verdict: promoted
+  source: live-execution
+- record: OTR 2026-08-21 lane 6 tiled VAE decode painted a transient blue blob into EVERY wan_ti2v render for the life of the v1 recipe; present in lanes 1/4/6 tiled arms, absent from lane 6 untiled and from ltx25; operator found it blind in a side-by-side after the lane had closed NO WIN on a seam matrix (basline-models 0e2c5b7; verdicts/lane6_wan_tiled_decode.md; OTR 30a38fa9 recipe v2)
+  bible_id: "12.124"
+  verdict: promoted
+  source: live-execution
+- record: OTR 2026-08-21 Ideogram 4 safety filter refused 6 of 6 real production card lines by returning a VALID non-black PNG at correct dimensions with host status SUCCESS; every generic guard passed it (OTR 4ce5d269; docs/2026-08-21-ideogram4-verdict.md, docs/2026-08-21-ideogram4-probe-receipt.json)
+  bible_id: "12.125"
   verdict: promoted
   source: live-execution
