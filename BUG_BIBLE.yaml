@@ -9584,7 +9584,7 @@ bugs:
 
 - id: "12.126"
   phase: 12
-  area: a-foreign-key-in-a-structured-prompt-schema-is-rendered-not-ignored
+  area: on-a-zeroed-negative-topology-a-prohibition-is-positive-conditioning
   symptom: |
     A structured JSON prompt is extended with extra fields by analogy with
     other APIs -- a trailing "negative_instruction" guard, a
@@ -9607,8 +9607,20 @@ bugs:
     a topology that has no text-negative input at all -- the guider's
     negative is wired from ConditioningZeroOut, the zeroed positive.
   fix: |
-    Before authoring any structured prompt, EXTRACT the vendor's own
-    schema statement -- open the shipped template's subgraph definitions
+    FIRST establish whether the graph has a negative channel at all. Read
+    the guider's negative input: if it is fed by ConditioningZeroOut of the
+    positive (or any zero tensor), there is NO negative channel, every
+    token is positive conditioning, and a prohibition can only ADD its own
+    nouns. Then AUDIT WHAT YOU ARE ALREADY SENDING before blaming the
+    model -- including boilerplate spliced in upstream by your own prompt
+    composer, which is the likeliest source because nobody reads it. Strip
+    prohibition clauses at the engine boundary rather than editing the
+    shared composer, since other engines DO have a negative channel and
+    still need theirs. Express suppression as a positive statement about
+    what occupies the space instead ("the lower band is unbroken matte
+    ground"), and leave no region of the canvas unclaimed. Second, and
+    only then, EXTRACT the vendor's own schema statement -- open the
+    shipped template's subgraph definitions
     and read the embedded magic-prompt/system text, which is the contract
     the checkpoint was tuned against. Byte-diff the payload against it:
     carry exactly the documented keys in the documented order and form,
@@ -9620,6 +9632,10 @@ bugs:
     variable per rerun -- this failure was first misread as a content
     refusal because prompt shape and canvas moved together.
   verify: |
+    (0) The graph's negative input is traced and recorded: a zeroed
+    negative means prohibitions are provably additive, and the fix is
+    deletion, not relocation. Moving a guard from a JSON key into prose
+    does NOT fix it.
     (1) The conforming payload renders with no invented text where the
     foreign-key payload demonstrably painted its guard words.
     (2) The payload's top-level keys are pinned by test to the schema the
@@ -9628,6 +9644,8 @@ bugs:
     (3) Any claim that the model refuses or degrades on some content
     names the single variable that was isolated to show it.
   tags: [structured-prompt-schema, foreign-key-rendered, magic-prompt-subgraph,
+    zeroed-negative-means-prohibitions-add, audit-your-own-prompt-first,
+    upstream-composer-boilerplate, positive-statement-beats-prohibition,
     schema-lives-in-the-template, zeroed-negative-topology,
     no-text-negative-channel, single-variable-isolation,
     prompt-shape-not-content, xref-12.125, xref-12.121]

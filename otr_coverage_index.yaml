@@ -2620,3 +2620,7 @@ records:
   bible_id: "12.126"
   verdict: promoted
   source: live-execution
+- record: OTR 2026-08-22 the SAME footer traced to OTR's OWN composer -- compose_still_word_prompt appends _STILL_WORD_TEXT_GUARD ("only the quoted words, no other text, no logos, no captions") to every word card, and Ideogram's guider negative is ConditioningZeroOut of the positive, so the guard conditioned ON logos/captions; the painted "NO MISCOS" is a mangled render of our own "no logos". 12.126 broadened from "foreign key" to the general rule (kibitz r2, both lanes; nodes/otr_meta_brief_image_prompt.py:1087)
+  bible_id: "12.126"
+  verdict: covered
+  source: live-execution
