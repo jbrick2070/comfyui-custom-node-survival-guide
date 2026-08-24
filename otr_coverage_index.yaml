@@ -2640,3 +2640,7 @@ records:
   bible_id: "12.130"
   verdict: promoted
   source: live-execution
+- record: OTR 2026-08-24 PBUG-20260802-02 third manifestation -- shakespeare/MARIA cast a real, source-attested speaking character (curated cast_hints for the Malvolio-letter scene) but a tight 1-act/45-word beat budget served zero dialogue to her slot; the freeze cascade's universal backstop correctly refused ("cast char_id='c03' (name='MARIA') has no non-skipped line"), and the original 2026-08-02 entry was still "NOT FIXED" at the time. Root cause: nodes/_otr_outline.py's _phase_check validates outline cast membership one-directionally (invented = used - locked), never the reverse (locked - used == starved), so a locked cast member can legitimately receive zero beats. Fixed with a repair pass (nodes/_otr_cast_coverage_repair.py) between allocation and the freeze gate -- the gate stays refuse-only per the existing "gates refuse, producers repair" convention -- with a fidelity graft grounding the repair in the character's real attested source line rather than free invention (OTR pending-push)
+  bible_id: "12.131"
+  verdict: promoted
+  source: live-execution

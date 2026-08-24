@@ -9838,3 +9838,62 @@ bugs:
     gap-between-jobs, orphaned-server-holds-memory,
     kill-the-runner-and-its-server, get-process-lacks-commandline,
     one-queue-beats-two]
+
+- id: "12.131"
+  phase: 12
+  area: a-locked-slot-has-no-obligation-to-be-served
+  symptom: |
+    A cast/roster member is legitimately allocated a slot by an earlier
+    stage, but a downstream generation pass -- composing under a tight
+    budget, a small model, a short window -- serves some slots and not
+    others. Nothing objects until a LATE, generic completeness gate refuses
+    the whole unit ("member X has no content"), by which point a portrait,
+    a credit, a caption or a proof may already reference the silent member.
+  cause: |
+    The allocation-time validator checks only that nothing UNPLANNED snuck
+    in (used - locked == invented), never the reverse (locked - used ==
+    starved). A member can be locked and receive zero output, and nothing
+    between allocation and the generic completeness gate ever notices.
+    The generic gate is not the bug -- it is working exactly as designed,
+    refusing loudly rather than shipping a silent ghost. The bug is that
+    nothing upstream ever tried to REPAIR the gap before the gate had to
+    fire, so every occurrence became a hard failure instead of a self-heal.
+  fix: |
+    Add a REPAIR pass between allocation and the completeness gate, not a
+    change to the gate itself -- the gate must stay refuse-only (repair
+    belongs to the producer, per the "gates refuse, producers repair"
+    convention). Extract the gate's own gap-finding predicate into a pure,
+    reusable function so the repair pass and the gate can never drift on
+    what counts as "served". For each gap: retry the existing slot if one
+    exists (composition ran, produced nothing usable); otherwise mint a
+    minimal new slot using the exact allocation-time row shape, entirely
+    within the mutable ledger/state object -- never appended to an already-
+    validated immutable/pydantic structure a later stage assumes is closed.
+    Reuse the SAME seeded generation call every other slot already goes
+    through -- no new sampling mechanism. On failure, leave the slot BYTE-
+    IDENTICAL to the pre-repair state; only the success case may change
+    anything. Gate the whole repair pass on whatever config already decides
+    "this producer owns its own completeness" (never a hardcoded allow-list)
+    so a producer with its own earlier, stricter gate is never double-served
+    or forced to fill a slot it deliberately left empty.
+  verify: |
+    (1) A fixture shaped exactly like the historical failure -- a locked
+    member, zero output, the completeness predicate returning a gap -- is
+    repaired: the predicate returns empty afterward, output is non-trivial
+    (not a placeholder token).
+    (2) A member allocated an existing-but-empty slot and a member allocated
+    NO slot at all both repair correctly (two mechanically different cases,
+    same predicate).
+    (3) A minted new slot's id/key never collides with an existing one,
+    checked against the real allocation scheme, not assumed.
+    (4) When the underlying generation call is exhausted/fails, the slot is
+    provably unchanged from its pre-repair state, and the completeness
+    predicate still reports the gap -- the repair must never mask a genuine
+    failure as success.
+    (5) A producer gated OUT of repair (its own earlier gate already covers
+    it) is a byte-identical no-op: nothing in its output changes.
+  tags: [allocate-then-serve-gap, one-directional-membership-check,
+    completeness-gate-is-refuse-only, repair-upstream-of-the-gate,
+    never-post-freeze-surgery, shared-gap-predicate-not-duplicated,
+    ledger-only-mint-never-touch-the-validated-structure,
+    same-seeded-slot-no-new-sampling, failure-leaves-state-untouched]
