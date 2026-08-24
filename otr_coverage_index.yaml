@@ -2644,3 +2644,7 @@ records:
   bible_id: "12.131"
   verdict: promoted
   source: live-execution
+- record: OTR 2026-08-24 scifi_news_pro failed 6 of 10 overnight writer-gate passes (60%) while every other bank failed zero; one of the two failure classes is UNKNOWN_SPEAKER on `**ANNOUNCER` -- markdown bold leaking into the speaker token, so a speaker the parser SHOULD accept is rejected purely for formatting, and the error names the roster rather than the transport (PBUG-20260824-01, OTR pending-push)
+  bible_id: "12.132"
+  verdict: promoted
+  source: live-execution

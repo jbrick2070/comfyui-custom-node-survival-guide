@@ -9897,3 +9897,58 @@ bugs:
     never-post-freeze-surgery, shared-gap-predicate-not-duplicated,
     ledger-only-mint-never-touch-the-validated-structure,
     same-seeded-slot-no-new-sampling, failure-leaves-state-untouched]
+
+- id: "12.132"
+  phase: 12
+  area: a-valid-token-rejected-for-its-formatting
+  symptom: |
+    A structured-output parser rejects a token that IS valid, reporting it as
+    unknown/unrecognized, because the model wrapped it in markdown emphasis --
+    `**NAME`, `*NAME*`, `__NAME__`, a stray backtick, a trailing colon. The
+    error names the token as the problem ("unknown speaker: **ANNOUNCER"),
+    which sends the reader hunting for a missing roster entry that is
+    actually present and correctly spelled.
+    Because the wrapper is intermittent -- the same prompt emits a bare token
+    most runs and a decorated one sometimes -- the failure is flaky, looks
+    like a content problem, and survives many green runs before anyone
+    believes it is mechanical.
+  cause: |
+    Instruction-tuned models emit markdown by habit, especially for anything
+    that reads like a heading, a label, or a speaker cue, and especially
+    under a system prompt that itself contains markdown. The parser matched
+    on the raw line and compared the token to a roster by exact string, so
+    a single pair of asterisks turned a known token into an unknown one.
+    The deeper trap: the diagnostic is written in terms of the ROSTER
+    ("speaker not in cast") rather than the TRANSPORT ("token had markup"),
+    so the message actively misdirects. Every layer downstream then inherits
+    a wrong theory of the failure -- a structural gate reports a skeleton
+    break for a line whose only defect was two asterisks.
+  fix: |
+    Normalize transport decoration OUT before any identity comparison:
+    strip paired emphasis markers, backticks, and trailing punctuation from
+    the candidate token, then match. Do it in ONE place the parser and every
+    validator share, so a second matcher cannot drift.
+    Keep the raw token for the ERROR MESSAGE. When a match still fails,
+    report both -- the raw token and its normalized form -- so the reader can
+    tell a formatting artifact from a genuinely absent roster entry at a
+    glance.
+    If refusal on decorated tokens is deliberate policy (some formats are
+    strict on purpose), say so IN the refusal: name the formatting as the
+    reason rather than reporting the token as unknown.
+    Do not "fix" this by asking the prompt to stop emitting markdown. That
+    is an instruction a model will follow most of the time, which is exactly
+    the failure profile that makes this expensive to diagnose.
+  verify: |
+    (1) Feed the parser the same token bare and wrapped in each emphasis form
+    the target models actually emit (`**X`, `*X*`, `__X__`, `` `X` ``, `X:`);
+    all resolve to the same identity, or all refuse with a message that names
+    the FORMATTING.
+    (2) A genuinely unknown token still refuses, and its message is
+    distinguishable from the formatting case -- the two failures must not
+    share one string.
+    (3) The normalization lives in exactly one function; grep proves no
+    second matcher compares roster tokens by raw string.
+  tags: [markdown-leaks-into-structured-output, normalize-before-compare,
+    error-message-names-the-wrong-layer, intermittent-looks-like-content,
+    strip-emphasis-keep-raw-for-the-message, one-matcher-not-two,
+    do-not-fix-it-in-the-prompt]
