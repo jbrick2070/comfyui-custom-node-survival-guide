@@ -9952,3 +9952,61 @@ bugs:
     error-message-names-the-wrong-layer, intermittent-looks-like-content,
     strip-emphasis-keep-raw-for-the-message, one-matcher-not-two,
     do-not-fix-it-in-the-prompt]
+- id: "12.133"
+  phase: 12
+  area: a-seal-that-verifies-how-the-artifact-was-derived-instead-of-what-it-is
+  symptom: |
+    A build produces an artifact, records a hash or seal beside it, and a
+    later integrity check RE-DERIVES the artifact and compares. The check
+    fails -- "seal is stale", "artifact does not match", "checksum mismatch"
+    -- for a document that nothing has touched, and the bytes on disk are
+    provably unchanged.
+    The failure is intermittent in the worst possible pattern: it fires only
+    when some optional input actually influenced the derivation. Every
+    ordinary case re-derives identically and stays green, so a full test
+    suite passes while the feature that USES the optional input is exactly
+    what breaks.
+  cause: |
+    Two independent mistakes that produce one symptom, and the second is the
+    one people miss.
+    (1) The conditions the build used -- flags, options, a lookup table, a
+    mode -- are not stored with the artifact, so the verifier re-derives
+    under DIFFERENT conditions than the producer used. It is not
+    re-verifying the artifact; it is deriving a different one and calling
+    the difference corruption.
+    (2) The sealed payload includes DERIVATION METADATA rather than only the
+    artifact: a receipt, a trace, a "how we got here" note, a list of which
+    rule fired. Two runs can produce a byte-identical RESULT by different
+    routes, and the seal then rejects a correct artifact because the route
+    differed. This survives fix (1): store every condition faithfully and a
+    seal over derivation metadata still breaks whenever the verifier's
+    inputs differ in any way that changes the route but not the result.
+  fix: |
+    Seal WHAT THE THING IS, never HOW IT WAS MADE. Split the payload: the
+    artifact fields go under the hash; receipts, traces and provenance notes
+    live beside it, reported and never compared.
+    Then make re-derivation faithful: persist the producing conditions ON the
+    artifact and have the verifier read them back, so producer and verifier
+    are the same function of the same inputs. Watch for a verifier that
+    reconstructs an input "equivalently" -- deriving the roster/config/table
+    from the artifact instead of storing it is the usual way conditions drift
+    apart while looking rigorous.
+    Prefer a verifier that CANNOT choose its own inputs.
+  verify: |
+    (1) Round-trip an artifact built with every optional input ENGAGED --
+    not just the default path. Ordinary inputs re-derive identically and hide
+    the defect.
+    (2) NEGATIVE CONTROL, and this is the one that matters: strip the stored
+    conditions back off the SAME artifact and assert verification now FAILS.
+    Without it the test passes whether or not the fix works, because the
+    happy path was already green.
+    (3) Grep the payload builder for any field that describes the PROCESS
+    rather than the RESULT -- receipts, traces, "normalizations", "applied
+    rules" -- and prove none is inside the hash.
+    (4) Confirm the producer and the verifier obtain their inputs from the
+    same place, by reading, not by reasoning.
+  tags: [seal-the-result-not-the-route, derivation-metadata-must-not-be-hashed,
+    verifier-must-re-derive-under-the-producers-conditions,
+    green-suite-hides-it-because-only-the-optional-path-breaks,
+    negative-control-or-the-test-is-vacuous,
+    it-breaks-exactly-the-feature-it-was-written-for]

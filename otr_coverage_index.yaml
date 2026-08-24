@@ -2648,3 +2648,7 @@ records:
   bible_id: "12.132"
   verdict: promoted
   source: live-execution
+- record: OTR 2026-08-24 the scifi_news_pro speaker-alias fix shipped and the FIRST post-fix live pass died at 3.8 min with "selected final draft parsed artifact seal is stale" -- FinalDraft gained the parse conditions but the constructor was never given them, and speaker-resolution receipts had been folded into `normalizations`, a field the sealed payload hashes; the build parsed against the full cast and the integrity check re-parsed against a smaller roster, so the same script sealed differently by route. A 12,097-test suite stayed green because it fires only when a speaker actually resolves through an alias -- the exact case the fix existed to serve (PBUG-20260824-01 follow-up, OTR a19f3df2)
+  bible_id: "12.133"
+  verdict: promoted
+  source: live-execution
