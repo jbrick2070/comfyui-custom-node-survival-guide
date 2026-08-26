@@ -32,9 +32,9 @@
 # SURFACES sharing one artifact -- the credits transcript roll and the hero
 # title card -- and conflating them cost an evening; the index keeps them as
 # two records for that reason.
-audited: '2026-08-21'
-bible_head: 7872f8a (+12.126 appended 2026-08-21 evening)
-bible_entries: 305
+audited: '2026-08-25'
+bible_head: 8734208 (+12.134 appended 2026-08-25 evening)
+bible_entries: 313
 records:
 - ref: BUG_LOG.md L1022 (BUG-LOCAL-231 soak data point)
   title: A long per-clip render loop had no routine VRAM reclamation — cleanup fired only on an OOM exception, so a gradual
@@ -2640,7 +2640,7 @@ records:
   bible_id: "12.130"
   verdict: promoted
   source: live-execution
-- record: OTR 2026-08-24 PBUG-20260802-02 third manifestation -- shakespeare/MARIA cast a real, source-attested speaking character (curated cast_hints for the Malvolio-letter scene) but a tight 1-act/45-word beat budget served zero dialogue to her slot; the freeze cascade's universal backstop correctly refused ("cast char_id='c03' (name='MARIA') has no non-skipped line"), and the original 2026-08-02 entry was still "NOT FIXED" at the time. Root cause: nodes/_otr_outline.py's _phase_check validates outline cast membership one-directionally (invented = used - locked), never the reverse (locked - used == starved), so a locked cast member can legitimately receive zero beats. Fixed with a repair pass (nodes/_otr_cast_coverage_repair.py) between allocation and the freeze gate -- the gate stays refuse-only per the existing "gates refuse, producers repair" convention -- with a fidelity graft grounding the repair in the character's real attested source line rather than free invention (OTR pending-push)
+- record: 'OTR 2026-08-24 PBUG-20260802-02 third manifestation -- shakespeare/MARIA cast a real, source-attested speaking character (curated cast_hints for the Malvolio-letter scene) but a tight 1-act/45-word beat budget served zero dialogue to her slot; the freeze cascade''s universal backstop correctly refused ("cast char_id=''c03'' (name=''MARIA'') has no non-skipped line"), and the original 2026-08-02 entry was still "NOT FIXED" at the time. Root cause: nodes/_otr_outline.py''s _phase_check validates outline cast membership one-directionally (invented = used - locked), never the reverse (locked - used == starved), so a locked cast member can legitimately receive zero beats. Fixed with a repair pass (nodes/_otr_cast_coverage_repair.py) between allocation and the freeze gate -- the gate stays refuse-only per the existing "gates refuse, producers repair" convention -- with a fidelity graft grounding the repair in the character''s real attested source line rather than free invention (OTR pending-push)'
   bible_id: "12.131"
   verdict: promoted
   source: live-execution
@@ -2650,5 +2650,9 @@ records:
   source: live-execution
 - record: OTR 2026-08-24 the scifi_news_pro speaker-alias fix shipped and the FIRST post-fix live pass died at 3.8 min with "selected final draft parsed artifact seal is stale" -- FinalDraft gained the parse conditions but the constructor was never given them, and speaker-resolution receipts had been folded into `normalizations`, a field the sealed payload hashes; the build parsed against the full cast and the integrity check re-parsed against a smaller roster, so the same script sealed differently by route. A 12,097-test suite stayed green because it fires only when a speaker actually resolves through an alias -- the exact case the fix existed to serve (PBUG-20260824-01 follow-up, OTR a19f3df2)
   bible_id: "12.133"
+  verdict: promoted
+  source: live-execution
+- record: OTR 2026-08-25 the BUG-LOCAL-098 quantized-load tripwire failed a live 4060 render LOUD ("NF4 quantized load did not materialize") on a load whose own structural counters were all correct (linear4bit_count=592, is_loaded_in_4bit=True) -- because the figure it actually gated on was `torch.cuda.memory_allocated()` sampled before/after the load, a PROCESS-GLOBAL counter, and an abandoned worker thread from an earlier timed-out NewsCuration phase (deliberately left draining, generation not being cancellable mid-token) was freeing tensors concurrently, driving the delta to -0.00 GiB. The guard was reading the wrong instrument, not mis-thresholding the right one (PBUG-20260825-04, OTR fb67d059)
+  bible_id: "12.134"
   verdict: promoted
   source: live-execution

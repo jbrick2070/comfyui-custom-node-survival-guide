@@ -10010,3 +10010,63 @@ bugs:
     green-suite-hides-it-because-only-the-optional-path-breaks,
     negative-control-or-the-test-is-vacuous,
     it-breaks-exactly-the-feature-it-was-written-for]
+
+- id: "12.134"
+  phase: 12
+  area: diagnostics
+  symptom: |
+    A load-verification tripwire fails a run LOUD -- "the quantized load did
+    not materialize" -- on a load that in fact succeeded. Its own evidence
+    line contradicts itself: the structural counters all look right
+    (linear4bit_count=592, is_loaded_in_4bit=True) while the memory figure it
+    actually gates on reads ~0.00 or negative. Restarting the app "fixes" it,
+    which reads as flaky hardware or a library bug and sends the next reader
+    hunting the loader.
+  cause: |
+    The tripwire measured a PROCESS-GLOBAL counter and reported the verdict as
+    if it were a fact about ONE model: it sampled
+    `torch.cuda.memory_allocated()` before and after the load and treated the
+    delta as that model's footprint. Any other activity on the same device
+    moves that number -- and in the observed incident an abandoned worker
+    thread from an earlier timed-out phase (deliberately left draining,
+    because generation is not cancellable mid-token) was freeing tensors
+    concurrently, so the delta went negative while the model loaded
+    perfectly. The guard did not have a false-positive threshold problem; it
+    was reading the wrong instrument. Note the shape: the check LOOKS
+    model-scoped because it brackets one model's load, but the quantity it
+    samples belongs to the whole process.
+  fix: |
+    Measure the thing you are asserting about, at the granularity you assert
+    it. Ask the MODEL where its weights are: walk `model.named_modules()`,
+    find the quantized module type, and read each one's own
+    `.weight.device` -- a fact no unrelated thread can move. Keep the global
+    figure if it is useful, but demote it in both the code and the error
+    message to explicitly-labelled telemetry that no branch reads.
+    The general rule: a diagnostic that gates on a shared, process-wide
+    quantity cannot make a claim about one component of that process. Before
+    trusting any such guard, ask what else in the process can move the number
+    while it is being sampled -- and if the answer is "another thread we
+    deliberately do not join", the guard is unsound by construction, not
+    merely noisy.
+  verify: |
+    (1) Extract the measurement into a pure function over the model object
+    and unit-test it with fakes -- a module whose weights are on the device,
+    one that is off it, and a model with no quantized modules at all. If the
+    check can only be exercised by loading a real model on a real GPU, it
+    cannot be regression-tested and will rot.
+    (2) NEGATIVE CONTROL: assert the function reports FAILURE for the
+    genuinely-unmaterialized case. A residency check that returns "fine" for
+    every input passes the happy path and proves nothing.
+    (3) Grep the guard's own branch conditions for any process-scoped
+    reading -- allocator totals, free-memory queries, device-wide counters.
+    Each one is either demoted to telemetry or justified in a comment.
+    (4) Confirm the error message no longer presents the global figure as
+    the reason for the verdict; a message that leads with a number the check
+    no longer gates on will be re-diagnosed as the cause by the next reader.
+  tags: [process-global-measurement-cannot-prove-a-component-fact,
+    diagnostic-reads-the-wrong-instrument, false-failure-on-a-successful-load,
+    concurrent-thread-moves-the-number-you-are-sampling,
+    ask-the-object-not-the-allocator, demote-global-figures-to-telemetry,
+    guard-must-be-unit-testable-without-a-gpu, negative-control-or-vacuous,
+    restart-appears-to-fix-it, xref-12.46]
+  legacy_id: BUG-LOCAL-098
