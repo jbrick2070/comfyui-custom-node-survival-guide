@@ -10148,3 +10148,70 @@ bugs:
   fix: Make the prompt class a function of the engine, resolved from the SAME policy object the execution plan reads so the two cannot disagree about which backend renders. Classify by declared FAMILY or capability, never by engine-name string matching. Refuse to CLASSIFY an unknown id rather than defaulting -- a default family is a silent wrong answer in both directions. Where the composer feeds a model a truncated context, filter its OUTPUT against the SAME truncated value, not the full source; comparing against a longer sequence than the model ever saw is a filter that cannot fire.
   verify: A beat routed to an incapable lane contains neither the forbidden content nor the capability-specific instruction; a beat routed to a capable lane is byte-identical to before the change; an unregistered engine id raises by name instead of classifying.
   tags: [prompting, engine-capability, multi-backend, lip-sync, silent-degrade, composer]
+
+- id: "12.137"
+  phase: 12
+  area: audio
+  symptom: >-
+    A generated audio bed is mixed, levelled, and reported green by every
+    receipt, and is completely inaudible on playback. The logs say the stems
+    decoded, the mix ran, and the loudness pass hit its target, so nothing looks
+    wrong anywhere in the pipeline.
+  cause: >-
+    A FIXED GAIN MULTIPLIER applied to audio whose level was never measured. A
+    ratio such as 0.20 bed over 0.80 programme reads as a mix balance and
+    silently assumes the bed arrives near full scale, the way a recorded stem
+    would. Model-GENERATED audio does not. Measured across one episode, LTX 2.5
+    foley stems arrived at -30 to -55 dBFS RMS, so multiplying by 0.20 subtracted
+    a further 14 dB and left the bed 37 to 58 dB under the programme (median 45;
+    audible is 15 to 25 under). Every receipt was truthful, because the bed
+    really was decoded, placed and levelled. None of them measured the bed
+    AGAINST the programme, which is the only number that answers whether you can
+    hear it.
+  fix: >-
+    Never apply a bare multiplier to generated audio of unknown level. Either
+    reference the stem (peak, or gated active RMS) before applying the ratio, or
+    state the ratio as a TARGET relative to the programme rather than as a
+    scalar. Where the fixed ratio is a standing decision, amend it explicitly
+    rather than reinterpreting it in code. Add the bed-versus-programme delta to
+    the receipt, so an inaudible bed cannot look green.
+  verify: >-
+    Per positioned beat, RMS of the bed in its window minus RMS of the programme
+    in the same window falls inside the intended band. A natural A/B settles it
+    quickly when two lanes share the path at different gains -- the 1.00 lane was
+    audible on identical stems while the 0.20 lane was not.
+  tags: [audio, mix, gain-staging, generated-audio, silent-failure, receipts]
+
+- id: "12.138"
+  phase: 12
+  area: prompting
+  symptom: >-
+    Renders do not move and look like stills, on video lanes that are
+    demonstrably capable of motion. No error and no failing test; the footage is
+    simply inert, and the instinct is to blame the model, the recipe, or the
+    sampler.
+  cause: >-
+    The prompt itself is asking for stillness. Damping adjectives such as subtle,
+    restrained, stable and comfortably composed accumulate in per-engine
+    defaults, in fallback floors, and in the instruction given to the model that
+    WRITES the motion, and each one looks locally reasonable. A clause writer
+    told to be subtle cannot describe a body that moves, and an appended stable
+    centered subject is an instruction to hold still. Measured on one episode, 8
+    of 12 character beats rendered on a fallback floor reading restrained visible
+    reaction, subtle natural body motion, stable mid-shot, so the floor WAS the
+    picture.
+  fix: >-
+    Treat damping adjectives as a defect class and audit for them the way
+    registry ids are audited. Ask for the motion VECTOR rather than a pose, and
+    scale it to the material, so a calm line earns small motion and an urgent
+    line earns real movement. Give each lane its own dialect instead of one
+    universal prompt, because a length-limited lane wants brevity where a prose
+    lane wants flowing prose. CRITICAL EXCEPTION -- on audio-driven lip-sync
+    lanes the steadying language is PROTECTIVE, since it keeps the mouth in
+    frame, so split the policy by FAMILY and never by engine name.
+  verify: >-
+    Grep every live engine default and prompt floor for damping adjectives and
+    expect zero hits outside audio-driven lanes. A character beat's composed
+    prompt names an action, and each lane's own published prompt directive is
+    obeyed.
+  tags: [prompting, motion, video, defaults, fallbacks, lip-sync, per-lane-dialect]

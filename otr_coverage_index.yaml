@@ -2680,3 +2680,36 @@ records:
   bible_id: "12.136"
   verdict: promoted
   source: published-episode
+- record: >-
+    OTR 2026-08-27 -- the LTX 2.5 foley bed shipped MIXED, LEVELLED and green on
+    every receipt, and was completely inaudible. Published episode
+    signal_lost_ink_and_martyrdom_20260827_071626, operator by ear- "I am not
+    hearing any foley". Measured- the bed sat 37 to 58 dB under the programme
+    (median 45; audible is 15-25). Cause- 0.20 is a bare MULTIPLIER on audio
+    whose level was never measured, and model-generated stems arrive at -30 to
+    -55 dBFS RMS, so the ratio subtracted a further 14 dB from something already
+    inaudible. Every receipt was truthful; none measured bed-versus-programme,
+    the only number that answers "can you hear it". Settled by a natural A/B-
+    the mime lane at gain 1.00 on identical stems was audible and operator-
+    approved the same day (PBUG-20260827-02)
+  bible_id: "12.137"
+  verdict: promoted
+  source: published-episode
+- record: >-
+    OTR 2026-08-27 -- renders looked like stills on lanes demonstrably capable of
+    motion, operator- "no sense in rendering a video that looks like a silly
+    pan". The prompt was asking for stillness- damping adjectives had
+    accumulated across per-engine defaults ("a person speaking, subtle facial
+    motion"; "subtle natural motion, cinematic light"), the ShotLock fallback
+    floor ("restrained visible reaction, subtle natural body motion, stable
+    mid-shot") and an appended "stable centered subject". 8 of 12 character
+    beats on the first qualified foley episode rendered on that floor, so the
+    floor WAS the picture. The same defect class had been proven and
+    operator-confirmed nine days earlier for the LTX motion clause, and a
+    converged four-round contract re-imported the damping words anyway.
+    Exception that must survive- on audio-driven lip-sync lanes the steadying
+    language is PROTECTIVE, so the policy splits by family, never by engine name
+    (PBUG-20260827-03)
+  bible_id: "12.138"
+  verdict: promoted
+  source: published-episode
