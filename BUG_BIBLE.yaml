@@ -10070,3 +10070,72 @@ bugs:
     guard-must-be-unit-testable-without-a-gpu, negative-control-or-vacuous,
     restart-appears-to-fix-it, xref-12.46]
   legacy_id: BUG-LOCAL-098
+
+- id: "12.135"
+  phase: 12
+  area: regression
+  symptom: |
+    A derived, invisible value silently stops being produced after an
+    optimisation removes the work it was incidentally computed by. Nothing
+    errors, no test fails, and the artifact still renders -- it is simply
+    wrong in a way only a human eye catches. Measured instance: 71 of 75
+    character stills across 17 episodes lost their identity seed, so the same
+    character was drawn with a different face in every beat of an episode.
+  cause: |
+    One switch was doing two jobs. A per-lane flag suppressed MINTING a
+    portrait image -- correct, because an unused portrait was costing a render
+    on an engine that refuses face close-ups -- and the same flag silently
+    emptied the prompt hash that a downstream seed derived a character's face
+    from. The two commits were 17 days apart, so neither looked wrong on its
+    own and no test connected them.
+    The trap inside the fix is worse than the bug and is the reason this entry
+    exists. The obvious repair is to transport the producer's raw prompt hash.
+    That is WRONG: the consumer mutates the prompt (a safety clause, a style
+    front-anchor, an image transform) and re-hashes it, so the value the
+    consumer actually keys on is not the value the producer computed. Four
+    independent readings -- a driver anchor, two review lanes and a synthesis
+    pass -- all asserted the two hashes were "byte-for-byte identical" before
+    one reviewer read the recomputation and refuted it. An equality test would
+    have settled it in milliseconds.
+  fix: |
+    Separate the two jobs the switch was doing. Suppressing WORK must not
+    suppress a DERIVED VALUE that work happened to carry: give the value its
+    own owner, computed independently of whether the expensive artifact is
+    produced. Here the identity basis is a text hash, so it costs nothing when
+    the pixels are skipped.
+    Transport the SOURCE TEXT, never the hash, and derive the basis in exactly
+    ONE place -- the consumer's own normalise-then-hash chain. Two copies of
+    that chain drift, and the symptom is faces moving.
+    Make the safe direction the default: a lane that declares nothing should
+    inherit the anchored behaviour, so a lane written tomorrow is correct for
+    free and forgetting fails safe. Declaring the exception is cheaper than
+    remembering the rule.
+    When lanes share one declarative plan object, write the exception onto a
+    COPY. Mutating the shared tuple in place strips the behaviour from every
+    sibling lane -- including, in the measured instance, the three cinematic
+    lanes carrying the defect and the one the production workflow renders with.
+  verify: |
+    (1) Assert the producer's hash and the consumer's hash DIFFER. That
+    inverted test is the one that catches the plausible-but-wrong fix; if it
+    ever passes, a mutation was removed and the transport design needs
+    revisiting.
+    (2) Structural guard, not a re-measurement: assert the producer emits the
+    source TEXT and stamps no hash-shaped field at all, and that the consumer
+    derives through the shared helper. This prevents the regression rather
+    than detecting it later.
+    (3) Pin the bug itself: with an empty basis, N beats of one character must
+    produce N DISTINCT seeds; with a basis, exactly ONE. Both directions, or
+    the guard is vacuous.
+    (4) Assert the shared plan object was COPIED: the opting-out lane declares
+    the exception AND its siblings still carry the default, compared by
+    identity (`is not`) as well as by value.
+    (5) Receipts must record whether the basis PARTICIPATED, not merely
+    whether one was available -- otherwise a receipt claims an anchor the
+    consumer never used.
+  tags: [one-switch-two-jobs, suppressing-work-suppressed-a-derived-value,
+    producer-hash-is-not-the-consumer-hash, transport-text-never-a-hash,
+    derive-in-exactly-one-place, default-to-the-safe-direction,
+    shared-plan-object-mutated-in-place, silent-no-error-no-failing-test,
+    seventeen-days-between-the-two-commits, equality-test-beats-four-readings,
+    xref-12.46]
+  legacy_id: PBUG-20260826-02
