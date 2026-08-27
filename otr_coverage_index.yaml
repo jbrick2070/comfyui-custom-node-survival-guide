@@ -2660,3 +2660,23 @@ records:
   bible_id: "12.135"
   verdict: promoted
   source: live-execution
+- record: >-
+    OTR 2026-08-27 -- characters mouthed their dialogue on `minimax_h3_video`,
+    a lane that decodes no audio at all, across the whole of published episode
+    `signal_lost_the_caretakers_clause_20260826_155835`. It is NOT lip-sync to
+    the TTS, because the lane never receives the WAV. A shared composer
+    prepended `_subject_anchor`'s literal "face visible, speaking to camera"
+    AND the beat's spoken line to EVERY character beat with no check on the
+    routed engine's capability, and H3 -- a joint audio-video model -- invented
+    its own utterance from that prompt text, which is why two performances of
+    the same words looked uncannily aligned and sent readers hunting an
+    audio-routing fault that did not exist. The reusable half is that the
+    composer was a function of CONTENT and not of the BACKEND. A Kibitz panel
+    then found the fix's own filter compared the FULL line while the writer was
+    shown only the first 240 characters, so a verbatim quote of the shown
+    context slipped through -- reproduced, and measured at 295 of 7096 ledger
+    lines over the cap across 111 episodes (PBUG-20260827-01, OTR e923a9f3 plus
+    6ae235a2)
+  bible_id: "12.136"
+  verdict: promoted
+  source: published-episode

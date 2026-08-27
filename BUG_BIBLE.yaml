@@ -10139,3 +10139,12 @@ bugs:
     seventeen-days-between-the-two-commits, equality-test-beats-four-readings,
     xref-12.46]
   legacy_id: PBUG-20260826-02
+
+- id: "12.136"
+  phase: 12
+  area: prompting
+  symptom: A backend renders an instruction it cannot physically honour, doing the nearest thing it can instead of failing. Nothing errors, no test fails, and the defect ships looking like a different subsystem's fault -- typically the one the instruction was ABOUT.
+  cause: The prompt composer is a function of the CONTENT (the beat, the character, the line) but not of the ROUTED ENGINE'S CAPABILITY. One composer serves every backend, so a clause written for a capable lane is emitted verbatim to an incapable one. In the reference case a shared composer prepended "face visible, speaking to camera" plus the literal dialogue to every character beat; on a video engine that decodes no audio the only available response was to draw a mouth in motion, which read as broken lip-sync against the separately-muxed voice track and sent readers hunting an audio-routing fault that did not exist.
+  fix: Make the prompt class a function of the engine, resolved from the SAME policy object the execution plan reads so the two cannot disagree about which backend renders. Classify by declared FAMILY or capability, never by engine-name string matching. Refuse to CLASSIFY an unknown id rather than defaulting -- a default family is a silent wrong answer in both directions. Where the composer feeds a model a truncated context, filter its OUTPUT against the SAME truncated value, not the full source; comparing against a longer sequence than the model ever saw is a filter that cannot fire.
+  verify: A beat routed to an incapable lane contains neither the forbidden content nor the capability-specific instruction; a beat routed to a capable lane is byte-identical to before the change; an unregistered engine id raises by name instead of classifying.
+  tags: [prompting, engine-capability, multi-backend, lip-sync, silent-degrade, composer]

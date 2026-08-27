@@ -2,7 +2,7 @@
 
 **By Jeffrey A. Brick** · April–May 2026
 
-An AI-agent QA harness for ComfyUI custom-node authoring. v2.1 — 314 bible entries + LLM round-robin consult addon.
+An AI-agent QA harness for ComfyUI custom-node authoring. v2.1 — 315 bible entries + LLM round-robin consult addon.
 
 ---
 
@@ -191,7 +191,7 @@ entries. Exits non-zero on issues so it's easy to wire into a pre-commit hook.
 
 ## What the regression suite checks
 
-314 bible entries across 12 phases; the pytest suite encodes the static-
+315 bible entries across 12 phases; the pytest suite encodes the static-
 analysis-checkable subset as executable assertions.
 
 Entries may carry additive `xref-XX.YY` tags (cross-reference to an
