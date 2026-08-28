@@ -10215,3 +10215,48 @@ bugs:
     prompt names an action, and each lane's own published prompt directive is
     obeyed.
   tags: [prompting, motion, video, defaults, fallbacks, lip-sync, per-lane-dialect]
+- id: "12.139"
+  phase: 12
+  area: preflight
+  symptom: >-
+    A preflight gate refuses every profile in an entire class with "model
+    file(s) the running server cannot see", while the live server's own
+    introspection endpoint lists the exact weight the whole time. The refusal
+    is unconditional -- no state of the disk would ever satisfy it -- so the
+    affected profiles sit permanently unexercised and look broken rather than
+    misconfigured.
+  cause: >-
+    The gate's required-model list mixes two different id vocabularies and
+    exact-matches against a server enumeration that can only speak one of
+    them. A model-introspection endpoint enumerates FILENAMES on disk; some
+    required-model entries are filenames and some are logical or HF-repo ids
+    (a dotted version string, a GGUF-suffixed id, an org/repo path). For the
+    filename entries the match is real verification. For the id entries no
+    filename on the server's list can ever equal a logical id, so the gate is
+    not reporting a missing weight -- it is reporting that an enumeration
+    which structurally cannot contain the thing does not contain it, and
+    scoring that as refutation. The gate was correct when it shipped, because
+    it was validated only against profiles whose required entries happened to
+    all be filenames; the defect was latent until the first profile carrying
+    a logical id reached it.
+  fix: >-
+    Classify each required-model entry by what it actually is before
+    comparing it to anything -- a closed suffix/shape test separating real
+    filenames from logical or repo-style ids is enough, since the two forms
+    do not overlap. Enforce only what the available enumeration can verify;
+    for everything else, report rather than refuse -- an id the gate cannot
+    check is not evidence of absence. Where a profile's declared requirement
+    is a logical id but a real filename is knowable (the engine that consumes
+    it names one), have the profile declare the filename so it gets real
+    verification instead of an unverifiable id sitting in the enforcement
+    path.
+  verify: >-
+    A profile whose required entries are legitimate filenames still fails
+    when that filename is genuinely absent from the server's enumeration --
+    the gate keeps its teeth. A profile whose required entries are logical or
+    repo-style ids no longer fails on that account alone, and its dry-run
+    reports the model as visible rather than refusing. A pinned filename<->
+    engine mapping test catches a future profile that reintroduces an id where
+    a filename belongs.
+  tags: [preflight, gate-vocabulary-collision, id-namespace-mismatch, enumeration-cannot-contain-it, false-refusal, model-verification, enforce-vs-report]
+  legacy_id: OTR-PBUG-20260823-01

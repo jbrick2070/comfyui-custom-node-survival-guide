@@ -2713,3 +2713,13 @@ records:
   bible_id: "12.138"
   verdict: promoted
   source: published-episode
+- record: >-
+    OTR PBUG-20260823-01 -- the canonical runner's preflight model gate
+    exact-matched a server FILENAME enumeration against required-model entries
+    that were sometimes logical/HF-repo ids, so nine profiles refused
+    unconditionally even though the live server's own /object_info listed the
+    real weight the whole time. Fixed b11a4269: split enforce (real filenames,
+    verified) from report (everything else) via a closed filename-shape test.
+  bible_id: "12.139"
+  verdict: promoted
+  source: live-preflight-refusal
