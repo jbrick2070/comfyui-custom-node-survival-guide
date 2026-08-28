@@ -2723,3 +2723,13 @@ records:
   bible_id: "12.139"
   verdict: promoted
   source: live-preflight-refusal
+- record: >-
+    OTR PBUG-20260823-02 -- the canonical runner printed RESULT TIMEOUT and
+    exited 1 on a healthy wan render at t=5396s while the server reported the
+    prompt RUNNING at 98% GPU and the clip count still climbing; the episode
+    finished ~40 minutes later and published cleanly. Fixed cebe7c75: on
+    timeout the runner now queries /queue and reports STILL ALIVE / really
+    ended / UNKNOWN instead of a single terminal-sounding message.
+  bible_id: "12.140"
+  verdict: promoted
+  source: live-false-timeout

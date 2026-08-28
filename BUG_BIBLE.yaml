@@ -10260,3 +10260,39 @@ bugs:
     a filename belongs.
   tags: [preflight, gate-vocabulary-collision, id-namespace-mismatch, enumeration-cannot-contain-it, false-refusal, model-verification, enforce-vs-report]
   legacy_id: OTR-PBUG-20260823-01
+- id: "12.140"
+  phase: 12
+  area: watcher-timeout
+  symptom: >-
+    A long-running job's watcher prints a terminal-sounding failure --
+    "TIMEOUT", "DEAD", "did not complete" -- and exits non-zero while the job
+    itself is healthy: the server reports the work RUNNING, the GPU is
+    saturated, and progress counters are still climbing. The job goes on to
+    finish and publish successfully minutes later. The reader's natural
+    response to a terminal message is to kill and re-run, which would destroy
+    a healthy render that was minutes from completing.
+  cause: >-
+    One message is used for two OPPOSITE states: the watcher gave up waiting,
+    and the work actually died. A watcher timeout is a fact about the
+    WATCHER'S patience, not a fact about the work, but a bare "TIMEOUT" reads
+    as the latter. The false case is common on any job whose real duration
+    varies far more than its configured timeout was set for -- a fixed
+    default sized for a typical run silently under-times a job class that
+    legitimately runs several times longer.
+  fix: >-
+    On a timeout, DO NOT declare the outcome from the timeout alone -- ask the
+    system the job is actually running on (a queue endpoint, a process table,
+    a heartbeat file) and report one of at least three verdicts: STILL ALIVE
+    (with live progress evidence and how to keep waiting), REALLY ENDED, or
+    UNKNOWN (state itself unreadable) -- stated as what was checked, never
+    guessed. Keep the classification function pure and unit-test each
+    verdict as a distinct case so the three outcomes cannot collapse back
+    into one string.
+  verify: >-
+    Against a live mid-run job, a timeout at the watcher's deadline resolves
+    to STILL ALIVE, cites real progress evidence read from the system, and
+    exits in a way that does not tear down the job. A genuinely dead job still
+    resolves to REALLY ENDED. An unreadable state resolves to UNKNOWN rather
+    than defaulting to either terminal verdict.
+  tags: [watcher-timeout, false-failure, long-running-job, terminal-message-ambiguity, queue-introspection, dont-guess-ask]
+  legacy_id: OTR-PBUG-20260823-02
