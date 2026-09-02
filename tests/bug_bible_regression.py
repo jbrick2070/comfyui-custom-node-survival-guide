@@ -2681,6 +2681,21 @@ class TestModelSpecificReferenceAdmission:
         )
 
 
+class TestProvisioningTrackedStateBoundary:
+    def test_cloud_provisioner_does_not_reject_template_untracked_paths(
+        self, pack_dir
+    ):
+        """BUG-12.141: a tracked-work guard must not reject normal untracked
+        venvs, caches, or sibling links owned by a cloud template."""
+        provisioner = os.path.join(pack_dir, "scripts", "otr_pod_provision.sh")
+        if not os.path.isfile(provisioner):
+            pytest.skip("pack has no OTR pod provisioner")
+        with open(provisioner, encoding="utf-8") as handle:
+            text = handle.read()
+        assert "status --porcelain --untracked-files=no" in text
+        assert "status --porcelain --untracked-files=all" not in text
+
+
 # ---------------------------------------------------------------------------
 # The bible must actually BE machine-readable
 # ---------------------------------------------------------------------------

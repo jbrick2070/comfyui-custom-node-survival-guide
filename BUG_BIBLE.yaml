@@ -10296,3 +10296,38 @@ bugs:
     than defaulting to either terminal verdict.
   tags: [watcher-timeout, false-failure, long-running-job, terminal-message-ambiguity, queue-introspection, dont-guess-ask]
   legacy_id: OTR-PBUG-20260823-02
+- id: "12.141"
+  phase: 12
+  area: provisioning-safety-boundary
+  symptom: >-
+    A pinned installer refuses a clean cloud image before dependency or model
+    work, claiming the core has tracked changes even though every tracked and
+    staged path is clean. The image's normal in-tree virtual environment,
+    cache, or sibling links are untracked, so every fresh instance of that
+    template is rejected by construction.
+  cause: >-
+    The installer's safety check observes a broader population than the
+    destructive operation it guards. `git status --porcelain
+    --untracked-files=all` mixes tracked edits, staged edits, and untracked
+    template-owned paths into one non-empty string, while the stated contract
+    is only to avoid replacing tracked work during a pinned checkout. A
+    conservative-sounding wider gate is not safer when the extra population is
+    normal input state; it makes the supported template permanently
+    un-installable and mislabels the cause.
+  fix: >-
+    Match the check to the operation's real overwrite boundary: inspect tracked
+    and staged state while excluding untracked entries. Preserve Git checkout
+    itself as the second fail-closed guard, because Git refuses when an
+    untracked path would actually be overwritten by the target commit. Name the
+    states the diagnostic really checks. Never clean, move, or delete untracked
+    template paths merely to satisfy the preflight.
+  verify: >-
+    In a real temporary Git checkout, commit one core file, add an untracked
+    in-tree virtual environment, and require the production status command to
+    report clean. Modify the tracked file and require the same command to report
+    dirty; stage it and require dirty again. Pin the provisioning script to the
+    tracked-only flag and reject the all-untracked flag. Finally rerun the
+    installer on the live template that originally failed and require it to
+    pass this boundary without removing the template-owned paths.
+  tags: [provisioning, safety-gate, tracked-vs-untracked, cloud-template, false-refusal, git-status, pinned-checkout, input-population]
+  legacy_id: OTR-PBUG-20260901-01
