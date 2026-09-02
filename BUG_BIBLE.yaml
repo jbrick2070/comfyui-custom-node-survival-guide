@@ -10331,3 +10331,77 @@ bugs:
     pass this boundary without removing the template-owned paths.
   tags: [provisioning, safety-gate, tracked-vs-untracked, cloud-template, false-refusal, git-status, pinned-checkout, input-population]
   legacy_id: OTR-PBUG-20260901-01
+
+- id: "12.142"
+  phase: 12
+  area: gpu-runtime-compatibility
+  symptom: >-
+    A GPU template advertises one CUDA generation and its virtual-environment
+    name advertises another, while the Python actually selected by the
+    application imports a third-party system torch build. Importing torch and
+    enumerating an NVIDIA device look plausible, but the first real CUDA
+    initialisation fails because the host driver cannot execute that wheel.
+    Reinstalling a compatible wheel appears to work, then a process-wide pip
+    constraint silently restores the incompatible build during the next
+    requirements install.
+  cause: >-
+    Labels were treated as runtime evidence. The image tag, venv directory
+    name, `torch.__version__`, host driver and executable CUDA capability are
+    distinct facts. A venv with system site packages can import outside its
+    own directory, and a template-owned constraint can override a later pip
+    command. No single label proves that the exact application interpreter can
+    execute a CUDA kernel on the attached card and driver.
+  fix: >-
+    Probe the exact Python the application will run and require real device
+    work -- allocate a CUDA tensor, perform an operation, synchronise, and
+    inspect the result. Automatic repair must be a closed, measured tuple of
+    current torch build and driver range with an exact replacement trio and
+    package index; unknown tuples fail closed. Escape a conflicting template
+    constraint for the repair, probe again, and prevent that same constraint
+    from undoing the repair during subsequent dependency installation. Do not
+    misclassify a runtime ABI failure as VRAM pressure or change the workload
+    to hide it.
+  verify: >-
+    On the originally failing host, the application's exact interpreter must
+    report the pinned replacement torch/vision/audio trio and complete a real
+    CUDA operation. Then install the normal core and pack requirements and
+    repeat the probe, proving no inherited constraint reverted the runtime.
+    An unmatched torch/driver tuple must refuse automatic mutation by name.
+  tags: [cuda, driver-runtime-mismatch, environment-label-is-not-evidence,
+    system-site-packages, pip-constraint, execution-probe, exact-repair-tuple,
+    fail-closed, no-vram-clamp]
+  legacy_id: OTR-PBUG-20260901-02
+
+- id: "12.143"
+  phase: 12
+  area: pinned-upstream-compatibility
+  symptom: >-
+    A node pack is at the exact supported Git commit and every model weight is
+    present, yet a fresh environment cannot import it because a transitive
+    dependency removed or stopped re-exporting one API. The installer reports
+    the pack present even though the application cannot register any of its
+    nodes.
+  cause: >-
+    Pinning the consumer repository did not pin the full import contract. A
+    later dependency version changed its public surface, while the pinned
+    consumer imported a convenience re-export for an operation already
+    available from another dependency it used directly. Commit identity alone
+    therefore proved source provenance, not executable compatibility.
+  fix: >-
+    Own the smallest source-level compatibility patch when the replacement is
+    semantically exact. Pin the upstream commit, clean preimage hash, patch
+    hash and patched postimage hash. Apply only to the exact clean preimage;
+    accept idempotent reprovisioning only for the exact postimage; allowlist
+    only the intended changed path; and fail closed on every other dirty or
+    untracked path. Avoid a broad dependency downgrade when a narrow direct
+    API call removes the incompatibility.
+  verify: >-
+    In a temporary Git checkout, apply the production patch to an exact
+    synthetic preimage and require the exact postimage, intended dirty-path
+    set and idempotent second provision. Mutate an unrelated tracked file and
+    require refusal. Finally boot the real application in the clean environment
+    that exposed the incompatibility and require the pack's nodes to import.
+  tags: [dependency-api-drift, pinned-commit-not-enough, compatibility-patch,
+    preimage-hash, patch-hash, postimage-hash, exact-dirty-allowlist,
+    idempotent-provision, narrow-fix]
+  legacy_id: OTR-PBUG-20260901-03
