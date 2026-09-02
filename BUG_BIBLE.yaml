@@ -10467,17 +10467,30 @@ bugs:
     discipline its sibling video engines already used.
   fix: >-
     Drop each node's output the moment its last consumer has run and soft-
-    empty the cache, keeping only the terminal and the diffusion MODEL node;
-    the encoder then leaves the card before the sampler starts. Apply the
-    same executor option to every engine with a separate text-encoder node,
-    and add a render test that asserts the executor is called with it.
+    empty the cache, keeping only the terminal and the diffusion MODEL node --
+    AND, for the text-encoder node, unload its model patcher through the host's
+    own registry (comfy.model_management.unload_model_and_clones) at that drop,
+    while it is still registered. Under the host's dynamic-VRAM mode a dropped
+    reference is not enough: the patcher keeps its weights in a host-managed
+    virtual buffer owned by the module, the registry forgets it, and the pages
+    stay allocated until another dynamic model applies pressure -- which a
+    classic (e.g. GGUF) diffusion model never does. Name the node ids to evict
+    explicitly (a sampling node's output can be a clone of the diffusion model
+    and the VAE also carries a patcher), unload only dynamic patchers (classic
+    ones are released by the drop), and guard the host API so a rename degrades
+    to the drop instead of failing the render.
   verify: >-
     Render one fixed-seed still per engine in-process on the card where both
-    models fit, before and after the change, and require byte-identical output
-    files (same sha256) with a lower peak VRAM and no slowdown; then render on
-    the small card and require the diffusion model to load with usable memory
-    and the per-step time to fall to the normal range. A unit test stubs the
-    graph executor and asserts free-after-use plus the MODEL keep set.
+    models fit, before and after the change, with the host's dynamic-VRAM mode
+    on AND off, and require byte-identical output files (same sha256) with a
+    lower or equal peak VRAM and no slowdown; then render on the small card
+    with the SHIPPED launch flags and require the diffusion model to load with
+    usable memory ("loaded completely" or a non-zero "MB usable"), the per-step
+    time in the normal range, and more than one still in the same process. A
+    unit test stubs the graph executor and asserts the eviction fires for the
+    named node at its drop, before the sampler runs, and never for an unnamed
+    or classic one.
   tags: [text-encoder-residency, free-after-use, in-process-executor,
-    low-vram, dynamic-vram, partial-load, byte-identical-before-after]
+    low-vram, dynamic-vram, orphaned-vbar, unload-through-registry,
+    partial-load, byte-identical-before-after]
   legacy_id: OTR-PBUG-20260902-01

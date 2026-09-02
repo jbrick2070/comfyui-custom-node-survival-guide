@@ -2749,8 +2749,13 @@ records:
     7.7 GB Qwen3-4B encoder stayed resident through sampling; on the 8 GB 4060
     clean room the Klein DiT loaded with "0.00 MB usable" and one still took
     ~42 min (120-143 s per step) under stock flags and the lowvram pair alike.
-    Fixed with free_after_use=True, keep={"unet"} in all three engines; proven
-    byte-identical before/after on the 5080 with 5-7 GB lower peak.
+    Fixed with free_after_use=True, keep={"unet"} in all three engines (proven
+    byte-identical before/after on the 5080 with 5-7 GB lower peak) PLUS, because
+    under ComfyUI 0.34 DynamicVRAM the reference drop leaves an orphaned VBAR
+    resident (Leg C3, unchanged), run_graph(evict_after_use={"clip"}) which
+    unloads the named dynamic patcher through unload_model_and_clones at its
+    drop (free 620 MB -> 6998 MB on the 8 GB card; sha256 identical on the 5080
+    on both paths). Design arc: docs/2026-09-02-encoder-eviction/.
   bible_id: "12.145"
   verdict: promoted
   source: live-headless-leg
