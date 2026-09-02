@@ -10405,3 +10405,41 @@ bugs:
     preimage-hash, patch-hash, postimage-hash, exact-dirty-allowlist,
     idempotent-provision, narrow-fix]
   legacy_id: OTR-PBUG-20260901-03
+
+- id: "12.144"
+  phase: 12
+  area: dependency-declaration
+  symptom: >-
+    On the interpreter version the host application ships (ComfyUI Desktop and
+    the portable build both moved to Python 3.13), the pack's documented
+    "pip install -r requirements.txt" step fails with "No matching
+    distribution found" for one optional engine's transitive dependency, and
+    NOTHING installs: pip freeze before and after are identical. The pack then
+    loads with most of its nodes skipped, and the user sees import-skip
+    lines that look unrelated to the dependency that actually failed.
+  cause: >-
+    One requirement line named a package whose only interpreter-compatible
+    release pins an old numpy with no wheel for the new interpreter, and
+    whose newer releases declare Requires-Python below it. pip resolves a
+    requirements file as one unit, so a single unsatisfiable optional line
+    vetoes every other line. The line had been added on a development box
+    running an older interpreter, where it resolved, and was never exercised
+    on the interpreter the host application actually ships.
+  fix: >-
+    Give any optional engine's requirement an environment marker that
+    matches the interpreters it genuinely supports (python_version,
+    sys_platform), mirror the marker into every manifest a registry reads,
+    and make the engine report itself unusable by name when its package is
+    absent so the voice or lane falls to a user choice instead of a crash.
+    Decide the default lane on the excluded interpreter explicitly rather
+    than shipping a default that cannot exist there.
+  verify: >-
+    On a clean install of the exact interpreter the host application ships,
+    run the documented install command and require a non-empty diff between
+    pip freeze before and after plus every core requirement present. Add a
+    test that parses every requirement line, evaluates its marker on each
+    shipped interpreter version, and asserts the core requirements are
+    unconditional while the known-capped ones carry a marker.
+  tags: [requires-python-cap, environment-marker, pip-all-or-nothing,
+    optional-engine, clean-install, interpreter-drift, registry-manifest]
+  legacy_id: OTR-PBUG-20260901-04

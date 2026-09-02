@@ -2733,3 +2733,13 @@ records:
   bible_id: "12.140"
   verdict: promoted
   source: live-false-timeout
+- record: >-
+    OTR PBUG-20260901-04 -- on a clean Python 3.13 portable install the
+    README's pip install -r requirements.txt installed NOTHING because
+    kokoro>=0.7.16 is unsatisfiable on 3.13 (numpy==1.26.4 pin, then
+    Requires-Python <3.13 on every newer kokoro/misaki) and pip resolves the
+    file all-or-nothing. Fixed with a python_version marker on the kokoro line
+    and tests/test_requirements_python_markers.py.
+  bible_id: "12.144"
+  verdict: promoted
+  source: live-clean-install
