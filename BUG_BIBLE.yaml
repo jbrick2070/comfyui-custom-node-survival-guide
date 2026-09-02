@@ -10443,3 +10443,41 @@ bugs:
   tags: [requires-python-cap, environment-marker, pip-all-or-nothing,
     optional-engine, clean-install, interpreter-drift, registry-manifest]
   legacy_id: OTR-PBUG-20260901-04
+
+- id: "12.145"
+  phase: 12
+  area: vram-residency
+  symptom: >-
+    An image (or video) engine that drives ComfyUI node classes in-process
+    renders correctly on the development card but takes 10-50x longer per
+    sampler step on a smaller card, with no error: the log shows the text
+    encoder "loaded completely" (or staged for dynamic VRAM), then the
+    diffusion model "loaded partially; 0.00 MB usable ... offloaded" after
+    "0 models unloaded", and the GPU sits at full memory and full utilisation
+    while every step runs from host memory. Stock launch flags and the
+    low-VRAM flag pair behave the same.
+  cause: >-
+    The in-process graph executor kept every node's output alive until the
+    whole graph finished, so the text-encoder object stayed referenced (and
+    resident) through sampling. On the big card the encoder and the diffusion
+    model co-reside and nothing shows; on the small card the encoder alone
+    fills it, and the host's smart-memory logic does not evict it because the
+    diffusion model's minimum partial load technically fits in the sliver
+    that is left. The engine had been written without the free-after-use
+    discipline its sibling video engines already used.
+  fix: >-
+    Drop each node's output the moment its last consumer has run and soft-
+    empty the cache, keeping only the terminal and the diffusion MODEL node;
+    the encoder then leaves the card before the sampler starts. Apply the
+    same executor option to every engine with a separate text-encoder node,
+    and add a render test that asserts the executor is called with it.
+  verify: >-
+    Render one fixed-seed still per engine in-process on the card where both
+    models fit, before and after the change, and require byte-identical output
+    files (same sha256) with a lower peak VRAM and no slowdown; then render on
+    the small card and require the diffusion model to load with usable memory
+    and the per-step time to fall to the normal range. A unit test stubs the
+    graph executor and asserts free-after-use plus the MODEL keep set.
+  tags: [text-encoder-residency, free-after-use, in-process-executor,
+    low-vram, dynamic-vram, partial-load, byte-identical-before-after]
+  legacy_id: OTR-PBUG-20260902-01

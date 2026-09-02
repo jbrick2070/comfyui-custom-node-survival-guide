@@ -2743,3 +2743,14 @@ records:
   bible_id: "12.144"
   verdict: promoted
   source: live-clean-install
+- record: >-
+    OTR PBUG-20260902-01 -- the three in-process image engines with a separate
+    text-encoder node ran the graph executor without free_after_use, so the
+    7.7 GB Qwen3-4B encoder stayed resident through sampling; on the 8 GB 4060
+    clean room the Klein DiT loaded with "0.00 MB usable" and one still took
+    ~42 min (120-143 s per step) under stock flags and the lowvram pair alike.
+    Fixed with free_after_use=True, keep={"unet"} in all three engines; proven
+    byte-identical before/after on the 5080 with 5-7 GB lower peak.
+  bible_id: "12.145"
+  verdict: promoted
+  source: live-headless-leg
