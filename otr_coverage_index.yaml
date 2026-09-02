@@ -2759,3 +2759,16 @@ records:
   bible_id: "12.145"
   verdict: promoted
   source: live-headless-leg
+- record: >-
+    OTR PBUG-20260902-02 -- the image stage rendered with the writer LLM
+    still on the card: 48 MB free at the first Klein still on the 8 GB clean
+    room (instrumented Leg C4b: the encoder's VBAR had 0 resident pages, the
+    writer that composed the still prompts was the occupant), and on the
+    5080 a 7.4 GB 12B writer had been co-resident with every still. The
+    canonical residue freer was called only by the LTX 2.5 / GGUF preflights;
+    fixed by calling it once per dispatch before the first local still
+    (da2b7a36). Every in-process probe missed it because none had the writer
+    loaded.
+  bible_id: "12.146"
+  verdict: promoted
+  source: live-headless-leg

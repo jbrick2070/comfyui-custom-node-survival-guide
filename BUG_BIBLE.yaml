@@ -10494,3 +10494,41 @@ bugs:
     low-vram, dynamic-vram, orphaned-vbar, unload-through-registry,
     partial-load, byte-identical-before-after]
   legacy_id: OTR-PBUG-20260902-01
+
+- id: "12.146"
+  phase: 12
+  area: vram-residency
+  symptom: >-
+    A GPU stage (image or video) that runs right after an out-of-band model
+    stage -- a transformers LLM writing prompts, a TTS -- loads its diffusion
+    model with "0 MB usable" on the small card and runs every step from host
+    memory, while an in-process probe of the same engine, started from an
+    empty card, works perfectly. On the big card the same episode renders but
+    slower than it should, with more models on the card than it can hold.
+  cause: >-
+    The out-of-band model lives in the pack's own cache, outside the host's
+    model registry, so the host's eviction logic never sees it and never
+    frees it; the pack released it after one earlier stage but reloaded it
+    for a later prompt-writing pass and never released it again before the
+    render. Every in-process probe missed the defect because the probe never
+    had the writer loaded. A generic "free every registered model" call is
+    also blind to it for the same reason.
+  fix: >-
+    Give the pipeline ONE canonical residue-freer that releases the
+    out-of-band caches (LLM, TTS) first, then surgically detaches any
+    host-tracked patcher, then flushes the allocator, and call it in every
+    GPU stage's load preflight -- image dispatch included, once per dispatch
+    before the first local render, gated so cloud adapters and cache-hit-only
+    dispatches never trigger it. Confirm nothing after that stage requests the
+    model again, or the release becomes a reload cost.
+  verify: >-
+    Instrument the render site on the small card to log free VRAM and the
+    diffusion model's resident pages at its load; require the log to show the
+    out-of-band model released (its allocated bytes dropping to near zero in
+    the freer's own report) and the diffusion model loaded with usable
+    memory. Then run the same leg on the big card and require the freer's
+    report to show the same release there (the bug is present on both; only
+    the symptom differs), with the stills rendering afterwards.
+  tags: [out-of-band-model, writer-llm-residency, residue-freer,
+    stage-preflight, low-vram, host-registry-blind, in-process-probe-miss]
+  legacy_id: OTR-PBUG-20260902-02
