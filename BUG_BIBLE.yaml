@@ -10570,3 +10570,119 @@ bugs:
     session-bearer, credential-access, api-key, status-reason, rule-change,
     manual-review, fail-closed]
   legacy_id: OTR-PBUG-20260902-04
+- id: "12.148"
+  phase: 12
+  area: metadata-provenance
+  symptom: >-
+    A resume, replay, or "re-run from a saved bundle" path completes every
+    expensive stage correctly and then refuses at the very last node, saying a
+    required receipt or metadata key is missing. The same job run normally
+    produces that key without trouble, and every unit test of the import or
+    clone passes. The cost is the whole job: the work is on disk, the product
+    is not.
+  cause: >-
+    A "clear the previous run's telemetry" list -- the set of keys a clone
+    wipes so the source's measurements are not republished as if they described
+    this run -- contained a key that only the SKIPPED stage ever writes. The
+    reasoning behind the list is sound for every member that the new run
+    re-stamps, and silently wrong for any member it does not: a resume path
+    exists precisely to avoid re-running stages, so a key whose sole author is
+    one of those stages is cleared and never rebuilt. The downstream requirement
+    is usually correct to refuse (refusing beats inventing a placeholder); the
+    clearing is the defect.
+  fix: >-
+    Make the list's invariant explicit and enforce it: every member must be
+    something the new run demonstrably re-stamps. Remove any key whose only
+    author is a stage the resume path skips, and carry it forward -- for
+    imported artifacts the source's value is the CORRECT value, not a stale
+    one, because the artifacts really were produced by it. Write the rule into
+    the constant's own comment so the next person adding a member has to answer
+    it.
+  verify: >-
+    Test what SURVIVES the clone, not only what is cleared. Assert the entire
+    requirement SET the terminal consumer demands, not the single key that
+    happened to break, because the next key added to the volatile list fails
+    identically. Prove the test bites: re-insert the key into the list and
+    confirm the test fails, remove it and confirm it passes. A test that
+    asserts only "the clear happened" cannot catch this class at all.
+  tags: [resume, replay, clone, state-reset, metadata-provenance, receipts,
+    volatile-keys, terminal-consumer, fail-loud, test-what-survives]
+  legacy_id: OTR-PBUG-20260903-01
+- id: "12.149"
+  phase: 12
+  area: tensors
+  symptom: >-
+    A resume/short-circuit run finishes green -- every success line prints, the
+    publish step reports OK -- and the delivered artifact is drastically
+    truncated or otherwise malformed. Comparing the intermediate files stage by
+    stage shows one stage where the size and duration collapse (in the incident:
+    156 MB / 85.7s in, 1.5 MB / 1.0s out) while every stage before it is
+    correct.
+  cause: >-
+    The short-circuit path emitted a fixed-size PLACEHOLDER on a typed wire --
+    a one-second silent buffer where the real run carries the full signal --
+    on the reasoning that the wire is unused because the real payload is copied
+    from a file. That reasoning held for the consumers that read the FILE and
+    failed for the consumer that measures the WIRE: a downstream stage derived
+    its own output length from the buffer's length, and a later combining stage
+    took the shorter of its two inputs. Nothing raised, because every value was
+    individually valid; only the DIMENSION was wrong.
+  fix: >-
+    A pass-through must pass the real thing through. Read the frozen artifact
+    the path is short-circuiting to and emit its actual samples, so downstream
+    sees exactly what a normal run produces because it IS what the normal run
+    produced. Where the real value genuinely cannot be reconstructed, preserve
+    the real DIMENSIONS at minimum (read the length from the container header)
+    and degrade in a named, logged order rather than to a constant.
+  verify: >-
+    Grep the pipeline for consumers that derive a length, count, resolution or
+    frame budget from a wire rather than from a file, and assert on the
+    property rather than the literal: the emitted wire must be longer than any
+    placeholder and must track the source artifact's length. Beware the test
+    that ENCODES the bug -- in the incident the existing test asserted the
+    placeholder's exact shape as the contract, and its fixture was a byte blob
+    no decoder could open, so a correct implementation would also have fallen
+    back and passed. Build fixtures that a real reader can actually read.
+  tags: [replay, resume, placeholder, tensor-shape, wire-vs-file, duration,
+    truncation, silent-failure, green-and-broken, fixture-quality,
+    test-encodes-the-bug]
+  legacy_id: OTR-PBUG-20260903-02
+- id: "12.150"
+  phase: 12
+  area: deps
+  symptom: >-
+    A stage reports healthy values in its own log line, and the very next stage
+    reports a wildly smaller one -- in the incident a node logged an 85.66s
+    master while the next logged "1.0s audio -> 25 frames". Nothing appears
+    between them in the log, because there is nothing to appear.
+  cause: >-
+    An optional-dependency import and its call sat inside a bare
+    `except Exception` whose handler returned a differently-SHAPED constant.
+    On this stack the call always raised -- torchaudio moved decoding to a
+    separate package (torchcodec) that is not installed, so the load raised
+    ImportError every single time -- which means the fallback was not a rare
+    degradation, it was the only path that had ever run. The swallow logged
+    nothing at all, and a dismissive comment ("the tensor is a courtesy")
+    encoded the false belief that made the shape change look harmless.
+  fix: >-
+    Keep the fast path, but give the fallback a real implementation rather than
+    a constant -- here a stdlib reader (`wave` + numpy) shared by every site
+    that needed it, so the value is correct whether or not the optional library
+    works. Narrow the except to the exceptions actually expected, and log at
+    ERROR naming the CONSEQUENCE ("falling back, episode length may be wrong")
+    rather than the mechanism. Delete comments that assert a value is unused;
+    verify the claim instead.
+  verify: >-
+    Write a test that forces the optional import to raise and asserts the
+    fallback returns real data of the right dimensions -- not merely that it
+    does not throw. Then check the assumption directly on the target stack: run
+    the import and the call in the real interpreter and read the exception,
+    because "optional dependency" and "dependency that never works here" are
+    indistinguishable from the log when the except is bare. Related but
+    distinct from 05.14, which covers a bare except laundering an error into a
+    plausible None; this entry is the case where the swallow is PERMANENT and
+    changes a dimension something downstream measures.
+  tags: [optional-dependency, bare-except, torchaudio, torchcodec, fallback,
+    silent-failure, dimension-change, logging, error-level, stdlib-fallback,
+    stale-comment]
+  legacy_id: OTR-PBUG-20260903-03

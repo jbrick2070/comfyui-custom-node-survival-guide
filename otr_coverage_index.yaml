@@ -2785,3 +2785,40 @@ records:
   bible_id: "12.147"
   verdict: promoted
   source: live-registry-scan
+- record: >-
+    OTR PBUG-20260903-01 -- the first live canonical replay rendered eight
+    good clips in 16:09 and published NOTHING: the credits roll refused on a
+    missing meta.image_engines. _REPLAY_RUN_VOLATILE_META cleared a key whose
+    only author (OTR_ImageGenDispatcher) a replay never runs, so it was wiped
+    and never rebuilt. Fixed by removing the key and writing the list's
+    invariant into the constant; pinned by a test asserting the whole
+    requirement set the credits roll demands, proven to bite by re-inserting
+    the key.
+  bible_id: "12.148"
+  verdict: promoted
+  source: live-headless-leg
+- record: >-
+    OTR PBUG-20260903-02 -- a replay published green and shipped ONE SECOND of
+    picture. SceneSequencer.sequence returned a torch.zeros(1, 2, 48000)
+    "DSP-safe placeholder" on the replay path; the procgen visualizer derives
+    duration from that wire (len(audio_np) / sr) and PostUpscaleProcgenBlend
+    takes the shorter input, so 85.7s became 1.0s. Fixed by reading the frozen
+    master named by meta.replay_from and passing its real samples. The existing
+    test had ENCODED the bug by asserting shape == (1, 2, 48000), and its
+    fixture master was an unreadable byte blob.
+  bible_id: "12.149"
+  verdict: promoted
+  source: live-headless-leg
+- record: >-
+    OTR PBUG-20260903-03 -- same truncation one node further down, after 02 was
+    fixed. OTR_EpisodeAssembler's replay branch wrapped torchaudio.load in a
+    bare except returning torch.zeros(1, 2, 48000); on torchaudio 2.10 that
+    load ALWAYS raises (ImportError: TorchCodec is required) so the fallback
+    was the only path ever taken, and the swallow logged nothing. Fixed with a
+    stdlib wave+numpy reader shared by both replay sites, torchaudio still
+    tried first, total failure now logged at ERROR naming the consequence.
+    Distinct from Bible 05.14 (bare except laundering an error into a plausible
+    None): here the swallow is permanent and changes a measured dimension.
+  bible_id: "12.150"
+  verdict: promoted
+  source: live-headless-leg
