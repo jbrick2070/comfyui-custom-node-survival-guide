@@ -32,6 +32,8 @@
 # SURFACES sharing one artifact -- the credits transcript roll and the hero
 # title card -- and conflating them cost an evening; the index keeps them as
 # two records for that reason.
+# 2026-09-02 delta (registry scanner): 1 record appended, promoted as
+# 12.147 -- a scanner rule change flagging the session-bearer hidden input.
 audited: 2026-08-26
 bible_head: 8734208 (+12.134 appended 2026-08-25 evening)
 bible_entries: 314
@@ -2772,3 +2774,14 @@ records:
   bible_id: "12.146"
   verdict: promoted
   source: live-headless-leg
+- record: >-
+    OTR PBUG-20260902-04 -- every registry version since alpha.9 Flagged:
+    2 critical "prohibited string" findings on the writer's hidden
+    session-bearer input (credential-access), 156 info YARA findings behind
+    them; alpha.8 shipped the same dict and went Active, so the scanner's
+    rule post-dates that scan. Fixed by declaring only api_key_comfy_org,
+    guarded by tests/test_registry_prohibited_strings.py; the info findings
+    need an admin batch approval (manual review request drafted).
+  bible_id: "12.147"
+  verdict: promoted
+  source: live-registry-scan

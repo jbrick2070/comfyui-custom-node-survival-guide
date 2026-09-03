@@ -10532,3 +10532,41 @@ bugs:
   tags: [out-of-band-model, writer-llm-residency, residue-freer,
     stage-preflight, low-vram, host-registry-blind, in-process-probe-miss]
   legacy_id: OTR-PBUG-20260902-02
+
+- id: "12.147"
+  phase: 12
+  area: registry-publishing
+  symptom: >-
+    Every version published to the Comfy Registry after a certain date lands
+    Flagged; the node's latest_version resolves to null and ComfyUI Manager
+    reports "not a CNR node" / cannot resolve an install target. An earlier
+    version with the same files went Active, and a file-by-file diff of the
+    Active and Flagged bundles finds no meaningful difference.
+  cause: >-
+    The registry's private scanner added a rule after the Active version was
+    scanned: a third-party pack that declares the hidden input for the
+    logged-in account's session bearer (the API-nodes convention, type name
+    AUTH_TOKEN plus _COMFY_ORG) is reported as a critical "prohibited string"
+    with the credential-access admin tag. The pack had declared it since the
+    day its credit-billed lane was written, so nothing in the bundle changed;
+    the rule did. Diffing bundle contents cannot find a rule change, and the
+    default versions endpoint hides the reason.
+  fix: >-
+    Declare only api_key_comfy_org; take the configured API key as the sole
+    credential and fail closed when it is absent (never bill a session).
+    Ship a test that walks every file the bundle ships (mirroring
+    .comfyignore) and refuses the session-bearer type name anywhere, with
+    the literal assembled at runtime so the test itself never carries it.
+    Then publish a new version; the scanner does not re-scan old ones.
+  verify: >-
+    Read GET /nodes/<id>/versions?include_status_reason=true, never the bare
+    versions endpoint or the web page, and count findings by severity. The
+    critical prohibited-string finding must be gone on the new version. Know
+    that any remaining finding, even severity info, keeps a version Flagged
+    until an admin batch-approves it (the only status-changing route in the
+    registry's openapi.yml is admin-only), so after a clean-of-criticals scan
+    the next move is a manual review request on the tracker, not more diffs.
+  tags: [comfy-registry, security-scan, prohibited-string, hidden-input,
+    session-bearer, credential-access, api-key, status-reason, rule-change,
+    manual-review, fail-closed]
+  legacy_id: OTR-PBUG-20260902-04
