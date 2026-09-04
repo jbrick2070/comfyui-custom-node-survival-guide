@@ -10686,3 +10686,81 @@ bugs:
     silent-failure, dimension-change, logging, error-level, stdlib-fallback,
     stale-comment]
   legacy_id: OTR-PBUG-20260903-03
+- id: "12.151"
+  phase: 12
+  area: video
+  symptom: >-
+    A render dies partway through an encode with an error that names the tool,
+    not the choice: "ffmpeg closed the pipe after 3 frame(s)". It only happens
+    on SOME machines -- a rented GPU container, AMD, a Mac -- and never on the
+    developer's own card, so it reads as an environment fault rather than a bug.
+  cause: >-
+    A hardware-capability question ("can this box encode with h264_nvenc?")
+    was answered by a STRING TEST, `"h264_nvenc" in (ffmpeg -codecs)`, which
+    reports whether ffmpeg was COMPILED with the encoder -- true on a machine
+    that cannot open an encode session. The correct answer already existed as a
+    real one-frame encode probe in a shared module, and that module's docstring
+    declared itself "the ONLY nvenc decision in the pack". It was the THIRD copy:
+    a sibling module the visualizer engines actually route through carried its
+    own string test, and the confident universal claim in the docstring is
+    exactly why nobody looked for it. On the developer's card, which HAS working
+    nvenc, the wrong answer was still the right answer, so the defect was
+    structurally invisible until a second machine disagreed.
+  fix: >-
+    Delegate, never re-implement: the copy now calls the shared probe, because a
+    fourth re-implementation is how this recurs a fourth time. Correct the
+    docstring's "the ONLY decision" to "the single source of truth every other
+    site delegates to", and write down the days it was false. Add a guard test
+    that bans the string test outside the owning module -- read the function's
+    CODE via the AST rather than its source text, or the docstring that quotes
+    the banned pattern becomes a false positive -- and prove the guard fails on
+    an injected regression before trusting it.
+  verify: >-
+    Run the probe on a machine WITHOUT the capability and confirm the shared
+    function returns False while the string test would return True; that
+    disagreement is the whole bug. More generally: grep the pack's docstrings for
+    universal claims -- "the only", "single source of truth", "every", "never",
+    "always" -- and check each against the code. A false universal claim reads
+    as coverage and stops the next reader from looking; three were found in one
+    session once someone did.
+  tags: [nvenc, ffmpeg, hardware-capability, string-test, duplicated-decision,
+    single-source-of-truth, false-docstring-claim, portability, container,
+    delegation, ast-guard, second-machine]
+  legacy_id: OTR-PBUG-20260904-01
+- id: "12.152"
+  phase: 12
+  area: llm-output
+  symptom: >-
+    Every episode's per-beat creative directives (expression, motion, camera)
+    come back empty, the log says "empty/unparseable ... reseed 1/2, 2/2" on
+    every batch, and all three reseed attempts fail identically. Every beat
+    falls through to a deterministic template, so the picture never reflects the
+    story -- and this ran at 100% failure for weeks under green logs.
+  cause: >-
+    A FIXED output-token budget behind a VARIABLE-size request. The pass batched
+    up to 15 beats and asked the model for one JSON row each (~73 tokens a row,
+    so ~1,100 needed) through a wrapper hardcoding `max_new_tokens=300`. The
+    reply stopped mid-object, the parser returned {} for "empty", "malformed"
+    AND "truncated" alike, and the reseed loop retried the IDENTICAL prompt under
+    the IDENTICAL ceiling -- a guaranteed-identical failure that cost two more
+    model calls per batch. The warning text named none of this: "unparseable"
+    covered three unrelated causes, and the one number that mattered, the budget,
+    never appeared in any log.
+  fix: >-
+    Size the budget to the request (per-item cost times item count, floored and
+    ceilinged). Make the retry CHANGE something -- re-bind a doubled budget on a
+    truncation-shaped failure, without re-resolving the model. Classify the
+    failed reply (empty / truncated / malformed) and print the parsed count, the
+    reply length and the budget in the warning, so the next occurrence names
+    itself.
+  verify: >-
+    Call the real model once at the old budget and once at a generous one on the
+    same prompt; a reply that ends mid-JSON at the first and closes cleanly at the
+    second is the proof (here: 0 of 4 rows parsed at 300, 4 of 4 at 1200). A
+    green unit suite does NOT catch this class -- the failure is a parse miss that
+    gets blamed on the model. Two portable rules: a fixed output budget behind a
+    request that scales with a count is a defect even when nothing errors; and a
+    retry that repeats a deterministic shortfall unchanged is not a retry.
+  tags: [llm, max-new-tokens, truncation, json-parse, reseed, retry-unchanged,
+    fixed-budget, silent-failure, diagnostic-logging, batch-size]
+  legacy_id: OTR-PBUG-20260903-07

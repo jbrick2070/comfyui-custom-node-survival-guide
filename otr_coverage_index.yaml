@@ -2822,3 +2822,26 @@ records:
   bible_id: "12.150"
   verdict: promoted
   source: live-headless-leg
+- record: >-
+    OTR PBUG-20260904-01 -- scope_draw._has_nvenc answered "can this box encode
+    h264_nvenc" with a string test on `ffmpeg -codecs` (compiled-with, not
+    can-encode). Third copy of a bug fixed twice; encode_sink.has_nvenc's
+    docstring claimed to be the ONLY nvenc decision, which is why the copy
+    survived. Found on a rented 4090 that lists the encoder and cannot open a
+    session; invisible on the 5080, which has working nvenc. Fixed by delegation
+    plus an AST-based guard test proven to fail on an injected regression.
+  bible_id: "12.151"
+  verdict: promoted
+  source: live-execution
+- record: >-
+    OTR PBUG-20260903-07 -- derive_creative_directives batched up to 15 beats
+    through a wrapper hardcoding max_new_tokens=300; replies truncated mid-JSON,
+    the parser returned {} for empty/malformed/truncated alike, and the reseed
+    loop retried the identical prompt under the identical ceiling. 100% of
+    character directives discarded for weeks under green logs. Fixed with a
+    per-beat budget, a reseed that doubles the budget on truncation, and a
+    classified warning that prints the budget. Live-proven 0/4 -> 4/4 on gemma
+    and 14/14 on Mistral-Nemo.
+  bible_id: "12.152"
+  verdict: promoted
+  source: live-execution
