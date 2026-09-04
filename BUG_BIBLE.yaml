@@ -10764,3 +10764,80 @@ bugs:
   tags: [llm, max-new-tokens, truncation, json-parse, reseed, retry-unchanged,
     fixed-budget, silent-failure, diagnostic-logging, batch-size]
   legacy_id: OTR-PBUG-20260903-07
+- id: "12.153"
+  phase: 12
+  area: deps
+  symptom: >-
+    The operator pins an external tool with an env var (here OTR_FFMPEG) and
+    the pin is silently ignored by nearly every call site on any box where the
+    same tool is ALSO on PATH -- the bare default wins, the pinned build never
+    runs, and the earlier "honours the env before PATH" fix reports done. The
+    suite is green throughout. Measured live: 9 of 10 resolvers returned the
+    PATH binary or the bare literal with the pin set to a different file.
+  cause: >-
+    Twelve resolver copies in four orders, six of which did
+    `if tool and (which(tool) or isfile(tool)): return tool` FIRST -- so the
+    caller's own signature default, the bare string "ffmpeg", was read as an
+    operator CHOICE and won whenever PATH could resolve it. Two copies never read
+    the env at all; three more sites executed the literal with no resolver, so a
+    guard on resolver copies could not see them. Every copy's test stubbed
+    `shutil.which` to None -- the ONE condition under which the defect cannot
+    manifest -- and the probe module beside them had already solved this exact
+    bug (a bare name is not a preference) without the encoder copies learning it.
+  fix: >-
+    ONE owner: explicit CHOICE (a bare tool name is not one -- reuse the rule the
+    probe module already owns) -> env pin -> PATH -> well-known install dirs ->
+    None, never raising. Every site becomes a thin adapter that keeps its own
+    contract on "none" (empty string, its own literal, or its named refusal).
+    Enforce with an AST guard that has NO allowlist: outside the owner no env
+    constant, no `which(...)` call at all, and no list literal whose first
+    element is the bare tool name (the shape that catches the literal-argv sites).
+    Run the precedence matrix with PATH LEFT AVAILABLE, and measure live before
+    and after with the pin pointing at a different existing file.
+  verify: >-
+    With the tool on PATH and the env pin set to a DIFFERENT existing file, call
+    every resolver seam and assert the pin comes back; AST-walk the package for
+    `which(` and the env constant outside the owner and assert zero. Two portable
+    rules: a signature default is never an operator choice; and a test that stubs
+    away the condition a bug needs is a test of the fix's absence.
+  tags: [environment-override, tool-resolution, signature-default, bare-name,
+    single-owner, ast-guard, test-stubs-the-condition, path-precedence,
+    literal-argv, ffmpeg]
+  legacy_id: OTR-PBUG-20260904-02
+- id: "12.154"
+  phase: 12
+  area: video
+  symptom: >-
+    Every remote / cloud video lane refuses any beat long enough to split into
+    segments, with a "would render N segments from ONE set of handles but
+    declares no session_identity()" error; local lanes render the same beat
+    fine. The plan then records the lane as "already fixed" while the refusal
+    is untouched.
+  cause: >-
+    A session-level gate exists to prove LOCAL handle drift cannot happen
+    between segments (segment 2 must render with the weights segment 1 loaded).
+    It was asked of adapters that hold no handles at all -- prepare() returns
+    nothing reusable, teardown is a no-op, each render is an independent provider
+    call -- so the question could not be honestly answered, and the adapter had
+    no way to say so. Inferring the exemption from an unrelated attribute (an
+    absent isolation flag) would enable the path by accident; inventing an
+    identity for handles that do not exist would be theater; leaving the refusal
+    kept a live failure on a lane the menu already offers.
+  fix: >-
+    An explicit, per-adapter DECLARATION (`session_residency = "remote"`) on
+    exactly the adapters with nothing to name, read FAIL-CLOSED: an absent or
+    misspelt attribute reads as local and the demand stands. Gate the pre-load
+    refusal, the post-prepare baseline and the per-segment drift check on it;
+    make the refusal message name the declaration; key the roster tripwire on
+    the declaration and add a control that no engine declares remote AND a local
+    isolation. No identity method on the remote adapters.
+  verify: >-
+    A fake remote adapter runs a two-segment session without ever being asked
+    for an identity; a fake local adapter without one is still refused BEFORE
+    anything loads; an unknown spelling is refused. Portable rule: when a gate
+    asks a question a component cannot honestly answer, give the component an
+    explicit way to say so, and read the ABSENCE of that declaration as "the
+    question stands" -- never as "exempt".
+  tags: [beat-session, multi-clip, remote-adapter, capability-declaration,
+    fail-closed, enablement-by-accident, contract-theater, session-identity]
+  legacy_id: OTR-PBUG-20260904-03

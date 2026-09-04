@@ -2845,3 +2845,19 @@ records:
   bible_id: "12.152"
   verdict: promoted
   source: live-execution
+- record: >-
+    OTR PBUG-20260904-02 (docs/PROD_BUG_LOG.md) -- nine of ten ffmpeg resolvers
+    ignored OTR_FFMPEG on a box with ffmpeg on PATH -- twelve copies, a signature
+    default read as a choice, tests stubbing which() to None, three literal-argv
+    sites. One owner + AST guard + precedence matrix; live 9/9 honour the pin after.
+  bible_id: "12.153"
+  verdict: promoted
+  source: live-execution
+- record: >-
+    OTR PBUG-20260904-03 (docs/PROD_BUG_LOG.md) -- every remote video lane refused
+    multi-segment beats (word_razzle on the 2026-09-03 pod matrix) because
+    BeatSession demanded a handle identity from adapters with no handles; explicit
+    fail-closed session_residency declaration on the seven remote adapters.
+  bible_id: "12.154"
+  verdict: promoted
+  source: live-execution
