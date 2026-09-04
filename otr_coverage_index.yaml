@@ -2861,3 +2861,12 @@ records:
   bible_id: "12.154"
   verdict: promoted
   source: live-execution
+- record: >-
+    OTR PBUG-20260904-04 (docs/PROD_BUG_LOG.md) -- every 8 GB-profile leg on the
+    5080 refused its writer -- the box that re-pinned Q4_K_M on 2026-08-29 still
+    carried the earlier upload of the same file, 1,440 bytes shorter, on the one
+    quant its default profile never loads. Re-downloaded, size and sha verified;
+    the next leg cleared the integrity gate.
+  bible_id: "12.155"
+  verdict: promoted
+  source: live-execution

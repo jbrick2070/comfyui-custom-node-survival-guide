@@ -10841,3 +10841,36 @@ bugs:
   tags: [beat-session, multi-clip, remote-adapter, capability-declaration,
     fail-closed, enablement-by-accident, contract-theater, session-identity]
   legacy_id: OTR-PBUG-20260904-03
+- id: "12.155"
+  phase: 12
+  area: deps
+  symptom: >-
+    Every render on a lower-VRAM profile refuses its LLM at load with
+    "Incomplete ... GGUF file: has N bytes, expected M" -- a difference of a
+    few kilobytes -- on the DEVELOPER's own box, days after the artifact table
+    was re-pinned, while the default (higher-VRAM) profile keeps rendering and
+    every fresh install (a second box, a rented pod) is fine.
+  cause: >-
+    The integrity table was re-pinned to the current upstream upload of a
+    quant the developer box does not use by default. That box still carried
+    the earlier upload of the same file (identical name, older bytes), and
+    nothing exercised that quant there: the default profile resolves a
+    different quant with its own pin, the drill box and the pod downloaded the
+    NEW build, so the one copy that could fail was the one nobody re-verified --
+    on the box that wrote the pin. The gate itself did exactly what it was built
+    to do (refuse, by name, before the render spends anything).
+  fix: >-
+    Re-download the pinned build to a temporary name, verify size AND sha256
+    against the table, then swap it in; keep the old copy aside for one session.
+    No code change. Record the finding as a portability lesson, not a bug in the
+    gate.
+  verify: >-
+    On every box that carries the artifact -- starting with the one that wrote
+    the pin -- load the quant the box does NOT use by default under a profile
+    that selects it (a one-act headless leg is enough) and confirm the integrity
+    gate passes. Portable rule: a pin tightened to "what a user can obtain" must
+    be re-verified against the dev box's OWN copy of every pinned quant, because
+    fresh-install drills prove fresh installs, never stale local files.
+  tags: [gguf, integrity-pin, size-sha256, stale-local-artifact, portability,
+    dev-box-blind-spot, quant-not-in-default-path]
+  legacy_id: OTR-PBUG-20260904-04
