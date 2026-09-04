@@ -2870,3 +2870,12 @@ records:
   bible_id: "12.155"
   verdict: promoted
   source: live-execution
+- record: >-
+    OTR PBUG-20260904-06 (docs/PROD_BUG_LOG.md) -- every published episode since
+    the 2026-09-03 obs rename carried a meta.paths.obs_final naming a file that
+    does not exist: the mux strips the show prefix to build the watching name,
+    the ledger's validator demanded it, and the planned pointer won silently.
+    Fixed by one spelled constant plus a pairing test.
+  bible_id: "12.156"
+  verdict: promoted
+  source: live-execution

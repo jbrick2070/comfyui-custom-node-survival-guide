@@ -10874,3 +10874,37 @@ bugs:
   tags: [gguf, integrity-pin, size-sha256, stale-local-artifact, portability,
     dev-box-blind-spot, quant-not-in-default-path]
   legacy_id: OTR-PBUG-20260904-04
+- id: "12.156"
+  phase: 12
+  area: io
+  symptom: >-
+    A ledger or manifest field that records the published artifact's path
+    names a file that does not exist, while the publisher's own stamp names
+    the real file. Nothing errors, every downstream stage keeps working, and
+    the dead pointer accumulates on every publish until something reads it.
+  cause: >-
+    The artifact's filename rule changed in the WRITER (a constant prefix
+    dropped, descriptive fields appended) and a separate READER that binds
+    the artifact to its record by name -- stem == record_id or
+    stem.startswith(record_id + "_") -- kept the old rule. The refusal fell
+    through to a planned default path instead of failing loud. The reader's
+    tests used record ids that did not carry the prefix, so the old rule and
+    the new name agreed in the fixture and disagreed in production.
+  fix: >-
+    Spell the naming element once, as a module constant the writer strips and
+    the reader accepts, and make the reader accept every form the writer
+    produces while still refusing another record's name (another title,
+    another timestamp, a bare prefix of the id). Import the constant at module
+    level where a test stub of the owning module cannot silently change the
+    writer's output through a fail-soft branch.
+  verify: >-
+    A PAIRING test: feed the writer a real record id carrying every element
+    production ids carry, and assert the reader adopts exactly the name the
+    writer produced; keep the negative cases falling back. Whenever a filename
+    rule changes, grep for every reader that binds by name (startswith,
+    endswith, regex on the stem) and change it in the same commit. Portable
+    rule: a name-bound reader is part of the naming rule, and the fixture must
+    use production-shaped ids or it proves nothing.
+  tags: [filename-rule, name-bound-reader, ledger-pointer, pairing-test,
+    silent-fallback, planned-vs-published, fixture-blind-spot]
+  legacy_id: OTR-PBUG-20260904-06
