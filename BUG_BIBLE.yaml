@@ -10908,3 +10908,84 @@ bugs:
   tags: [filename-rule, name-bound-reader, ledger-pointer, pairing-test,
     silent-fallback, planned-vs-published, fixture-blind-spot]
   legacy_id: OTR-PBUG-20260904-06
+- id: "12.157"
+  phase: 12
+  area: huggingface
+  symptom: >-
+    Every model download through `snapshot_download` dies instantly with
+    `AttributeError: '<YourClass>' object has no attribute 'total'` (or `n`,
+    or `refresh`) the first time a cold cache needs a repo, while single-file
+    downloads through `hf_hub_download` in the same process keep working. The
+    failure appears only after a progress bar is wired up, so the feature added
+    to make downloads visible is what makes them impossible.
+  cause: >-
+    A hand-rolled stand-in was passed as `tqdm_class=`. `tqdm_class` is not a
+    narrow callback interface -- huggingface_hub constructs REAL bars from it
+    and then manipulates them as tqdm objects. `snapshot_download` builds two
+    parent bars and, once per file, runs
+    `parent.total = (parent.total or 0) + total` followed by `parent.refresh()`:
+    an attribute READ, an attribute WRITE, and a method call. A look-alike that
+    keeps counters private (`self._total`) and implements only
+    update/close/__enter__/__exit__ satisfies none of them. The surface is
+    whatever the library decides to touch, so it also grows across versions.
+    `hf_hub_download` callers are unaffected because they pass no `tqdm_class`,
+    which is exactly what makes the bug look intermittent and feature-specific.
+  fix: >-
+    SUBCLASS the real `tqdm.std.tqdm` and override only the display hook; do not
+    reimplement the protocol. Every attribute then exists and stays writable,
+    and it costs no new dependency because tqdm is already required by
+    huggingface_hub. Two traps: do NOT pass `disable=True` to keep the console
+    quiet -- tqdm short-circuits `update()` when disabled so the display hook
+    never runs and the bar silently forwards nothing while looking correct; give
+    it a private `io.StringIO` as `file` instead. And pop unexpected kwargs
+    (`name=`) defensively, since the library injects extras only for its own
+    subclass today. The hook must never raise: swallow every exception, because
+    a progress indicator that kills a 24 GB download is worse than none.
+  verify: >-
+    Drive the LIBRARY'S OWN constructor, not your class directly. Call
+    `huggingface_hub.utils.tqdm._create_progress_bar(cls=YourAdapter, **kwargs)`
+    with the exact keyword arguments the caller passes, then replay the
+    aggregation lines verbatim and assert the total accumulates. A test that
+    builds the adapter by hand and asserts on its own mock PASSES against the
+    broken version -- this is a CONTRACT bug, not a logic bug, so the test is
+    worthless unless the real library is in the loop. Also assert progress
+    actually reaches the sink (a bar that forwards nothing is the disable=True
+    trap) and that a sink which throws does not propagate.
+  tags: [huggingface, snapshot_download, tqdm, tqdm-class, progress-bar,
+    duck-typing, protocol-surface, contract-test, cold-cache, comfyui]
+  legacy_id: OTR-PBUG-20260906-08
+- id: "12.158"
+  phase: 12
+  area: workflow-json
+  symptom: >-
+    The application downloads, loads, or runs a different model, engine or
+    backend than the one the code calls its default. Nothing errors and no test
+    fails; the only symptom is a first-run user paying for a choice that was
+    supposedly reversed -- here a 23.9 GB download where the settled default was
+    8.7 GB.
+  cause: >-
+    The default was changed in CODE (a `DEFAULT_*` constant) but the shipped
+    graph/preset/template still had the OLD value saved in its widget values.
+    A saved graph does not consult the constant; the constant is only a fallback
+    for a graph that omits the field, and a shipped template never omits it.
+    The two disagreed and the graph won, because the graph is what executes.
+  fix: >-
+    Change the constant and every SHIPPED artifact that pins it in the same
+    commit, then prove the edit is surgical: diff against HEAD and assert links,
+    input descriptors and widget COUNT are identical, with only the intended
+    values changed. Resolve the widget slots BY NAME through the same helper the
+    generator uses -- saved widget arrays are POSITIONAL, so a hardcoded index
+    silently addresses the wrong slot the first time a widget is inserted above
+    it. Distinguish artifacts that INHERIT the default from ones that carry
+    their own per-profile value; only the former are fixed by fixing the master.
+  verify: >-
+    A test that loads every SHIPPED template, resolves the slot by name, and
+    asserts it equals the constant -- plus a second assertion that the saved
+    label is an exact member of the live dropdown, since a near-miss string
+    fails validation at load rather than falling back. Portable rule: a constant
+    the shipped graph disagrees with is DEAD, and "we decided X" is not true
+    until the artifact that ships says X. Any decision recorded only in code
+    needs a test that ties the artifact to it, or it will drift back silently.
+  tags: [workflow-json, widgets-values, positional-widgets, shipped-default,
+    dead-constant, template-drift, first-run-cost, comfyui]
+  legacy_id: OTR-PBUG-20260906-09
