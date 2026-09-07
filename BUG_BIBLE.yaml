@@ -10928,8 +10928,14 @@ bugs:
     keeps counters private (`self._total`) and implements only
     update/close/__enter__/__exit__ satisfies none of them. The surface is
     whatever the library decides to touch, so it also grows across versions.
-    `hf_hub_download` callers are unaffected because they pass no `tqdm_class`,
-    which is exactly what makes the bug look intermittent and feature-specific.
+    Any download lane that does not hand the library a `tqdm_class` is
+    untouched, which is exactly what makes the bug look intermittent and
+    feature-specific: in the originating case a second lane moved 36.8 GB
+    successfully in the same run because it never used the library's downloader
+    at all -- it pinned revisions with `hf_hub_url`/`get_hf_file_metadata` and
+    streamed the bytes itself over urllib with a plain `(done, total)` callback.
+    When one download path dies and another thrives, compare which one hands the
+    library an object, not which one looks busier.
   fix: >-
     SUBCLASS the real `tqdm.std.tqdm` and override only the display hook; do not
     reimplement the protocol. Every attribute then exists and stays writable,
@@ -10939,8 +10945,18 @@ bugs:
     never runs and the bar silently forwards nothing while looking correct; give
     it a private `io.StringIO` as `file` instead. And pop unexpected kwargs
     (`name=`) defensively, since the library injects extras only for its own
-    subclass today. The hook must never raise: swallow every exception, because
-    a progress indicator that kills a 24 GB download is worse than none.
+    subclass today. THE HOOK MUST CATCH BaseException, NOT Exception -- this is
+    the trap that looks like over-catching and is not. tqdm's `refresh()` is
+    `self._lock.acquire(); self.display(); self._lock.release()` with no
+    try/finally, and `TqdmDefaultWriteLock` keeps its `th_lock` as a CLASS
+    attribute, so ANYTHING the hook raises strands the lock and the next
+    `refresh()` on any tqdm anywhere in the process blocks forever. A
+    KeyboardInterrupt inside the sink deadlocks the whole application, not the
+    download. Losing one Ctrl-C during a progress paint is far cheaper.
+    Finally, WRITE COMPLETION EXPLICITLY when the download call returns: files
+    already in the cache return before any progress object is built, so a
+    resumed transfer aggregates only the missing pieces and a fully cached one
+    aggregates nothing, leaving the bar part-way while the work is done.
   verify: >-
     Drive the LIBRARY'S OWN constructor, not your class directly. Call
     `huggingface_hub.utils.tqdm._create_progress_bar(cls=YourAdapter, **kwargs)`
