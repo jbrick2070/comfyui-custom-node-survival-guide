@@ -2711,6 +2711,84 @@ class TestProvisioningTrackedStateBoundary:
 # check that reports clean because it never examined the thing it claims to
 # cover. Fixed by converting those six fields to block scalars; kept fixed here.
 
+# ---------------------------------------------------------------------------
+# BUG-12.159: a silent bitmap font fallback mis-places every centred element.
+# Static because the failure is invisible at runtime -- the glyphs render fine
+# and only their POSITION is wrong, so nothing errors and no render fails.
+# ---------------------------------------------------------------------------
+
+class TestSilentFontFallback:
+    """BUG-12.159: `ImageFont.load_default()` must never stand in silently.
+
+    A pack that MEASURES text with PIL to compute a position, and DRAWS it with
+    something else (libass, a subtitle burner, a different canvas), has two
+    independent font resolvers joined only by arithmetic. When PIL's candidate
+    list misses on a platform it falls back to a bitmap face that IGNORES the
+    requested size -- so the measurement is off by roughly a factor of ten, the
+    draw is unaffected, and centred text lands off-frame on that platform only.
+
+    The fallback itself is correct behaviour; being SILENT about it is the
+    defect. A single log line at the fallback turns "the operator squints at a
+    published title card" into "the render said so".
+    """
+
+    #: Where a fallback may sit without a warning: PIL's own vendored default
+    #: is loaded internally, and a test may exercise the fallback deliberately.
+    _EXEMPT_PARTS = ("site-packages", "__pycache__", "tests", "test_")
+
+    def test_load_default_is_never_a_silent_fallback(self, py_files):
+        """AST, not grep -- a prose mention is not a call.
+
+        The first version of this test matched the literal text
+        `load_default`, and its very first run flagged a DOCSTRING that
+        explained the rule. Finding real call sites is what `ast` is for.
+        """
+        import ast
+        import re
+
+        offenders = []
+        for path in py_files:
+            if any(part in str(path) for part in self._EXEMPT_PARTS):
+                continue
+            try:
+                src = open(path, encoding="utf-8").read()
+                tree = ast.parse(src)
+            except (OSError, UnicodeDecodeError, SyntaxError):
+                continue
+            lines = src.splitlines()
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                fn = node.func
+                if not (isinstance(fn, ast.Attribute)
+                        and fn.attr == "load_default"):
+                    continue
+                i = node.lineno - 1
+                # A warning anywhere in the surrounding window counts: the
+                # message usually precedes the call, occasionally follows it.
+                # Deliberately permissive about HOW it is emitted -- an earlier
+                # pattern demanded a `log.` prefix and missed
+                # `logging.getLogger("OTR").warning(`, reporting a site that
+                # was in fact warning correctly. The rule is "say something".
+                window = "\n".join(lines[max(0, i - 14):i + 4])
+                if re.search(r"\.(warning|warn|error|exception)\s*\(|"
+                             r"warnings\.warn|print\s*\(", window):
+                    continue
+                offenders.append("%s:%d" % (path, node.lineno))
+
+        assert not offenders, (
+            "BUG-12.159: `ImageFont.load_default()` is called as a fallback "
+            "with no warning nearby, at %s.\n\n"
+            "That fallback IGNORES the size argument, so any position computed "
+            "from a width it measured is wrong by roughly an order of "
+            "magnitude -- while a separate drawing path renders the glyphs at "
+            "the real size. The result is text that looks correct and is "
+            "placed off-frame, on one platform only, with a clean log. Emit a "
+            "warning at the fallback (once per process is enough) naming the "
+            "platform and the override that fixes it."
+            % ", ".join(offenders))
+
+
 class TestBibleIsActuallyParseable:
     def _repo_root(self):
         """Survival-guide repo root (parent of tests/).

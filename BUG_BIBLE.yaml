@@ -10970,6 +10970,67 @@ bugs:
   tags: [huggingface, snapshot_download, tqdm, tqdm-class, progress-bar,
     duck-typing, protocol-surface, contract-test, cold-cache, comfyui]
   legacy_id: OTR-PBUG-20260906-08
+- id: "12.159"
+  phase: 12
+  area: rendering
+  symptom: >-
+    Text is drawn correctly but POSITIONED wrong -- a centred title sits off to
+    one side or runs past the frame edge -- on one platform only, while the same
+    build centres perfectly on another. Nothing errors, no test fails, and the
+    glyphs themselves look right, which is why it reads as a cosmetic layout bug
+    rather than a platform gap. Other text on the SAME frame is placed correctly.
+  cause: >-
+    TWO INDEPENDENT FONT RESOLVERS, joined only by arithmetic. One subsystem
+    MEASURES text to compute a position (here PIL opening a font FILE by
+    absolute path, to do `x = centre - text_width // 2`); a different subsystem
+    DRAWS it (here libass, handed a font FAMILY NAME in an ASS style, under an
+    alignment that anchors at the given coordinate rather than centring itself).
+    Nothing passes a "centre" flag anywhere -- the arithmetic IS the centring,
+    and it is only as good as the measured width. The two resolvers had separate
+    per-platform tables and one of them had no entry for the platform, so
+    measurement silently fell back to a bitmap font that IGNORES the requested
+    size: a 21-character string measured 131px instead of 1218px at size 96, and
+    the real glyphs were drawn from that wrong origin. The correctly-placed text
+    on the same frame used an alignment where the DRAWING library did the
+    centring, so it never consulted the broken measurement.
+  fix: >-
+    Make the two sides agree BY CONSTRUCTION, not by two hand-kept tables.
+    Iterate FAMILY-MAJOR: complete one family's entire search -- its exact paths
+    AND the drawing library's own name-based lookup -- before considering the
+    next family, so preference cannot leak between search stages. (Splitting it
+    into "all paths, then all names" reintroduces the bug: an exact-path hit on
+    the second-choice family returns before the first-choice family's name
+    search ever runs.) Put the family the DRAWING side names first. Never let a
+    silent fallback stand in for a real face -- log it, because that silence is
+    what lets the defect reach a shipped artifact. Provide a path override for
+    hosts whose fonts are only reachable through a mechanism the measuring
+    library does not consult (fontconfig-only systems such as NixOS: the drawing
+    side finds the font and the measuring side cannot).
+  verify: >-
+    Assert the measured advance-per-character SCALES with the requested size
+    (a real face gives roughly 0.6 of the point size; a bitmap fallback gives
+    roughly 0.065 and is constant across sizes). Do NOT assert that the centred
+    string fits the frame -- `(w/2 - tw/2) + tw <= w` is a TAUTOLOGY for any
+    tw <= w and passes against the broken code; that exact test shipped green
+    while the bug was live. Assert the measured family MATCHES the family the
+    drawing side names, resolved through the drawing side's own accessor so an
+    override mismatch fails in CI rather than on a frame. Drive the real
+    resolver rather than re-implementing its comparison in the test. CRITICAL
+    for any resolver cached in a MODULE GLOBAL: reset that cache between tests,
+    or whichever test runs first warms it and every later test is served the
+    cached answer without executing the discovery code at all -- twelve source
+    mutants survived a QA pass for exactly this reason, including one that
+    deleted the entire fallback tier. Key the cache on the CONFIGURATION that
+    produced it, not on a "have we resolved yet" boolean, or an override set by
+    one run poisons every later run in the same process; and invalidate the
+    size-keyed object cache with it, since a stale font object is exactly as
+    wrong as a stale path. Publish the cache key AFTER the value, under a lock,
+    or a concurrent cold start reads "resolved" with the value still empty.
+  tags: [rendering, fonts, text-measurement, two-resolvers, platform-gap,
+    silent-fallback, module-global-cache, cache-invalidation, mutation-testing,
+    tautological-test, subtitles, comfyui]
+  legacy_id: OTR-PBUG-20260909-02
+
 - id: "12.158"
   phase: 12
   area: workflow-json

@@ -35,8 +35,8 @@
 # 2026-09-02 delta (registry scanner): 1 record appended, promoted as
 # 12.147 -- a scanner rule change flagging the session-bearer hidden input.
 audited: 2026-08-26
-bible_head: 81a8a9e (+12.157-12.158 appended 2026-09-06 evening, OTR 4060 clean-install drill)
-bible_entries: 337
+bible_head: 7be7825 (+12.159 appended 2026-09-09, OTR rented-Mac font-resolution drill)
+bible_entries: 338
 records:
 - ref: BUG_LOG.md L1022 (BUG-LOCAL-231 soak data point)
   title: A long per-clip render loop had no routine VRAM reclamation — cleanup fired only on an OOM exception, so a gradual
@@ -2898,3 +2898,17 @@ records:
   bible_id: "12.158"
   verdict: promoted
   source: live-execution
+- record: >-
+    OTR PBUG-20260909-02 (docs/PROD_BUG_LOG.md) -- hero title cards published
+    off the right edge of the frame, on macOS only. video_engine._load_font had
+    no macOS candidate, so PIL fell to its bitmap default, which IGNORES the
+    requested size: a 21-character title measured 131px instead of 1218px at
+    size 96, _otr_title_card centred from that width, and libass then drew the
+    real Menlo glyphs from the resulting origin (ASS Alignment 7, top-left, via
+    an explicit \pos). Two independent font resolvers joined only by
+    arithmetic. Windows was correct throughout, which is why it read as a
+    cosmetic layout bug rather than a platform gap. Verified on the published
+    episode lightning_mac_proof_3.
+  bible_id: "12.159"
+  verdict: promoted
+  source: live-artifact
