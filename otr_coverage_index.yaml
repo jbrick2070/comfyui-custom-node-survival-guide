@@ -2899,7 +2899,7 @@ records:
   verdict: promoted
   source: live-execution
 - record: >-
-    OTR PBUG-20260909-02 (docs/PROD_BUG_LOG.md) -- hero title cards published
+    OTR PBUG-20260909-04 (docs/PROD_BUG_LOG.md) -- hero title cards published
     off the right edge of the frame, on macOS only. video_engine._load_font had
     no macOS candidate, so PIL fell to its bitmap default, which IGNORES the
     requested size: a 21-character title measured 131px instead of 1218px at

@@ -11029,7 +11029,7 @@ bugs:
   tags: [rendering, fonts, text-measurement, two-resolvers, platform-gap,
     silent-fallback, module-global-cache, cache-invalidation, mutation-testing,
     tautological-test, subtitles, comfyui]
-  legacy_id: OTR-PBUG-20260909-02
+  legacy_id: OTR-PBUG-20260909-04
 
 - id: "12.158"
   phase: 12
