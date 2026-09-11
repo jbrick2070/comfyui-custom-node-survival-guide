@@ -7296,6 +7296,11 @@ bugs:
     throughout; only the description of the work is false. This is the inverse
     polarity of the permanently-empty receipt and needs its own hunt, because it
     cannot be found by looking for fields nobody ever sets.
+    A separate OTR occurrence was published by My Story pairlock_02 on
+    bd814148: actual IndexTTS2 references were selected for blank-gender cast
+    rows, while the credits named legacy Bark presets. That run also had a
+    source-gender defect; truthful engine/reference reporting does not by
+    itself establish correct casting or source fidelity.
   cause: |
     The runtime and the receipt read the same underlying value through DIFFERENT
     rules. Code that decides behaviour uses a named predicate -- "is this
@@ -7308,6 +7313,9 @@ bugs:
     What makes it durable is that the nearest test asserts the field's SHAPE --
     isinstance(value, bool) -- and a wrong bool is still a bool. That test passes
     forever while the value is inverted for a whole tier.
+    Another route skips primary assignment when a source attribute is unknown,
+    then selects a real asset at render time. Without the delivered stamp, a
+    legacy default is mistaken for the actual selection by the publishing reader.
   fix: |
     Give the fact ONE authority and make every consumer read it. Where a
     predicate already exists because the runtime needed it, the receipt calls
@@ -7317,12 +7325,20 @@ bugs:
     assertion comparing each receipt field against what the code actually does
     makes every later component inherit it, because this recurs wherever a
     skip-token idiom is adopted.
+    For alternate assignment paths, use the existing durable assignment owner
+    to stamp the same selected asset before dispatch. Keep an unknown source
+    attribute separate from the now-known selected reference; do not invent the
+    attribute, add a content gate or create another post-freeze ledger writer.
   verify: |
     For every tier, assert the receipt field EQUALS what the runtime does with
     the same token -- not that it is the right type, and not against a literal.
     Add a second assertion at the CONSUMER that publishes it, so the fix is
     pinned where the falsehood actually surfaced and not only at its source.
-  tags: [receipts, telemetry, truthiness, sentinel, published-artifact, gate-hole]
+    OTR's test_genderless_cast_wire_disk_render_and_credits_share_the_actual_reference
+    executes CastLock, durable disk/singleton/wire persistence, real reference
+    resolution and the credits builder. The Bible catalog retains this behavior
+    coverage; the OTR suite executes it without model synthesis.
+  tags: [receipts, telemetry, truthiness, sentinel, published-artifact, gate-hole, xref-12.51, xref-12.90]
 
 - id: "12.90"
   phase: 12
@@ -11184,6 +11200,9 @@ bugs:
     A local structured pass repeatedly emits undecodable output even though its
     transport already exposes a schema-binding capability. Parsing and repair
     are present, but generation never receives the grammar.
+    The same bypass appeared in the live pairlock_02 cleanup scope authorizer:
+    spans:null twice failed its nonnullable list schema despite an available
+    native binder, so valid dialogue retained an unresolved cleanup flag.
   cause: >-
     The caller supplies a schema to post-generation validation while invoking
     the unbound callable. A schema argument in the retry helper does not itself
@@ -11204,6 +11223,8 @@ bugs:
     test_scheduler_local_schema_binding_reaches_truncating_generator and
     test_generate_invoked_with_prefix_fn. Repeated real-model qualification is
     separate from this executable wiring proof.
+    Include the public cleaner's binder-once/reused-retry behavior and actual
+    grammar admission of omitted/empty spans versus exclusion of explicit null.
   tags: [llm, structured-json, schema-binding, call-routing, retry]
   legacy_id: PBUG-20260910-05
 
@@ -11241,6 +11262,40 @@ bugs:
     canonical model run is separately required for live qualification.
   tags: [llm, cleanup, source-fidelity, scoped-repair, ledger]
   legacy_id: PBUG-20260829-14
+
+- id: "11.65"
+  phase: 11
+  area: sparse-rewrite-materializes-author-defaults-over-accepted-data
+  symptom: >-
+    A correction changes accepted metadata even though its raw JSON explicitly
+    changed none of those values. Live OTR My Story pairlock_02 omitted fields;
+    validation supplied defaults for 15 leaves/lists, erasing stated gender,
+    requirement classifications, source references, strength and assumptions.
+    The operation was recorded as an applied rewrite.
+  cause: >-
+    A permissive schema appropriate for first authorship is reused as a full
+    replacement contract. After validation materializes defaults, model_dump
+    alone cannot distinguish omission from an explicit replacement. List-position
+    overlays can transfer metadata between different identities when reordered.
+  fix: >-
+    At the full-artifact correction owner, retain field-presence information.
+    Reconstruct omitted fields from an immutable accepted candidate, using only
+    explicit unique stable identities for nested lists. Explicit values and
+    clears remain authoritative; returned list membership/order wins. Revalidate
+    a fresh object and run the existing structural validator on that exact
+    object before returning, persisting or hashing it. Each failed attempt must
+    reuse the original baseline. Do not apply full-artifact overlay to edit-script
+    responses with a different shape, or add another model pass/retry budget.
+  verify: >-
+    Execute the production conservation helper with omitted and explicit fields,
+    reordered/removed/added/ambiguous identities and explicit empty values. Test
+    fresh validation, alias handling, failed-attempt isolation and the actual
+    saved artifact/returned artifact/receipt hash agreement. A sparse unchanged
+    response must stay unchanged without extra calls. OTR regressions are in
+    test_story_source_review.py and test_my_story_runner.py. This does not prove
+    a model's semantic corrections are faithful; qualify that on real output.
+  tags: [llm, structured-json, pydantic, source-fidelity, omission, xref-11.39]
+  legacy_id: PBUG-20260910-03
 
 - id: "12.160"
   phase: 12

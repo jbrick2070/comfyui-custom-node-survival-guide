@@ -1644,6 +1644,75 @@ class TestPhase07To12ProductionRegressionCatalog:
             for name in names:
                 assert f"def {name}(" in source, f"production regression missing: {relative_path}::{name}"
 
+    def test_otr_sparse_rewrite_conserves_only_omitted_fields(self, pack_dir):
+        """BUG-11.65: execute the actual pure reconstruction without model imports."""
+        path = os.path.join(pack_dir, "nodes", "_otr_story_source.py")
+        if not os.path.isfile(path):
+            pytest.skip("source correction owner is OTR-local")
+        with open(path, encoding="utf-8") as handle:
+            tree = ast.parse(handle.read(), filename=path)
+        definitions = [node for node in tree.body
+                       if isinstance(node, ast.FunctionDef) and node.name == "_retain_omitted"]
+        assert len(definitions) == 1, "BUG-11.65: source conservation owner missing"
+        pydantic = pytest.importorskip("pydantic")
+        namespace = {"BaseModel": pydantic.BaseModel}
+        exec(compile(ast.Module(body=definitions, type_ignores=[]), path, "exec"), namespace)
+        Person = pydantic.create_model("Person", name=(str, ""), gender=(str, ""),
+                                      speaking=(bool, True))
+        Draft = pydantic.create_model("Draft", people=(list[Person], []), setting=(str, ""))
+        original = Draft(people=[Person(name="A", gender="female"),
+                                 Person(name="B", gender="male")], setting="kitchen").model_dump()
+        import copy
+        before = copy.deepcopy(original)
+        reply = Draft.model_validate({"people": [{"name": "B"},
+                                                 {"name": "A", "gender": "", "speaking": False}]})
+        conserved = Draft.model_validate(namespace["_retain_omitted"](
+            reply, original, {("people",): "name"}))
+        assert conserved.setting == "kitchen"
+        assert [(p.name, p.gender, p.speaking) for p in conserved.people] == [
+            ("B", "male", True), ("A", "", False)]
+        for rows in ([], [{"name": "New"}], [{"name": "A"}, {"name": "A"}], [{}]):
+            result = namespace["_retain_omitted"](
+                Draft.model_validate({"people": rows}), original, {("people",): "name"})
+            assert len(result["people"]) == len(rows)
+            assert all(not row["gender"] for row in result["people"])
+        assert original == before
+
+    def test_otr_pairlock_followup_retains_behavior_coverage(self, pack_dir):
+        """BUG-11.39/11.63/11.65/12.89: retain tests executed by the OTR suite."""
+        if not os.path.isfile(os.path.join(pack_dir, "nodes", "_otr_my_story.py")):
+            pytest.skip("My Story behavior coverage is OTR-local")
+        expected = {
+            "tests/test_my_story_runner.py": {
+                "test_sparse_p0_source_reply_keeps_saved_metadata_and_records_unchanged"},
+            "tests/test_story_source_review.py": {
+                "test_sparse_source_correction_conserves_metadata_by_identity_not_position",
+                "test_explicit_corrections_clears_and_list_membership_are_authoritative",
+                "test_rejected_proposal_is_not_the_next_baseline_and_validator_result_is_journaled"},
+            "tests/test_ledger_clean_stage.py": {
+                "test_scope_authorization_binds_once_and_reuses_bound_slot_for_repair",
+                "test_scope_binder_failure_propagates_without_unconstrained_fallback"},
+            "tests/test_constrained_generate.py": {
+                "test_scope_authorization_real_grammar_accepts_empty_or_omitted_spans_never_null"},
+            "tests/test_my_story_visual_source.py": {
+                "test_scene_owner_receives_current_ages_and_shared_action_without_literalizing_memory"},
+            "tests/test_cast_lock.py": {
+                "test_auto_registry_stamps_genderless_character_without_inventing_gender"},
+            "tests/test_cast_lock_voice_ref_completeness.py": {
+                "test_unspecified_gender_names_the_real_render_reference_without_changing_identity"},
+            "tests/test_credits_roll_spec.py": {
+                "test_genderless_cast_wire_disk_render_and_credits_share_the_actual_reference"},
+            "tests/test_credits_s2_durable_stamps.py": {
+                "test_cast_lock_copies_local_wire_ledger_into_singleton"},
+        }
+        for relative, names in expected.items():
+            path = os.path.join(pack_dir, *relative.split("/"))
+            with open(path, encoding="utf-8") as handle:
+                tree = ast.parse(handle.read(), filename=path)
+            actual = {node.name for node in ast.walk(tree)
+                      if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
+            assert names <= actual, f"missing behavior coverage in {relative}: {names - actual}"
+
     def test_otr_native_termination_resolver_is_shared_and_nonmutating(self, pack_dir):
         """BUG-12.100: execute the real pure resolver; retain native/parser tests."""
         path = os.path.join(pack_dir, "nodes", "_otr_model_loader.py")
