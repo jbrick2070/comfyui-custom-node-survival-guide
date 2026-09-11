@@ -1609,6 +1609,7 @@ class TestPhase07To12ProductionRegressionCatalog:
             "tests/test_story_source_review.py": (
                 "test_stubborn_failure_stops_at_two_actual_calls_without_a_fourth_or_fifth_round",
                 "test_spoken_correction_is_applied_without_changing_surrounding_bytes_ids_or_order",
+                "test_spoken_source_alias_repairs_to_an_applied_missing_action_within_two_calls",
                 "test_tail_persists_source_repair_before_propagating_later_cleanup_failure",
                 "test_tail_rollback_keeps_attempt_history_and_actual_retained_hash_without_rechecking",
             ),
@@ -1636,6 +1637,7 @@ class TestPhase07To12ProductionRegressionCatalog:
             ),
             "tests/test_constrained_generate.py": (
                 "test_generate_invoked_with_prefix_fn",
+                "test_spoken_source_grammar_excludes_candidate_field_and_accepts_all_source_keys",
             ),
         }
         for relative_path, names in expected.items():
@@ -1645,6 +1647,53 @@ class TestPhase07To12ProductionRegressionCatalog:
                 source = handle.read()
             for name in names:
                 assert f"def {name}(" in source, f"production regression missing: {relative_path}::{name}"
+
+    def test_otr_spoken_source_schema_uses_the_original_field_namespace(self, pack_dir):
+        """BUG-11.39: execute actual schema nodes without importing pack/GPU startup.
+
+        This portable scan may target an uninstalled pack. AST selection keeps
+        the production definitions, with explicit failures if they are moved;
+        the OTR suite separately exercises real imports and native decoding.
+        """
+        source_path = os.path.join(pack_dir, "nodes", "_otr_story_source.py")
+        input_path = os.path.join(pack_dir, "nodes", "_otr_story_input.py")
+        if not os.path.isfile(source_path):
+            pytest.skip("My Story source coordinates are OTR-local")
+        import typing
+        pydantic = pytest.importorskip("pydantic")
+        namespace = {"Literal": typing.Literal, "get_args": typing.get_args,
+                     "TypeAlias": typing.TypeAlias,
+                     "BaseModel": pydantic.BaseModel, "ConfigDict": pydantic.ConfigDict,
+                     "StrictStr": pydantic.StrictStr, "StrictInt": pydantic.StrictInt,
+                     "Field": pydantic.Field}
+        with open(input_path, encoding="utf-8") as handle:
+            input_tree = ast.parse(handle.read(), filename=input_path)
+        names = {"CREATIVE_FIELDS", "CreativeFieldName"}
+        fields, found = [], set()
+        for node in input_tree.body:
+            targets = (node.targets if isinstance(node, ast.Assign) else
+                       [node.target] if isinstance(node, ast.AnnAssign) else [])
+            selected = {target.id for target in targets
+                        if isinstance(target, ast.Name) and target.id in names}
+            if selected:
+                fields.append(node)
+                found.update(selected)
+        assert found == names, "Source namespace declarations moved; update this isolated schema guard"
+        exec(compile(ast.Module(body=fields, type_ignores=[]), input_path, "exec"), namespace)
+        with open(source_path, encoding="utf-8") as handle:
+            source_tree = ast.parse(handle.read(), filename=source_path)
+        definitions = [node for node in source_tree.body if isinstance(node, ast.ClassDef)
+                       and node.name == "SpokenSourceEdit"]
+        assert len(definitions) == 1
+        exec(compile(ast.Module(body=definitions, type_ignores=[]), source_path, "exec"), namespace)
+        model = namespace["SpokenSourceEdit"]
+        assert model.model_json_schema()["properties"]["source_field"].get("enum") == list(namespace["CREATIVE_FIELDS"])
+        for field in namespace["CREATIVE_FIELDS"]:
+            assert model(line_id="l1", source_field=field, source_quote="source",
+                         original_quote="candidate", replacement="corrected").source_field == field
+        with pytest.raises(pydantic.ValidationError):
+            model(line_id="l1", source_field="text", source_quote="candidate",
+                  original_quote="candidate", replacement="corrected")
 
     def test_otr_full_repair_uses_captured_text_when_generation_raises(self, pack_dir):
         """BUG-11.48: execute the lane owner, not a copied repair implementation."""

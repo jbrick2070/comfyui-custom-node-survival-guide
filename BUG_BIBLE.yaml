@@ -3760,6 +3760,20 @@ bugs:
     preservation of untouched bytes, and durable repair history after cleanup
     failure or rollback. Coverage: test_story_source_review.py and
     test_my_story_runner.py in the OTR production regression suite.
+    Keep an edit's original-source field namespace closed in the bound schema
+    when the application validator already accepts only those fields. Live
+    My Story pairlock_05 generated source_field=text, confusing candidate text
+    with original source; its remaining repair returned no edits. Generate
+    the same allowed field enum from the existing source authority. Teach
+    source_quote versus original_quote and candidate-line offsets in the
+    actual model instruction, not only unused schema descriptions. Verify
+    native grammar excludes the invalid alias and all original source keys
+    remain usable; these assertions discriminate the schema correction.
+    Separately retain integration coverage that a corrected replacement applies
+    inside the same two-call budget. That conservation test also passes before
+    this schema correction and is not evidence of semantic recovery.
+    This structural correction does not certify semantic fidelity or justify
+    an additional publication gate.
     Visual coverage: tests/test_my_story_visual_source.py verifies full source
     and scene context, actual corrected-prompt application, bounded malformed
     retries, no stale appearance prepend, neutral portrait isolation, failed
