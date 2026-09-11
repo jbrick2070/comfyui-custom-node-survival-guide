@@ -3786,6 +3786,15 @@ bugs:
     author-only calls without a journal; and no scope leak into other phases.
     Keep partial scene/frame scope and exact spoken-edit conservation. These
     tests prove routing and application, not a live model's semantic fidelity.
+    My Story pairlock_07 quoted one spoken row but named another on both attempts.
+    Exact-row validation must identify the submitted line ID, quote, offsets and
+    selected draft text in its repair feedback. Preserve strict identity and
+    interval matching; never infer a different target or add a retry. Exercise
+    the existing second call with a corrected ID and actual applied replacement,
+    a stubborn wrong ID that retains the input, and repeated Unicode quotes
+    repaired using exact offsets. Re-entry must not reset the two-call budget.
+    Actionable feedback does not certify that an unproposed source omission is
+    repaired, nor does it justify a new publication gate.
     Visual coverage: tests/test_my_story_visual_source.py verifies full source
     and scene context, actual corrected-prompt application, bounded malformed
     retries, no stale appearance prepend, neutral portrait isolation, failed

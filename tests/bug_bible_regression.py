@@ -1610,6 +1610,8 @@ class TestPhase07To12ProductionRegressionCatalog:
                 "test_stubborn_failure_stops_at_two_actual_calls_without_a_fourth_or_fifth_round",
                 "test_spoken_correction_is_applied_without_changing_surrounding_bytes_ids_or_order",
                 "test_spoken_source_alias_repairs_to_an_applied_missing_action_within_two_calls",
+                "test_spoken_wrong_row_feedback_drives_bounded_exact_id_repair",
+                "test_spoken_interval_feedback_repairs_repeated_unicode_quote_with_exact_offsets",
                 "test_tail_persists_source_repair_before_propagating_later_cleanup_failure",
                 "test_tail_rollback_keeps_attempt_history_and_actual_retained_hash_without_rechecking",
             ),
