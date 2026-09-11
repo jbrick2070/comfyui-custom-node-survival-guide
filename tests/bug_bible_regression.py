@@ -1592,13 +1592,14 @@ class TestPhase07To12ProductionRegressionCatalog:
         )
 
     def test_otr_my_story_current_repair_and_parent_identity_coverage(self, pack_dir):
-        """BUG-11.48/12.58: current owners must not hide behind a retired catalog."""
+        """BUG-11.48 / BUG-11.62 / BUG-12.58: current owners need executable coverage."""
         if not os.path.isfile(os.path.join(pack_dir, "nodes", "_otr_my_story.py")):
             pytest.skip("My Story regression coverage is OTR-local")
         expected = {
             "tests/test_my_story_runner.py": (
                 "test_full_treatment_repair_preserves_material_and_matches_variable_controls",
                 "test_the_music_cues_anchor_to_real_sentinel_rows",
+                "test_zero_boundaries_preserves_all_unused_cue_proposals",
             ),
             "tests/test_music_cue_duration_reaches_the_beat.py": (
                 "test_my_story_null_parent_music_rows_preserve_timeline_identity",

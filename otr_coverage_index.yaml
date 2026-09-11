@@ -35,8 +35,8 @@
 # 2026-09-02 delta (registry scanner): 1 record appended, promoted as
 # 12.147 -- a scanner rule change flagging the session-bearer hidden input.
 audited: 2026-08-26
-bible_head: 7be7825 (+12.159 appended 2026-09-09, OTR rented-Mac font-resolution drill)
-bible_entries: 338
+bible_head: ea9fb788 (+11.62 appended 2026-09-10, OTR 4060 My Story boundary projection)
+bible_entries: 339
 records:
 - ref: BUG_LOG.md L1022 (BUG-LOCAL-231 soak data point)
   title: A long per-clip render loop had no routine VRAM reclamation — cleanup fired only on an OOM exception, so a gradual
@@ -2912,3 +2912,12 @@ records:
   bible_id: "12.159"
   verdict: promoted
   source: live-artifact
+- record: >-
+    OTR PBUG-20260910-04 -- 4060 My Story Steps 118/119/121 selected one act
+    but P0/P1 projected the enabled music-break checkbox as music between acts.
+    Assembly correctly had zero boundaries. The shared count now drives both
+    planning prompts, frame and assembly. Real runner/freeze fixtures cover
+    1/2/3/6 acts with breaks on/off and preserved surplus proposals.
+  bible_id: "11.62"
+  verdict: promoted
+  source: live-execution

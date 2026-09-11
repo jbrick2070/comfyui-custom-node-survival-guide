@@ -11073,3 +11073,29 @@ bugs:
   tags: [workflow-json, widgets-values, positional-widgets, shipped-default,
     dead-constant, template-drift, first-run-cost, comfyui]
   legacy_id: OTR-PBUG-20260906-09
+
+- id: "11.62"
+  phase: 11
+  area: generated-plan-boundary-count
+  symptom: >-
+    A generated plan promises between-section events for a one-section request,
+    even though deterministic assembly correctly emits no such events.
+  cause: >-
+    The prompt projects an enabled checkbox as an unconditional affirmative.
+    The assembler derives the actual count from topology. These two projections
+    disagree at the one-section boundary: enabled does not imply any boundaries.
+  fix: >-
+    Derive the boundary count once from the selected topology and the enable
+    control, then use that same rule for planning, framing and assembly. For
+    adjacent sections the count is max(0, section_count - 1) when enabled,
+    otherwise zero. State the numeric count to the model. Preserve unused
+    proposals as evidence; do not add prose keyword bans to hide a false prompt.
+  verify: >-
+    Exercise the real prompt builders and assembler together for one, two, three
+    and six sections with the enable control on and off. Assert the prompt count,
+    exact emitted boundary anchors, zero-boundary surplus disposition and final
+    structural validation. A helper-only arithmetic test misses divergent callers.
+    OTR coverage: test_the_music_cues_anchor_to_real_sentinel_rows and
+    test_zero_boundaries_preserves_all_unused_cue_proposals.
+  tags: [llm, prompt-projection, topology, boundary-count, source-fidelity]
+  legacy_id: OTR-PBUG-20260910-04
