@@ -35,8 +35,10 @@
 # 2026-09-02 delta (registry scanner): 1 record appended, promoted as
 # 12.147 -- a scanner rule change flagging the session-bearer hidden input.
 audited: 2026-08-26
-bible_head: 77bd6012 (+11.63 appended 2026-09-10, OTR My Story schema-binder routing)
-bible_entries: 340
+# Last code/test base; the September 11 incident-only delta follows this commit.
+# The audited date above describes the historical audit, not a new full scrape.
+bible_head: 7c87b17bed48bfe3c36a362a755b91d5bab95a47
+bible_entries: 344
 records:
 - ref: BUG_LOG.md L1022 (BUG-LOCAL-231 soak data point)
   title: A long per-clip render loop had no routine VRAM reclamation — cleanup fired only on an OOM exception, so a gradual
@@ -2931,3 +2933,26 @@ records:
   bible_id: "11.63"
   verdict: promoted
   source: live-execution
+
+- record: >-
+    OTR PBUG-20260911-03 -- canonical09 on9367f2fd retained a scopes video under
+    episodes/_shared/tmp rather than the active episode. Existing path class
+    01.02 applies; 12.66 is related artifact-identity context. Root cause is the
+    scopes producer's explicit shared-scratch selection/system-temp fallback,
+    not a pending-to-final rename bug. OPEN: producer repair and executable
+    episode-path coverage are still owed. Publication succeeded with scopes
+    blending bypassed. This records class coverage, not implementation closure.
+  bible_id: '01.02'
+  verdict: covered
+  source: live-artifact
+- record: >-
+    OTR PBUG-20260910-03 follow-ups through canonical09 -- existing11.39 owns
+    raw-source preservation, exact-row corrective feedback and separate house
+    frame ownership. On9367f2fd the full Gemma4-12B canonical publication keeps
+    all supplied dinner facts in saved spoken text. Source correction remains
+    bounded; a final no-op is not model-certified PASS. Visual continuity,
+    actual audio listening and repeatability remain open. All nine attempts
+    and their four writing failures/five publications remain in the record.
+  bible_id: '11.39'
+  verdict: covered
+  source: live-artifact

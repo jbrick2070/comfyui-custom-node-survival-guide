@@ -10,6 +10,14 @@ while preserving exact row identity and unresolved outcomes.
 It also covers separating house-frame narration from dramatic cast and endings,
 with complete bounded repairs and preserved source identity.
 
+Live OTR canonical09 now records one saved-dialogue source-fidelity pass;
+visual continuity, audio listening and repeatability remain open. The coverage
+index also records OPEN PBUG-20260911-03 under path rule01.02: a retained scopes
+video is written outside its owning episode. Incident annotations do not change
+the 344 parsed rules or executable checks. Producer repair and the matching
+portable verification/test expansion are the next coding chunk, not a claimed
+fix in this documentation handoff.
+
 ---
 
 ### What this catches

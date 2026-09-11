@@ -53,6 +53,15 @@ bugs:
   tags: [discovery, paths, desktop-app]
   legacy_id: "55"
 
+# OPEN OTR occurrence, 2026-09-11, PBUG-20260911-03 (class01.02; xref12.66):
+# Canonical09 on9367f2fd retained a rendered scopes MP4 in episodes/_shared/tmp.
+# OTR's explicit asset contract requires even retained intermediate video to
+# live under its active episode; generic temp-dir advice below is not an OTR
+# exemption. The existing producer selects shared scratch and has a system-temp
+# fallback. Publication succeeded with blending bypassed; the path defect stays
+# OPEN. Correct the producer and expand the portable verify/test together in the
+# next coding chunk. This is incident evidence, not a fixed/test-covered claim.
+# Receipt: OTR docs/2026-09-11-my-story-5080-qualification/pairlock_09_receipt.md.
 - id: "01.02"
   phase: 1
   area: paths
@@ -3709,6 +3718,10 @@ bugs:
   tags: [concurrency, race-condition, refine-loop, freeze-cascade, cleanup]
   legacy_id: PBUG-20260623-01
 
+# Live OTR follow-up, canonical09 on9367f2fd: saved spoken text preserves all
+# dinner-source facts after bounded owner repairs; actual voice credits agree.
+# One saved-dialogue pass does not close visual continuity/audio/repeatability.
+# Raw source and spoken-correction input/output hashes are distinct. See09receipt.
 - id: "11.39"
   phase: 11
   area: llm-output
