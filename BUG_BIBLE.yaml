@@ -11099,3 +11099,33 @@ bugs:
     test_zero_boundaries_preserves_all_unused_cue_proposals.
   tags: [llm, prompt-projection, topology, boundary-count, source-fidelity]
   legacy_id: OTR-PBUG-20260910-04
+
+- id: "11.63"
+  phase: 11
+  area: structured-pass-schema-binder-routing
+  symptom: >-
+    A local structured pass repeatedly emits undecodable output even though its
+    transport already exposes a schema-binding capability. Parsing and repair
+    are present, but generation never receives the grammar.
+  cause: >-
+    The caller supplies a schema to post-generation validation while invoking
+    the unbound callable. A schema argument in the retry helper does not itself
+    connect that schema to token selection in the transport. This differs from
+    missing prompt/schema contracts (11.38) and unsupported grammars (11.55).
+  fix: >-
+    Bind the affected pass's local callable once to its production schema when
+    the capability is available, and use that callable for every existing retry.
+    Preserve neighboring passes, slot ownership/accounting and transports without
+    the capability. Keep ordinary parsing and bounded typed repair after decoding.
+  verify: >-
+    Exercise the actual pass with a recording binder. Require one binding to the
+    correct schema, every attempt through the returned callable, unchanged
+    neighboring passes and failure after malformed output exhausts the ladder.
+    Verify the scheduler forwards the schema to the real local generation owner
+    and the owner supplies its prefix constraint to model.generate. OTR anchors:
+    test_only_p1_binds_once_and_all_its_retries_use_that_callable,
+    test_scheduler_local_schema_binding_reaches_truncating_generator and
+    test_generate_invoked_with_prefix_fn. Repeated real-model qualification is
+    separate from this executable wiring proof.
+  tags: [llm, structured-json, schema-binding, call-routing, retry]
+  legacy_id: PBUG-20260910-05
