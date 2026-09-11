@@ -1610,6 +1610,22 @@ class TestPhase07To12ProductionRegressionCatalog:
                 "test_tail_persists_source_repair_before_propagating_later_cleanup_failure",
                 "test_tail_rollback_keeps_attempt_history_and_actual_retained_hash_without_rechecking",
             ),
+            "tests/test_my_story_visual_source.py": (
+                "test_complete_source_scene_dialogue_and_target_reach_applied_correction",
+                "test_actual_shared_source_call_does_not_change_neutral_portrait_scope",
+                "test_corrected_narrative_appearance_is_not_prepended_back_into_prompt",
+                "test_scene_correction_has_one_budget_including_malformed_and_schema_repairs",
+                "test_malformed_reply_is_repaired_once_and_actual_second_prompt_is_used",
+                "test_provider_oom_and_cancellation_escape_without_becoming_empty_scene",
+                "test_failed_visual_operation_is_logged_with_context_before_provider_error_escapes",
+                "test_derived_payload_applies_each_correction_and_forwards_zero_reseed_budget",
+                "test_wired_node_resolves_raw_owner_once_and_keeps_portraits_separate",
+                "test_fresh_cache_and_durable_manifest_use_current_receipt",
+                "test_changed_source_or_dialogue_invalidates_cache_even_with_stale_payload",
+                "test_real_jump_merge_keeps_scene_source_scope_and_invalidates_cache",
+                "test_changed_prompt_discloses_stale_evidence_and_banana_never_claims_pass",
+                "test_cache_hit_clears_removed_source_receipt",
+            ),
             "tests/test_music_cue_duration_reaches_the_beat.py": (
                 "test_my_story_null_parent_music_rows_preserve_timeline_identity",
             ),
@@ -1627,6 +1643,126 @@ class TestPhase07To12ProductionRegressionCatalog:
                 source = handle.read()
             for name in names:
                 assert f"def {name}(" in source, f"production regression missing: {relative_path}::{name}"
+
+    def test_otr_credits_hero_containment_has_real_font_and_footer_coverage(self, pack_dir):
+        """BUG-12.160: pure production wrapping plus actual paint regressions."""
+        path = os.path.join(pack_dir, "nodes", "otr_credits_roll.py")
+        if not os.path.isfile(path):
+            pytest.skip("credits hero owner is OTR-local")
+        test_path = os.path.join(pack_dir, "tests", "test_credits_roll_spec.py")
+        with open(test_path, encoding="utf-8") as handle:
+            test_tree = ast.parse(handle.read(), filename=test_path)
+        test_names = {node.name for node in ast.walk(test_tree) if isinstance(node, ast.FunctionDef)}
+        expected = {
+            "test_hero_complete_glyphs_stay_in_column_and_subtitle_follows",
+            "test_live_lantern_title_preserves_footer_policy",
+            "test_hero_negative_bearing_uses_actual_font_bounds",
+            "test_hero_wrap_keeps_modified_and_joined_symbols_together",
+            "test_short_hero_keeps_its_existing_position_font_and_whitespace",
+        }
+        assert expected <= test_names, f"BUG-12.160: missing production regressions {expected - test_names}"
+        with open(path, encoding="utf-8") as handle:
+            tree = ast.parse(handle.read(), filename=path)
+        names = {"_hero_clusters", "_hero_lines"}
+        definitions = [node for node in tree.body
+                       if isinstance(node, ast.FunctionDef) and node.name in names]
+        assert {node.name for node in definitions} == names, "BUG-12.160: missing complete-title layout owner"
+        namespace = {}
+        exec(compile(ast.Module(body=definitions, type_ignores=[]), path, "exec"), namespace)
+        image = pytest.importorskip("PIL.Image")
+        image_draw = pytest.importorskip("PIL.ImageDraw")
+        image_font = pytest.importorskip("PIL.ImageFont")
+        font = None
+        for candidate in (os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts", "consola.ttf"),
+                          "DejaVuSans.ttf", "/System/Library/Fonts/Menlo.ttc"):
+            try:
+                font = image_font.truetype(candidate, 48)
+                break
+            except OSError:
+                continue
+        if font is None:
+            pytest.skip("real font unavailable; production paint regression owners verified")
+        draw = image_draw.Draw(image.new("RGB", (1024, 256)))
+        wrap = namespace["_hero_lines"]
+        for title in ("THE LANTERN BURNS BRIGHT WHILE SLANDER HIDES", "ABCDEFGHIJKLMNOPQRSTUVWXYZ" * 3,
+                      "A\u0301" * 42, "\U0001f44d\U0001f3fd" * 20,
+                      "\U0001f1fa\U0001f1f8" * 20, "\U0001f469\u200d\U0001f4bb" * 20):
+            lines = wrap(draw, title, font, 598)
+            assert "".join(lines).replace(" ", "") == title.replace(" ", "")
+            for line in lines:
+                left, _, right, _ = draw.textbbox((0, 0), line, font=font)
+                assert max(0, right) - min(0, left) <= 598
+        for symbol in ("A\u0301", "\U0001f44d\U0001f3fd", "\U0001f1fa\U0001f1f8", "\U0001f469\u200d\U0001f4bb"):
+            left, _, right, _ = draw.textbbox((0, 0), symbol, font=font)
+            assert wrap(draw, symbol * 3, font, max(0, right) - min(0, left)) == [symbol] * 3
+
+    def test_otr_open_health_requires_frozen_intent_and_reports_unknown(self, pack_dir):
+        """BUG-12.161: execute the classifier without importing a render runtime."""
+        path = os.path.join(pack_dir, "nodes", "_otr_video_engines", "render_driver.py")
+        if not os.path.isfile(path):
+            pytest.skip("open health owner is OTR-local")
+        with open(path, encoding="utf-8") as handle:
+            tree = ast.parse(handle.read(), filename=path)
+        definitions = [node for node in tree.body if isinstance(node, ast.FunctionDef)
+                       and node.name == "check_ltx_open_health"]
+        constants = [node for node in tree.body if isinstance(node, ast.Assign)
+                     and any(isinstance(target, ast.Name)
+                             and target.id in {"_LTX_OPEN_ENGINES", "_LTX_OPEN_ROLES"}
+                             for target in node.targets)]
+        assert len(definitions) == 1 and len(constants) == 2
+        import copy
+        import logging
+        from types import SimpleNamespace
+        namespace = {
+            "_LOG": logging.getLogger("Bible.ltx_health"),
+            "_receipt": SimpleNamespace(is_sanctioned_gap=lambda row: row.get("status") == "sanctioned_gap"),
+            "_vreg": SimpleNamespace(CAPABILITIES={"still_pan": {}}, is_registered=lambda eid: eid == "still_pan"),
+            "_OPENING_MUSIC_SUFFIX": "_music_open", "RenderFloorError": RuntimeError,
+            "otr_env": os.environ,
+        }
+        exec(compile(ast.Module(body=constants + definitions, type_ignores=[]), path, "exec"), namespace)
+        check = namespace["check_ltx_open_health"]
+        for intended, actual, exists, expected in (
+            ("still_pan", "still_pan", True, "not_requested"),
+            (None, "ltx_video", True, "unknown"),
+            ("unmapped", "ltx_video", True, "unknown"),
+            ("ltx_video", "still_pan", True, "degraded"),
+            ("ltx_video", "ltx_video", False, "degraded"),
+            *((eid, eid, True, "healthy") for eid in namespace["_LTX_OPEN_ENGINES"]),
+        ):
+            manifest = {"roles_effective": {"announcer_visual": intended},
+                        "clips": [{"shot_id": "s1", "beat_id": "b1", "role": "announcer_visual",
+                                   "engine_id": actual, "exists": exists}]}
+            before = copy.deepcopy(manifest)
+            report = {"stale": True}
+            bad = check(manifest, strict=False, report_out=report)
+            assert report["status"] == expected
+            assert "stale" not in report and report["rows"][0]["intended_engine_id"] == intended
+            assert bool(bad) == (expected == "degraded")
+            assert manifest == before
+            json.dumps(report)
+            if expected == "degraded":
+                with pytest.raises(RuntimeError):
+                    check(manifest, strict=True)
+                manifest["clips"][0]["status"] = "sanctioned_gap"
+                assert check(manifest, strict=True, report_out=report) == []
+                assert report["status"] == "sanctioned"
+            else:
+                assert check(manifest, strict=True) == []
+        expected_tests = {
+            "test_ltx_open_health.py": {
+                "test_each_intended_ltx_engine_has_healthy_actual_artifact",
+                "test_only_proven_ltx_intent_demands_an_ltx_open",
+                "test_actual_ltx_without_intent_cannot_establish_health",
+                "test_manifest_uses_frozen_effective_intent_not_picked_or_mutated_shot",
+            },
+            "test_ltx_open_health_stdlib.py": {"test_health_check_does_not_mutate_the_manifest"},
+        }
+        for filename, expected in expected_tests.items():
+            with open(os.path.join(pack_dir, "tests", filename), encoding="utf-8") as handle:
+                test_tree = ast.parse(handle.read(), filename=filename)
+            names = {node.name for node in ast.walk(test_tree) if isinstance(node, ast.FunctionDef)}
+            assert expected <= names, f"BUG-12.161: missing production regressions {expected - names}"
 
     def test_otr_positioned_media_timeline_ownership(self, pack_dir):
         """BUG-12.69: positioned output excludes duplicated crossfade work."""

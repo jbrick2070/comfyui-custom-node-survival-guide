@@ -3733,6 +3733,24 @@ bugs:
     attempt budget that includes helper retries and never resets after a rewrite.
     Exhausted optional source correction retains accepted usable text with an
     unresolved receipt; it is not an additional publication veto or a PASS claim.
+    Apply the same authority to scene prompts: the 4060 My Story Step 120
+    preserved a shared dinner in authored text but staged the living mother
+    waiting alone or Jeffrey absent. Send the full raw source, resolved setting,
+    scene/act context, ordered dialogue, target identity and candidate companions
+    to the existing bounded scene rewriter. Let that model decide presence;
+    not every speaker must appear in every frame. Retain the returned corrected
+    prompt, without reintroducing stale narrative appearance afterward. Neutral
+    portraits, announcer and music prompts retain their separate scopes.
+    Count malformed/schema retries inside the existing maximum of two actual
+    scene-correction attempts; zero reseeds permits one. Bind the correction
+    receipt to source/context and corrected-input hashes. Record later style,
+    safety and finishing transforms against the actual final prompt/hash, without
+    claiming the final image is source-qualified. Recompute current context for
+    cache reads, including setting-only changes and cloned jump-cut scenes, and
+    replace inherited receipts with current evidence on fresh and cached rows
+    and in durable manifests. Real provider/memory/cancellation failures retain
+    their type; if no payload returns, journal completed failure evidence through
+    the existing logger rather than pretending an image row was persisted.
   verify: |
     Remove one required source literal from an otherwise valid artifact and
     assert the exact owning coordinate fails before publication. Switch only a
@@ -3742,6 +3760,13 @@ bugs:
     preservation of untouched bytes, and durable repair history after cleanup
     failure or rollback. Coverage: test_story_source_review.py and
     test_my_story_runner.py in the OTR production regression suite.
+    Visual coverage: tests/test_my_story_visual_source.py verifies full source
+    and scene context, actual corrected-prompt application, bounded malformed
+    retries, no stale appearance prepend, neutral portrait isolation, failed
+    attempt logging and fresh/cache/manifest evidence. Require
+    test_changed_source_or_dialogue_invalidates_cache_even_with_stale_payload
+    (including a setting-only change) and
+    test_real_jump_merge_keeps_scene_source_scope_and_invalidates_cache.
   tags: [llm-output, source-grounding, provenance, literal-anchor, channel-isolation, fail-closed, llm]
   legacy_id: PBUG-20260712-04
 
@@ -11175,3 +11200,90 @@ bugs:
     canonical model run is separately required for live qualification.
   tags: [llm, cleanup, source-fidelity, scoped-repair, ledger]
   legacy_id: PBUG-20260829-14
+
+- id: "12.160"
+  phase: 12
+  area: rendered-text-container-containment
+  symptom: >-
+    A long credits title crosses its own column and collides with the adjacent
+    cast heading although a shorter title fits. The Mac canonical publication
+    The Lantern Burns Bright While Slander Hides on 2026-09-10 exhibited this
+    in its saved credits frame; the episode completed and was accepted with
+    the appearance defect parked. Evidence is OTR
+    docs/2026-09-10-mac-final/README.md and images/credits.png, publication
+    SHA-256 986d2cb71576ce8ac73cf14850f5fecd85dbf460dc7e4fc875c107348f8b88d4.
+  cause: >-
+    Autoshrink stopped at the minimum readable size, then drew the entire
+    unwrapped title without a container-width guarantee. A size floor does not
+    imply a width bound. Measuring advance alone also misses negative bearings
+    and glyph overhang. This is distinct from 12.159: the measuring and drawing
+    fonts can agree perfectly and still overflow when no wrapping owns the
+    container or when the next block assumes a single title line.
+  fix: >-
+    Preserve short-title typography, then wrap the complete title at its existing
+    legibility floor. Split overlong words between display clusters, retaining
+    combining marks, modifiers, flag pairs and joined symbols. Use the drawing
+    library's glyph bounds, account for bearings at the origin, and advance the
+    following block below all title lines. Share this exact layout between
+    scratch measurement and paint. Feed the measured height into the existing
+    footer-spacing and explicitly marked abridgment policy; do not silently
+    ellipsize the title or drop reproducibility records. A canvas smaller than
+    an indivisible glyph or the complete minimum card needs an explicit layout
+    limitation, not a false containment claim or destruction of finished media.
+  verify: >-
+    Exercise actual font drawing at each supported card size with the published
+    Lantern title, a fitting short title, a long unbroken token, combining marks,
+    modified emoji, flag pairs and joined symbols. Assert all displayed title
+    characters survive, actual painted bounds remain inside the column, lines
+    do not overlap, and the subtitle follows the lowest title glyph. Assert
+    scratch and paint heights agree and the live title respects the footer
+    policy. Include a real italic font with negative bearings. OTR anchors:
+    test_hero_complete_glyphs_stay_in_column_and_subtitle_follows,
+    test_live_lantern_title_preserves_footer_policy,
+    test_hero_negative_bearing_uses_actual_font_bounds and
+    test_hero_wrap_keeps_modified_and_joined_symbols_together in
+    tests/test_credits_roll_spec.py. The portable guard executes the production
+    wrapping helpers and requires these real-font regressions to remain present.
+  tags: [rendering, credits, typography, glyph-bounds, unicode, wrapping, containment]
+  legacy_id: PBUG-20260911-01
+
+- id: "12.161"
+  phase: 12
+  area: health-diagnostics-frozen-route-intent
+  symptom: >-
+    A successful intentionally all-stills render emits failed-LTX health
+    warnings although no LTX route was requested. The 4060 My Story Step 121
+    published signal_lost_los_angeles_dinner_pair_lock_visual_leg_20260910_193857
+    with 13 still_pan clips and logged five LTX-OPEN HEALTH warnings. The
+    committed live receipts are OTR docs/4060_DRILL_LOG.md Step 121 and
+    docs/2026-09-10-my-story-4060/README.md. This is a false diagnostic on a
+    completed media route, not evidence that LTX or the stills render failed.
+  cause: >-
+    The health check inferred a required engine family from a role name rather
+    than consulting the frozen effective route. It compared every opener to
+    LTX even when the operator chose a registered non-LTX engine. Conversely,
+    simply suppressing warnings when route evidence is absent would confuse
+    unknown applicability with a verified healthy requested path.
+  fix: >-
+    Copy frozen effective route intent into the artifact manifest and compare
+    it with delivered engine identity and artifact existence. Report a requested
+    LTX route with an existing accepted-family artifact as healthy; a requested
+    route with a wrong or absent artifact as degraded; an intentional registered
+    non-LTX route as not requested; and missing or unmapped intent as unknown,
+    even when an actual LTX artifact exists. Preserve sanctioned-gap handling
+    separately. Return these primitive distinctions in the durable report;
+    an empty offending-row list alone is not a health claim. Keep the default
+    checker non-mutating, strict failure scoped to real requested degradation,
+    and fallback, audio and routing behavior unchanged.
+  verify: >-
+    Exercise each accepted LTX engine with an existing artifact, an intended
+    non-LTX route, absent and unmapped intent, missing artifacts, sanctioned
+    gaps, and strict-mode failures. Prove actual LTX alone cannot turn unknown
+    intent into health. Build a real manifest from the frozen effective map,
+    verify a selected or mutated shot route does not replace it, and mutate
+    the source map afterward to prove the manifest owns a copy. OTR regressions
+    live in tests/test_ltx_open_health.py and test_ltx_open_health_stdlib.py;
+    the portable guard directly exercises the production classifier and pins
+    the manifest-persistence and non-mutation regression owners.
+  tags: [diagnostics, telemetry, frozen-route, provenance, false-warning, applicability]
+  legacy_id: PBUG-20260906-03
