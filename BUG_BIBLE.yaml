@@ -3774,6 +3774,18 @@ bugs:
     this schema correction and is not evidence of semantic recovery.
     This structural correction does not certify semantic fidelity or justify
     an additional publication gate.
+    My Story pairlock_06 retained a global episode ending in its treatment but
+    foregrounded a conflicting local ending_state to the sole act writer.
+    Verify the last act's explicit target uses the existing nonblank episode
+    ending, independently of unheard cast, while earlier acts retain their local
+    targets. Preserve blank-global fallback and exact multiline ending data.
+    Pass the same static artifact-scope instruction to the existing author and
+    correction owner without putting model-derived ending text into system
+    instructions or leaking the scope keyword to the native structured caller.
+    Exercise one, three and six acts; actual applied and unchanged corrections;
+    author-only calls without a journal; and no scope leak into other phases.
+    Keep partial scene/frame scope and exact spoken-edit conservation. These
+    tests prove routing and application, not a live model's semantic fidelity.
     Visual coverage: tests/test_my_story_visual_source.py verifies full source
     and scene context, actual corrected-prompt application, bounded malformed
     retries, no stale appearance prepend, neutral portrait isolation, failed

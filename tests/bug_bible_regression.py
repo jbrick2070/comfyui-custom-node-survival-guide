@@ -1760,7 +1760,10 @@ class TestPhase07To12ProductionRegressionCatalog:
             pytest.skip("My Story behavior coverage is OTR-local")
         expected = {
             "tests/test_my_story_runner.py": {
-                "test_sparse_p0_source_reply_keeps_saved_metadata_and_records_unchanged"},
+                "test_sparse_p0_source_reply_keeps_saved_metadata_and_records_unchanged",
+                "test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast",
+                "test_act_scope_without_a_source_journal_still_reaches_the_author",
+                "test_act_scope_does_not_leak_to_other_phases_of_the_real_runner"},
             "tests/test_story_source_review.py": {
                 "test_sparse_source_correction_conserves_metadata_by_identity_not_position",
                 "test_explicit_corrections_clears_and_list_membership_are_authoritative",
