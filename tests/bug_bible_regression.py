@@ -1592,7 +1592,7 @@ class TestPhase07To12ProductionRegressionCatalog:
         )
 
     def test_otr_my_story_current_repair_and_parent_identity_coverage(self, pack_dir):
-        """BUG-11.48 / BUG-11.62 / BUG-11.63 / BUG-12.58: executable coverage."""
+        """BUG-11.39 / BUG-11.48 / BUG-11.62 / BUG-11.63 / BUG-12.58 coverage."""
         if not os.path.isfile(os.path.join(pack_dir, "nodes", "_otr_my_story.py")):
             pytest.skip("My Story regression coverage is OTR-local")
         expected = {
@@ -1600,7 +1600,15 @@ class TestPhase07To12ProductionRegressionCatalog:
                 "test_full_treatment_repair_preserves_material_and_matches_variable_controls",
                 "test_the_music_cues_anchor_to_real_sentinel_rows",
                 "test_zero_boundaries_preserves_all_unused_cue_proposals",
-                "test_only_p1_binds_once_and_all_its_retries_use_that_callable",
+                "test_author_p1_reuses_its_binding_and_source_corrections_bind_their_own_schemas",
+                "test_combined_corrections_reach_the_saved_artifacts_and_spoken_ledger",
+                "test_unusable_source_rewrites_stop_at_two_and_keep_a_usable_saved_ledger",
+            ),
+            "tests/test_story_source_review.py": (
+                "test_stubborn_failure_stops_at_two_actual_calls_without_a_fourth_or_fifth_round",
+                "test_spoken_correction_is_applied_without_changing_surrounding_bytes_ids_or_order",
+                "test_tail_persists_source_repair_before_propagating_later_cleanup_failure",
+                "test_tail_rollback_keeps_attempt_history_and_actual_retained_hash_without_rechecking",
             ),
             "tests/test_music_cue_duration_reaches_the_beat.py": (
                 "test_my_story_null_parent_music_rows_preserve_timeline_identity",

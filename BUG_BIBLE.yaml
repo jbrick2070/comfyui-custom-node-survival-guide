@@ -3727,10 +3727,21 @@ bugs:
     owned score and spoken-script locations, validate them after every retake,
     and keep visual-style instructions on a separate channel that cannot alter
     any story message.
+    For flexible source-authored lanes such as My Story, retain the exact raw
+    source separately from working interpretations. A semantic correction must
+    return actual usable text through its author/cleanup owner, with a fixed
+    attempt budget that includes helper retries and never resets after a rewrite.
+    Exhausted optional source correction retains accepted usable text with an
+    unresolved receipt; it is not an additional publication veto or a PASS claim.
   verify: |
     Remove one required source literal from an otherwise valid artifact and
     assert the exact owning coordinate fails before publication. Switch only a
     visual-style setting and assert captured story messages remain byte-identical.
+    My Story: exercise full corrected artifacts and exact source-grounded spoken
+    replacements; verify raw Unicode/ending context, a two-call stubborn failure,
+    preservation of untouched bytes, and durable repair history after cleanup
+    failure or rollback. Coverage: test_story_source_review.py and
+    test_my_story_runner.py in the OTR production regression suite.
   tags: [llm-output, source-grounding, provenance, literal-anchor, channel-isolation, fail-closed, llm]
   legacy_id: PBUG-20260712-04
 
