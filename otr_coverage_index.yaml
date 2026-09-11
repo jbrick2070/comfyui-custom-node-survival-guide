@@ -34,11 +34,11 @@
 # two records for that reason.
 # 2026-09-02 delta (registry scanner): 1 record appended, promoted as
 # 12.147 -- a scanner rule change flagging the session-bearer hidden input.
-audited: 2026-08-26
+audited: 2026-09-11
 # Last code/test base; the September 11 incident-only delta follows this commit.
 # The audited date above describes the historical audit, not a new full scrape.
-bible_head: 7c87b17bed48bfe3c36a362a755b91d5bab95a47
-bible_entries: 344
+bible_head: 55c6e4f944a2f1aeabbee23d77e9f914f8f91d04
+bible_entries: 346
 records:
 - ref: BUG_LOG.md L1022 (BUG-LOCAL-231 soak data point)
   title: A long per-clip render loop had no routine VRAM reclamation — cleanup fired only on an OOM exception, so a gradual
@@ -2937,11 +2937,54 @@ records:
 - record: >-
     OTR PBUG-20260911-03 -- canonical09 on9367f2fd retained a scopes video under
     episodes/_shared/tmp rather than the active episode. Existing path class
-    01.02 applies; 12.66 is related artifact-identity context. Root cause is the
+    01.02 applies; 12.66 is related artifact-identity context. Root cause was the
     scopes producer's explicit shared-scratch selection/system-temp fallback,
-    not a pending-to-final rename bug. OPEN: producer repair and executable
-    episode-path coverage are still owed. Publication succeeded with scopes
-    blending bypassed. This records class coverage, not implementation closure.
+    not a pending-to-final rename bug. CODE FIXED 2026-09-11: the producer
+    resolves the episode identity at entry and writes through the validated
+    per-episode authority, with the scratch selection and the fallback both
+    removed, and executable destination coverage added. A live canonical
+    requalification is still owed, so this is fixed-and-covered, not live-proven.
+    Publication succeeded with scopes blending bypassed.
+  bible_id: '01.02'
+  verdict: covered
+  source: live-artifact
+- record: >-
+    OTR PBUG-20260911-03, portable contract promoted. A RETAINED intermediate
+    that a later node consumes is a deliverable of its job, not scratch, and
+    belongs under its owner rather than in any swept tier -- the 2026-06-30
+    hygiene repair had moved this file out of the ambient system temp dir into a
+    project-owned scratch tier and a test then PINNED it there, asserting the
+    contract backwards. The fix also proves the split the class turns on: the
+    RAW identity goes to the path authority so its raising gate decides
+    placement, while a filename sanitizer stays a basename label, because "a/b"
+    sanitizes to the legal token "a_b" and would otherwise create a bogus job
+    directory silently. Promoted as new rule 01.05 with real-producer
+    destination coverage in OTR tests/test_video_scene_aware_scopes.py.
+  bible_id: '01.05'
+  verdict: promoted
+  source: live-artifact
+- record: >-
+    OTR PBUG-20260911-03, second portable lesson. The hygiene guard named for
+    this exact defect passed while the defect was present: its regex matched
+    only a single-line join on the temp resolver, and the producer bound the
+    temp root to a variable first and joined on a later line, so the pattern
+    structurally could not see it. A ban you depend on asserts on the SYMBOL,
+    not the call shape, and is proven by reintroducing the shipped spelling and
+    watching the guard fail. Promoted as new rule 01.06; the OTR guard now bans
+    the resolver name outright in tests/test_node_temp_hygiene.py.
+  bible_id: '01.06'
+  verdict: promoted
+  source: live-artifact
+- record: >-
+    OTR PBUG-20260911-03, third defect, found in the path authority while
+    re-homing onto it. _validate_episode_id accepted a dots-only id: "." is not
+    a traversal token by the ".." substring test, and pathlib collapses it, so
+    otr_composited_dir(".") returned <output>/otr/episodes/composited -- outside
+    any episode, yet still passing the output-tree contract because its first
+    part is "episodes", where every ledger walker would have read it as an
+    episode. Pre-existing but newly reachable once a workflow-supplied id
+    reached the authority. Fixed at the authority with coverage across every
+    per-episode helper. Existing class 01.02 covers it; no new rule is claimed.
   bible_id: '01.02'
   verdict: covered
   source: live-artifact

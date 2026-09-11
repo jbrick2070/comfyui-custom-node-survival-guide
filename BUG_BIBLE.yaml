@@ -53,15 +53,22 @@ bugs:
   tags: [discovery, paths, desktop-app]
   legacy_id: "55"
 
-# OPEN OTR occurrence, 2026-09-11, PBUG-20260911-03 (class01.02; xref12.66):
+# OTR occurrence, 2026-09-11, PBUG-20260911-03 (class01.02; xref12.66; the
+# portable contract it taught is now rule 01.05):
 # Canonical09 on9367f2fd retained a rendered scopes MP4 in episodes/_shared/tmp.
 # OTR's explicit asset contract requires even retained intermediate video to
-# live under its active episode; generic temp-dir advice below is not an OTR
-# exemption. The existing producer selects shared scratch and has a system-temp
-# fallback. Publication succeeded with blending bypassed; the path defect stays
-# OPEN. Correct the producer and expand the portable verify/test together in the
-# next coding chunk. This is incident evidence, not a fixed/test-covered claim.
-# Receipt: OTR docs/2026-09-11-my-story-5080-qualification/pairlock_09_receipt.md.
+# live under its active episode; the generic temp-dir advice below is not an OTR
+# exemption. CODE FIXED 2026-09-11: the producer now resolves the episode
+# identity at entry and writes through the validated per-episode authority, with
+# the shared-scratch selection and the system-temp fallback both removed. A
+# second defect was found in the authority itself while re-homing onto it -- a
+# dots-only id was accepted and collapsed to a directory OUTSIDE any episode --
+# and is fixed with coverage across every per-episode helper. Offline-qualified:
+# full suite14,471 passed/51 inherited failures, identities and normalized
+# payloads matching baseline; finished-diff Sonnet QA Clean. A live canonical
+# requalification is still owed, so this is fixed-and-covered, NOT live-proven.
+# Receipts: OTR docs/2026-09-11-my-story-5080-qualification/pairlock_09_receipt.md
+# and the PBUG-20260911-03 entry in OTR docs/PROD_BUG_LOG.md.
 - id: "01.02"
   phase: 1
   area: paths
@@ -94,6 +101,34 @@ bugs:
   verify: |
     After Stop-Process -Name ComfyUI -Force, the process disappears within 5 seconds. No orphaned python.exe processes remain. GPU memory is fully released (nvidia-smi shows 0 MiB for the process).
   tags: [discovery, desktop-app, electron, process-kill, cuda, gpu, restart]
+  legacy_id: ""
+
+- id: "01.05"
+  phase: 1
+  area: paths
+  symptom: |
+    A rendered intermediate that a LATER node consumes is written into a swept temp or shared-scratch tier. The run succeeds, so nothing fails; the files simply accumulate there, belong to no job, and can be deleted mid-run by whatever sweeps that tier.
+  cause: |
+    The producer classified the file as "scratch" because it is an intermediate. The operative test is not the word intermediate -- it is RETENTION plus a downstream CONSUMER. A file the producer never deletes and another node reads is a deliverable of its job, whatever it is named. A prior hygiene repair can entrench this: moving the write out of the ambient system temp dir into a project-owned scratch tier looks like the fix, and a test then pins the file to that scratch tier, so the real contract is now asserted backwards.
+  fix: |
+    Route it through the per-job path authority that owns the asset, and delete every fallback. Hand the authority the RAW identity so its validation gate decides placement; a filename sanitizer is for the BASENAME only and must never choose the directory -- "a/b" sanitizes to the legal token "a_b", so a sanitized label reaching the authority silently creates a bogus job directory instead of raising. An asset that cannot be placed under its owner is a FAILED render, not a render somewhere else. Resolve the identity at ENTRY, before expensive work, so a bad one costs nothing. Write through on the first encode; do not render to scratch and move afterwards.
+  verify: |
+    A real-producer test pins the DESTINATION, not existence: assert the returned path's parent equals the authority's directory for that identity, and that it is NOT under the scratch tier or the ambient system temp dir. "A file exists" passes no matter where it landed, which is how this class survives. Add a refusal case proving an invalid identity RAISES rather than inventing a directory. Pin the test's output root to a tmp dir first -- once the producer writes under a real job directory, an unpinned test mints phantom job directories in the operator's live workspace on every run.
+  tags: [paths, temp, intermediates, retention, janitor, test-coverage]
+  legacy_id: ""
+
+- id: "01.06"
+  phase: 1
+  area: paths
+  symptom: |
+    A source-scanning guard test passes, yet the exact defect it is named for is present in the file it scans.
+  cause: |
+    The pattern matches only one spelling. A regex anchored on a single-line call such as join(gettempdir(), "x") cannot see the same write split across two statements -- a variable bound to the temp root, then joined on a later line. The test was written from the one example in front of its author, so it encodes that example rather than the rule, and it reports green for years.
+  fix: |
+    For a ban you actually depend on, assert on the SYMBOL, not the call shape: forbid the resolver's name appearing in the file at all. That survives refactors, two-step assignments and aliasing. Keep the structural pattern as a cheap tree-wide ratchet if it is useful, but never let it be the only guard on a known defect. Where a comment must mention the banned name, reword the comment -- the ban is worth more than the prose.
+  verify: |
+    Reintroduce the defect in the real spelling that shipped, in a scratch copy, and confirm the guard FAILS. A guard never proven to fail has not been tested; it has only been run.
+  tags: [testing, regression-guard, static-analysis, false-green]
   legacy_id: ""
 
 # ─────────────────────────────────────────────────────────────

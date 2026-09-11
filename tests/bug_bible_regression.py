@@ -137,6 +137,8 @@ def workflow_jsons(pack_dir):
 # PHASE 01 — BOOTSTRAP & DISCOVERY
 # BUG-01.02: Use folder_paths, not hand-rolled paths
 # BUG-01.03: No dirname chain miscounts
+# BUG-01.05: A retained intermediate a consumer reads is a deliverable, not
+#            scratch -- never leave it in a swept tier
 # ─────────────────────────────────────────────────────────────────
 
 class TestPhase01Paths:
@@ -167,6 +169,65 @@ class TestPhase01Paths:
             f"{', '.join(violations)}. Use folder_paths or a "
             f"module-level _REPO_ROOT anchor instead."
         )
+
+    def test_no_retained_temp_path_is_returned_to_a_consumer(self, py_files):
+        """BUG-01.05: a path built from the ambient system temp dir must not be
+        RETURNED to a downstream consumer.
+
+        Returning it is what makes the file a deliverable rather than scratch:
+        something else now reads it, so it must be retained -- and the ambient
+        temp dir is swept by the OS and by any project janitor. Detected with
+        AST rather than a regex on purpose. The shipped OTR instance of this bug
+        (PBUG-20260911-03, 2026-09-11) bound the temp root to a local first and
+        joined on a LATER line, which the pack's own single-line
+        ``join(gettempdir(), "x")`` regex structurally could not see -- so it
+        passed for months while the defect was present. See BUG-01.06.
+        """
+        violations = []
+        for fpath in py_files:
+            try:
+                with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                    tree = ast.parse(f.read())
+            except (SyntaxError, ValueError):
+                continue
+
+            def _is_gettempdir(node):
+                return (isinstance(node, ast.Call)
+                        and isinstance(node.func, ast.Attribute)
+                        and node.func.attr in ("gettempdir", "mkdtemp"))
+
+            for fn in ast.walk(tree):
+                if not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    continue
+                # locals bound to the ambient temp root inside this function
+                tainted = set()
+                for node in ast.walk(fn):
+                    if isinstance(node, ast.Assign) and _is_gettempdir(node.value):
+                        for tgt in node.targets:
+                            if isinstance(tgt, ast.Name):
+                                tainted.add(tgt.id)
+                if not tainted:
+                    continue
+                # a cleanup in the same function means it is genuine scratch
+                cleaned = any(
+                    isinstance(n, ast.Attribute) and n.attr in
+                    ("remove", "unlink", "rmtree") for n in ast.walk(fn))
+                if cleaned:
+                    continue
+                for node in ast.walk(fn):
+                    if not isinstance(node, ast.Return) or node.value is None:
+                        continue
+                    names = {n.id for n in ast.walk(node.value)
+                             if isinstance(n, ast.Name)}
+                    if names & tainted:
+                        violations.append(
+                            "%s::%s" % (os.path.basename(fpath), fn.name))
+                        break
+
+        assert not violations, (
+            "BUG-01.05: a retained ambient-temp path is returned to a consumer "
+            "(route it through the per-job path authority that owns the asset, "
+            "and drop the fallback): %r" % violations)
 
     def test_output_nodes_use_folder_paths(self, py_files):
         """BUG-01.02: Nodes that write output files should use
@@ -1064,6 +1125,17 @@ class TestPhase02UtfLauncherGuard:
 
 # NOTES ON NON-TESTABLE BUG BIBLE ENTRIES
 # ─────────────────────────────────────────────────────────────────
+# BUG-01.06 (a guard test that matches one spelling): a claim ABOUT a pack's own
+#   guard tests, not about its node code, so there is no pack source to scan.
+#   Its verify condition is a discipline: reintroduce the defect in the spelling
+#   that actually shipped and confirm the guard FAILS. A guard never proven to
+#   fail has only been run, not tested. Measured instance: OTR's
+#   test_node_temp_hygiene.py was named for the exact scopes temp-dir leak and
+#   passed while the leak was present, because its regex required a one-line
+#   join() and the producer used a two-step assignment (PBUG-20260911-03,
+#   2026-09-11). The static half -- do not return a retained ambient-temp path
+#   -- is enforced by BUG-01.05 above.
+#
 # BUG-01.04 (Electron wrapper process name): Runtime discovery issue, not a
 #   code-level check. ComfyUI Desktop runs as ComfyUI.exe (Electron), not
 #   python.exe. Killing python.exe hangs on CUDA handles. Must discover the
