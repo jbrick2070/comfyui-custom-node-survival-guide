@@ -1669,6 +1669,42 @@ class TestPhase07To12ProductionRegressionCatalog:
                     f"BUG-12.69 executable guard missing: {test_name}"
                 )
 
+    def test_otr_cleanup_conserves_original_scope(self, pack_dir):
+        """BUG-11.64: exercise pure production construction without loading models."""
+        path = os.path.join(pack_dir, "nodes", "_otr_ledger_clean.py")
+        if not os.path.isfile(path):
+            pytest.skip("scoped cleanup owner is OTR-local")
+        with open(path, encoding="utf-8") as handle:
+            parsed = ast.parse(handle.read(), filename=path)
+        names = {"_RepairSpan", "_exact_interval", "_merge_repair_spans",
+                 "_covers_spoken_row", "_splice_replacements"}
+        definitions = [node for node in parsed.body
+                       if isinstance(node, (ast.FunctionDef, ast.ClassDef)) and node.name in names]
+        assert {node.name for node in definitions} == names, "BUG-11.64: missing scoped cleanup owner"
+        import typing
+        namespace = {key: getattr(typing, key) for key in ("Any", "NamedTuple", "Mapping", "Sequence")}
+        module = ast.Module(body=definitions, type_ignores=[])
+        exec(compile(module, path, "exec"), namespace)
+        ground = namespace["_exact_interval"]
+        merge = namespace["_merge_repair_spans"]
+        splice = namespace["_splice_replacements"]
+        covers = namespace["_covers_spoken_row"]
+        original = "  (sigh)\tStay;  please.\n(sigh)  "
+        assert ground(original, {"quote": "(sigh)"}) is None
+        start = original.rindex("(sigh)")
+        assert ground(original, {"quote": "(sigh)", "start_char": start,
+                                 "end_char": start + 6}) == (start, start + 6)
+        spans = merge(original, [(2, 8), (start, start + 6)])
+        proposals = [{"span_id": spans[0].span_id, "replacement": "Oh."},
+                     {"span_id": spans[1].span_id, "replacement": ""}]
+        assert splice(original, spans, proposals) == "  Oh.\tStay;  please.\n  "
+        with pytest.raises(ValueError):
+            splice(original, spans, proposals[:1])
+        with pytest.raises(ValueError):
+            splice(original, spans, [proposals[0], proposals[0]])
+        assert covers("Until next time.", [(0, 10), (6, 16)])
+        assert not covers(original, [(2, 8), (start, start + 6)])
+
     def test_otr_explicit_word_delivery_is_owned_before_media(self, pack_dir):
         """BUG-12.70: requested length is hash-bound before media readiness."""
         paths = {

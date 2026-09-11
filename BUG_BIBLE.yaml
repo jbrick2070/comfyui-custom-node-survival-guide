@@ -11129,3 +11129,38 @@ bugs:
     separate from this executable wiring proof.
   tags: [llm, structured-json, schema-binding, call-routing, retry]
   legacy_id: PBUG-20260910-05
+
+- id: "11.64"
+  phase: 11
+  area: model-cleanup-original-scope-conservation
+  symptom: >-
+    A cleanup model condemns valid spoken text and replaces it with different
+    dialogue. On the 4060 My Story Step 120, Until next time became That's a
+    wrap. The ledger committed the rewrite rather than retaining a flagged row.
+  cause: >-
+    A complaint about a passage was treated as permission to rewrite the whole
+    row. Display summaries do not preserve exact offsets, repeated quotes do
+    not identify an occurrence, and several partial complaints can collectively
+    cover the entire row. A clean reread or reduced complaint count proves none
+    of the original text outside the complaint was conserved.
+  fix: >-
+    Freeze exact original intervals once. Pattern matches retain raw offsets;
+    model quotes need unique exact grounding or bounded localization. Require
+    dedicated model authorization for collective whole-row scope. For partial
+    repairs validate one model replacement per approved ID and interleave it
+    with unchanged original slices. Keep whitespace and punctuation exactly,
+    never widen scope on retry, and require a validated model reread before
+    clean or best-progress acceptance. Unresolved authorization or reread
+    retains the original with a receipt;
+    actual provider, capacity, cancellation and memory failures keep their type.
+  verify: >-
+    Exercise the shared cleaner on the live coda false accusation, a genuine
+    whole-row direction, repeated quotes and disjoint edits. Require exact
+    outside-scope conservation, reject collective whole-row bypasses and invalid
+    replacement IDs, malformed reread, and show the candidate in reread context. OTR executable
+    regressions live in tests/test_ledger_clean_stage.py; the portable Bible
+    guard exercises exact occurrence grounding, original-slice construction
+    and collective coverage without importing model or GPU runtimes. A fresh
+    canonical model run is separately required for live qualification.
+  tags: [llm, cleanup, source-fidelity, scoped-repair, ledger]
+  legacy_id: PBUG-20260829-14
