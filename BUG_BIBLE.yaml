@@ -4036,7 +4036,7 @@ bugs:
     structure it did not own.
   fix: |
     Generate required-path instructions from the current schema and include
-    the failed artifact, exact error, preservation rules, and accepted
+    the complete failed artifact, exact error, preservation rules, and accepted
     cross-object mappings in typed repair. Derive eligible mechanical metadata
     deterministically from the accepted graph; never alter authored prose, and
     reject missing, ambiguous, or graph-inconsistent mappings.
@@ -4045,6 +4045,9 @@ bugs:
     missing boundary, and a legacy metadata enum. Assert the repair contract
     names the complete required paths and authoritative mappings; deterministic
     metadata repair changes only owned fields and fails closed for bad graphs.
+    Put required ending material beyond the first 400 characters of a failed
+    typed artifact; require the repair to receive the full original response,
+    including that material, and retain it in the accepted durable ledger.
   tags: [llm-output, nested-schema, typed-repair, graph-metadata, deterministic-repair, preservation, llm]
   legacy_id: PBUG-20260711-06
 
@@ -4677,14 +4680,18 @@ bugs:
     child list. Allocate child suffixes against the complete current line-id
     namespace so repeated repair passes cannot collide. Downstream
     render/caching identity must remain keyed by the unique line id so siblings
-    sharing a parent never collapse.
+    sharing a parent never collapse. Supplemental timeline rows with no
+    authored parent use an absent/null parent reference, never a fabricated
+    beat id copied from their line id; cue anchors retain their line identity.
   verify: |
     Split one accepted line and cut another. Assert unique child line ids share
     the first accepted beat id, the cut beat remains with an empty line list,
     the outline-to-ledger consistency guard is clean, and line-keyed consumers
     still receive distinct identities. Split the parent again and require a new
     collision-free child id. Initialize from an outline and require parent
-    membership to exist before later timing stages.
+    membership to exist before later timing stages. Include supplemental music
+    rows without parent beats: require a clean gap audit while cue anchors,
+    mirror timing, interstitial identity, and content seals remain unchanged.
   tags: [ledger, hierarchy, line-id, beat-id, structural-edit, parent-child, referential-integrity, render-identity]
   legacy_id: PBUG-20260721-05
 

@@ -1591,6 +1591,27 @@ class TestPhase07To12ProductionRegressionCatalog:
             "BUG-12.52: canonical headless boot must clear a stale one-shot override"
         )
 
+    def test_otr_my_story_current_repair_and_parent_identity_coverage(self, pack_dir):
+        """BUG-11.48/12.58: current owners must not hide behind a retired catalog."""
+        if not os.path.isfile(os.path.join(pack_dir, "nodes", "_otr_my_story.py")):
+            pytest.skip("My Story regression coverage is OTR-local")
+        expected = {
+            "tests/test_my_story_runner.py": (
+                "test_full_treatment_repair_preserves_material_and_matches_variable_controls",
+                "test_the_music_cues_anchor_to_real_sentinel_rows",
+            ),
+            "tests/test_music_cue_duration_reaches_the_beat.py": (
+                "test_my_story_null_parent_music_rows_preserve_timeline_identity",
+            ),
+        }
+        for relative_path, names in expected.items():
+            path = os.path.join(pack_dir, *relative_path.split("/"))
+            assert os.path.isfile(path), f"production regression module missing: {relative_path}"
+            with open(path, encoding="utf-8") as handle:
+                source = handle.read()
+            for name in names:
+                assert f"def {name}(" in source, f"production regression missing: {relative_path}::{name}"
+
     def test_otr_positioned_media_timeline_ownership(self, pack_dir):
         """BUG-12.69: positioned output excludes duplicated crossfade work."""
         driver_path = os.path.join(
