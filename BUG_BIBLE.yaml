@@ -4084,6 +4084,14 @@ bugs:
     Put required ending material beyond the first 400 characters of a failed
     typed artifact; require the repair to receive the full original response,
     including that material, and retain it in the accepted durable ledger.
+    When generation raises before returning, the lane's full-artifact repair
+    must use the exception's captured completion if returned text is empty.
+    Preserve exact text, prefer a nonempty returned response, and never stringify
+    arbitrary error attributes. Live OTR pairlock_03 supplied an empty repair
+    draft despite 11,581 captured characters. Test the actual final ladder call
+    receiving the latest failed completion and producing a validated saved
+    artifact within the same attempt limit; failed fragments stay evidence,
+    not accepted proposals. Shared callers with other policies are unchanged.
   tags: [llm-output, nested-schema, typed-repair, graph-metadata, deterministic-repair, preservation, llm]
   legacy_id: PBUG-20260711-06
 

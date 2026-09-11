@@ -1598,6 +1598,8 @@ class TestPhase07To12ProductionRegressionCatalog:
         expected = {
             "tests/test_my_story_runner.py": (
                 "test_full_treatment_repair_preserves_material_and_matches_variable_controls",
+                "test_halted_treatment_repair_receives_the_latest_full_completion_and_rewrites",
+                "test_full_repair_keeps_returned_text_precedence_and_never_invents_a_draft",
                 "test_the_music_cues_anchor_to_real_sentinel_rows",
                 "test_zero_boundaries_preserves_all_unused_cue_proposals",
                 "test_author_p1_reuses_its_binding_and_source_corrections_bind_their_own_schemas",
@@ -1643,6 +1645,31 @@ class TestPhase07To12ProductionRegressionCatalog:
                 source = handle.read()
             for name in names:
                 assert f"def {name}(" in source, f"production regression missing: {relative_path}::{name}"
+
+    def test_otr_full_repair_uses_captured_text_when_generation_raises(self, pack_dir):
+        """BUG-11.48: execute the lane owner, not a copied repair implementation."""
+        path = os.path.join(pack_dir, "nodes", "_otr_my_story.py")
+        if not os.path.isfile(path):
+            pytest.skip("My Story repair owner is OTR-local")
+        with open(path, encoding="utf-8") as handle:
+            tree = ast.parse(handle.read(), filename=path)
+        definitions = [node for node in tree.body if isinstance(node, ast.FunctionDef)
+                       and node.name == "_full_artifact_repair"]
+        assert len(definitions) == 1
+        namespace = {}
+        exec(compile(ast.Module(body=definitions, type_ignores=[]), path, "exec"), namespace)
+        repair = namespace["_full_artifact_repair"]("Repair the complete artifact.")
+        error = ValueError("generation halted")
+        error.raw_completion = '{"logline":"' + "unfinished material " * 40
+        source = [{"role": "user", "content": "the complete original source"}]
+        result = repair(original_prompt=source, failed_output="", error=error)
+        assert result[-2]["content"] == error.raw_completion
+        assert result[0] == source[0]
+        result = repair(original_prompt=source, failed_output='{"returned":true}', error=error)
+        assert result[-2]["content"] == '{"returned":true}'
+        error.raw_completion = {"not": "text"}
+        result = repair(original_prompt=source, failed_output="", error=error)
+        assert result[-2]["content"] == ""
 
     def test_otr_sparse_rewrite_conserves_only_omitted_fields(self, pack_dir):
         """BUG-11.65: execute the actual pure reconstruction without model imports."""
