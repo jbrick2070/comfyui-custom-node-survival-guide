@@ -210,7 +210,7 @@ ids are immutable), added by the 2026-07-12 consistency audit.
 | 08 I/O & Output Nodes           | Headless API, intermediates, preview thumbnails, OUTPUT_NODE discipline | 08.01–08.08 |
 | 09 Subprocess & Network         | Pipe deadlocks, asyncio, offline fallbacks, cloud-API contracts; process identity, Windows portability | 09.02, 09.05–09.08 |
 | 10 Safety, Pools, RNG           | Content filters, pool sizing, RNG correctness; seed provenance, cast coherence | 10.01–10.09 |
-| 11 LLM-Specific                 | Token budgets, prompt-detector contracts, format normalisers, three-tier resilience, typed repair ladders, schema-grammar compatibility, cleanup conservation, applied source-grounded scene corrections and current cache receipts | 11.01–11.64 |
+| 11 LLM-Specific                 | Token budgets, prompt-detector contracts, format normalisers, three-tier resilience, typed repair ladders, schema-grammar compatibility, shared native termination contracts, cleanup conservation, applied source-grounded scene corrections and current cache receipts | 11.01–11.64, 12.100 |
 | 12 Regression, Git, Handoff     | Repo hygiene, AST parse, workflow JSON link integrity, dedup foreign keys, ledger write-back, stale-LLM-API ladder, assembled-surface validation, identity classification, artifact-tree rename transactions, canonical derived-metric ownership, explicit requested-length delivery; rewrite parity, multi-window git discipline, test isolation, model-specific semantic-capability admission, credits glyph containment, frozen-route health applicability | 12.02, 12.06, 12.07, 12.35, 12.39, 12.52, 12.60, 12.61, 12.66, 12.67, 12.70, 12.75–12.85, 12.120, 12.160–12.161 |
 
 ## How an AI coding agent uses this kit

@@ -1644,6 +1644,63 @@ class TestPhase07To12ProductionRegressionCatalog:
             for name in names:
                 assert f"def {name}(" in source, f"production regression missing: {relative_path}::{name}"
 
+    def test_otr_native_termination_resolver_is_shared_and_nonmutating(self, pack_dir):
+        """BUG-12.100: execute the real pure resolver; retain native/parser tests."""
+        path = os.path.join(pack_dir, "nodes", "_otr_model_loader.py")
+        if not os.path.isfile(path):
+            pytest.skip("native terminator owner is OTR-local")
+        with open(path, encoding="utf-8") as handle:
+            tree = ast.parse(handle.read(), filename=path)
+        names = {"_native_token_ids", "native_eos_token_ids"}
+        definitions = [node for node in tree.body
+                       if isinstance(node, ast.FunctionDef) and node.name in names]
+        assert {node.name for node in definitions} == names, "BUG-12.100: shared EOS resolver missing"
+        import copy
+        from numbers import Integral
+        from types import SimpleNamespace
+        from typing import Any
+        namespace = {"Integral": Integral, "Any": Any}
+        exec(compile(ast.Module(body=definitions, type_ignores=[]), path, "exec"), namespace)
+        resolve = namespace["native_eos_token_ids"]
+        for generation, config, chat, expected in (
+            (SimpleNamespace(eos_token_id=[7, 8, 7]), SimpleNamespace(eos_token_id=4), 9, [7, 8, 9]),
+            (SimpleNamespace(eos_token_id=0), SimpleNamespace(eos_token_id=4), 9, [0, 9]),
+            (None, SimpleNamespace(eos_token_id=248044), 248046, [248044, 248046]),
+            (None, SimpleNamespace(eos_token_id=4, text_config=SimpleNamespace(eos_token_id=[5, 6])), 9, [5, 6, 9]),
+            (SimpleNamespace(eos_token_id=[True, -1, "7", 1.5]), SimpleNamespace(eos_token_id=4),
+             (9, False, -2), [4, 9]),
+            (None, SimpleNamespace(), {9, 8}, [8, 9]),
+            (None, SimpleNamespace(), None, []),
+        ):
+            model = SimpleNamespace(config=config)
+            if generation is not None:
+                model.generation_config = generation
+            entry = {"model": model, "tokenizer": SimpleNamespace(eos_token_id=chat)}
+            before = copy.deepcopy(entry)
+            assert resolve(entry) == expected
+            assert entry == before, "BUG-12.100: resolver mutated model/tokenizer configuration"
+        configured = [7, 8]
+        entry = {"model": SimpleNamespace(generation_config=SimpleNamespace(eos_token_id=configured)),
+                 "tokenizer": SimpleNamespace(eos_token_id=9)}
+        previous = resolve(entry)
+        configured[:] = [10]
+        assert resolve(entry) == [10, 9] and previous == [7, 8, 9]
+        expected_tests = {
+            "test_generation_budget.py": {
+                "test_all_native_routes_stop_on_configured_or_chat_eos_at_capacity",
+                "test_native_eos_respects_generation_precedence_and_nested_fallback",
+                "test_native_eos_collection_normalization_keeps_padding_scalar",
+            },
+            "test_constrained_generate.py": {
+                "test_real_lmfe_uses_shared_model_chat_eos_and_refreshes_without_mutating_history",
+            },
+        }
+        for filename, expected in expected_tests.items():
+            with open(os.path.join(pack_dir, "tests", filename), encoding="utf-8") as handle:
+                test_tree = ast.parse(handle.read(), filename=filename)
+            actual = {node.name for node in ast.walk(test_tree) if isinstance(node, ast.FunctionDef)}
+            assert expected <= actual, f"BUG-12.100: missing native/parser regression owners {expected - actual}"
+
     def test_otr_credits_hero_containment_has_real_font_and_footer_coverage(self, pack_dir):
         """BUG-12.160: pure production wrapping plus actual paint regressions."""
         path = os.path.join(pack_dir, "nodes", "otr_credits_roll.py")

@@ -7727,6 +7727,14 @@ bugs:
     sentence cut off mid-word. And a detector built on "how long has this
     string been open" cannot tell a legitimately long field from a loop, so it
     is a second length cap wearing a liveness costume.
+    A distinct termination-boundary specimen appeared in OTR's full canonical
+    My Story pairlock_01 on 2c9d47f2, prompt
+    19cba4cc-ceaa-43d6-833a-393854eb45f1: both attempts of one optional source
+    correction produced complete JSON followed by 82 and 87 trailing newlines, then hit
+    the liveness guard at 672 generated tokens. The main treatment separately
+    exhausted three attempts on open-string repetition; the run ended without
+    media after 400.67 seconds. The request, terminal history and failed ledger
+    are archived under docs/2026-09-11-my-story-5080-qualification/ in OTR.
   cause: |
     Three separate mistakes that look like one:
     (a) Under grammar-constrained decoding the EOS token is masked until the
@@ -7746,6 +7754,14 @@ bugs:
         prompt, parsed after the call -- a max_length stops nothing: the
         runaway still burns the window, and the artifact is discarded
         afterwards. That is strictly worse than no ceiling.
+    At the completed-document boundary, the grammar and native decoder can
+    also disagree on what ends a response: the pairlock configuration readback
+    found tokenizer/chat EOS 248046 versus native model-config EOS 248044,
+    with no cached generation_config.json. Grammar admission, generation stopping
+    and post-call completion classification had separate terminator owners.
+    The exact hidden token sequence was not persisted, so the newline artifact
+    establishes a termination gap, not proof of which EOS token was sampled.
+    This evidence does not explain or resolve the separate open-string failure.
   fix: |
     TWO SIGNALS ARE REQUIRED, AND NEITHER SUBSUMES THE OTHER. This entry
     originally prescribed cycle detection alone; that was written from two
@@ -7793,6 +7809,18 @@ bugs:
     and the grammar mask both write -inf, prefix validation only checks that the
     grammar returned a non-empty list rather than that a token SURVIVED the ban,
     and the intersection can be empty -- which crashes sampling outright.
+    Align the termination contract separately from liveness: resolve effective
+    native generation-config terminators first, fall back to the decoder's
+    nested text/model config when absent, and combine them with the tokenizer's
+    chat terminators. Preserve multiple valid IDs and zero, deduplicate without
+    mutating either configuration, exclude booleans/negative/non-integral values,
+    and keep padding scalar. Use the same per-call set for every native factory,
+    grammar admission and post-call completion classification. Rebuild cached
+    grammar tokenizer data when its EOS signature changes, while keeping each
+    parser/enforcer fresh and old in-flight histories unchanged. Do not weaken
+    the liveness guard, parse-and-salvage halted output, or claim this contract
+    fix has qualified an open-string failure; a fresh live run must establish
+    the narrower observed termination behavior and remaining authoring outcome.
   verify: |
     Automatable, and the false-positive tests are the ones that matter:
     (0) Feed it a NON-REPEATING spiral -- one unit, thousands of tokens, every
@@ -7812,6 +7840,19 @@ bugs:
         deterministic prompt-side refusal stays non-recoverable.
     (6) Assert the guard is wired into the PRODUCTION entry point, not only
         callable in isolation -- delete the call site and the suite must go red.
+    (7) Execute the actual native EOS resolver with scalar, multiple, zero,
+        nested-config and absent-generation-config cases. Assert deterministic
+        normalization, configured precedence, chat-ID inclusion and nonmutation.
+        Drive writer, constrained, base and polish factories at exact capacity
+        with each effective terminator using the real Transformers EOS criterion.
+        Drive real LMFE through an unfinished and completed JSON document: no
+        EOS before completion, all effective EOS IDs allowed afterward. Change
+        configuration on a warm entry and require fresh tokenizer data without
+        rewriting an earlier parser's history. OTR ownership regressions are
+        test_all_native_routes_stop_on_configured_or_chat_eos_at_capacity,
+        test_native_eos_respects_generation_precedence_and_nested_fallback,
+        test_native_eos_collection_normalization_keeps_padding_scalar and
+        test_real_lmfe_uses_shared_model_chat_eos_and_refreshes_without_mutating_history.
   tags: [llm, structured-json, grammar-constrained, lm-format-enforcer, degenerate-repetition, runaway-decode, stopping-criteria, liveness, silent-truncation, tokenizer-independence, no-repeat-ngram, fail-loud, xref-11.50]
   legacy_id: "OTR-2026-08-13-writer-decode-runaway"
 
