@@ -1763,6 +1763,10 @@ class TestPhase07To12ProductionRegressionCatalog:
         expected = {
             "tests/test_my_story_runner.py": {
                 "test_sparse_p0_source_reply_keeps_saved_metadata_and_records_unchanged",
+                "test_treatment_frame_repair_replaces_owned_fields_in_the_saved_ledger",
+                "test_stubborn_frame_treatment_uses_one_typed_repair_and_saves_failure",
+                "test_p0_frame_correction_explicitly_replaces_cast_and_preserves_frame_request",
+                "test_p0_p1_scope_stays_local_and_reaches_existing_source_owner",
                 "test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast",
                 "test_act_scope_without_a_source_journal_still_reaches_the_author",
                 "test_act_scope_does_not_leak_to_other_phases_of_the_real_runner"},

@@ -3795,6 +3795,26 @@ bugs:
     repaired using exact offsets. Re-entry must not reset the two-call budget.
     Actionable feedback does not certify that an unproposed source omission is
     repaired, nor does it justify a new publication gate.
+    My Story pairlock_08 placed the production house announcer in the dramatic
+    cast, opening beat and global ending; the reserved-name repair repeated it.
+    Distinguish frame ownership in interpretation, treatment and their existing
+    correction calls. Preserve explicit frame requests under that owner and
+    legitimate dramatic people, including announcer professions. On a reserved
+    cast failure, ask the same bounded repair to correct any misplaced frame
+    material throughout the complete treatment. Report a simultaneous act-count
+    defect in that same attempt. Do not blindly strip a cast row, invent an
+    alias, scan prose for forbidden words or add another model loop. Verify
+    complete returned artifacts reach the saved treatment and final-act target,
+    explicit interpretation cast/count replacement survives omitted-field
+    conservation, phase scope reaches the existing correction without leaking
+    native kwargs, and a stubborn reserved response stops after its one typed
+    repair. Exercise one, three and six acts with flexible dramatic cast and
+    preserve the separate frame and failed-artifact journal. P0 remains planning;
+    these tests prove routing/application, not live source qualification.
+    P0 can still return an incorrect cast/count, and frame prose without a
+    reserved cast identity can pass structural validation. The existing model
+    correction and inspection of actual output own those semantic outcomes;
+    never describe this bounded repair as deterministic source qualification.
     Visual coverage: tests/test_my_story_visual_source.py verifies full source
     and scene context, actual corrected-prompt application, bounded malformed
     retries, no stale appearance prepend, neutral portrait isolation, failed

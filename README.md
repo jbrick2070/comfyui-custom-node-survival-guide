@@ -7,6 +7,8 @@ An AI-agent QA harness for ComfyUI custom-node authoring. v2.1 — 344 bible ent
 BUG-11.39 also covers actionable source-repair feedback: identify the selected
 row, quote and offsets so the existing bounded retry can correct an edit,
 while preserving exact row identity and unresolved outcomes.
+It also covers separating house-frame narration from dramatic cast and endings,
+with complete bounded repairs and preserved source identity.
 
 ---
 
