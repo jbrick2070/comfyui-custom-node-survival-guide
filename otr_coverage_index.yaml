@@ -3021,3 +3021,26 @@ records:
   bible_id: '12.162'
   verdict: covered
   source: review
+
+- record: >-
+    OTR PBUG-20260911-05, live artifact 2026-09-10 (Much Ado 3.1 ledger): the
+    shakespeare lane performed invented lines ("I hold this blade high between
+    us") while the verbatim passage selector (_otr_passage_selector.py, 14 KB,
+    three commits, its own test file) had ZERO production callers and the line
+    composer never received source text. Fixed 2026-09-11 (187baff0) by wiring
+    the executor end to end and proving it on a published episode whose four
+    character rows equal the raw scene window word for word.
+  bible_id: '12.163'
+  verdict: covered
+  source: live-artifact
+- record: >-
+    OTR 2026-09-11, review-found on the same change: FIVE independent "sayable
+    surface" predicates (cleanup, freeze, authorship receipt, coverage gate, TTS
+    prep) each re-implemented the same stripper; protecting the verbatim rows at
+    one was verified only there and the freeze still killed a passage whose
+    chunk was a whole parenthetical. Second instance of 12.162 (follow the value
+    to every consumer), recorded as review-found under the rule the live
+    incidents admitted.
+  bible_id: '12.162'
+  verdict: covered
+  source: review

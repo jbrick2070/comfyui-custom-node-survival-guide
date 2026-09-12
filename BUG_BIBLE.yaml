@@ -11508,3 +11508,17 @@ bugs:
     Neuter the fix at the producer and confirm the CONSUMER-level test fails. Then delete the caller you fixed and confirm the crash cannot come back through another caller. A test that only calls the fixed function directly proves the function, not the wiring -- and the wiring is what shipped the regression.
   tags: [regression-guard, wiring, choke-point, false-green, caller-consumer]
   legacy_id: ""
+
+- id: "12.163"
+  phase: 12
+  area: regression
+  symptom: |
+    A feature the plan calls done, whose module has its own green test file and several commits, does not exist at runtime. The episode ships the OLD behaviour -- a Shakespeare scene performed in invented lines while the verbatim window selector sat in the tree with zero production callers -- and nothing fails: the tests pass because they call the helper directly, the suite is green, and the pipeline never reaches the code.
+  cause: |
+    The helper was built and tested in isolation and never wired into the one path that runs. Correct code nothing calls is invisible to every check that passes; a dead-code tool reads it as deletable, which is the opposite decision. Four instances were found in one day on the same pack (a grounding selector, a passage selector, a caption-capability probe, a source overview later deleted for having no consumer).
+  fix: |
+    Wire a helper in the SAME change that builds it, or write the row that says exactly what it is waiting for. After adding a function, grep the package for a caller that is not a test and not the defining module; no caller means one of two decisions and both are fine as long as one is chosen. Where the wiring matters, assert the CALL exists at its real site -- source inspection is the right tool for exactly that question and nothing else.
+  verify: |
+    For every public function added by a change, `grep -rn "<name>(" <package>/` excluding tests and the defining module returns at least one hit, or the plan carries a row naming the helper as intentionally unwired and what unblocks it. A test that calls the helper directly proves the helper; only a call at the production site proves the feature.
+  tags: [regression-guard, wiring, dead-code, false-green, built-and-unwired]
+  legacy_id: ""
