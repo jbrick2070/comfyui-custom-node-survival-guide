@@ -34,11 +34,11 @@
 # two records for that reason.
 # 2026-09-02 delta (registry scanner): 1 record appended, promoted as
 # 12.147 -- a scanner rule change flagging the session-bearer hidden input.
-audited: 2026-09-11
+audited: 2026-09-12
 # Last code/test base; the September 11 incident-only delta follows this commit.
 # The audited date above describes the historical audit, not a new full scrape.
-bible_head: 55c6e4f944a2f1aeabbee23d77e9f914f8f91d04
-bible_entries: 346
+bible_head: 032923303d82425006658716831cb5ac02e47ac3
+bible_entries: 350
 records:
 - ref: BUG_LOG.md L1022 (BUG-LOCAL-231 soak data point)
   title: A long per-clip render loop had no routine VRAM reclamation — cleanup fired only on an OOM exception, so a gradual
@@ -3053,5 +3053,39 @@ records:
     and blend probes through the PyAV-capable boundary and making the gates say
     UNPROVEN on a sentinel; proved by a canonical leg on the same cold shape.
   bible_id: '12.164'
+  verdict: covered
+  source: live-artifact
+- record: >-
+    OTR PBUG-20260911-07, live artifact 2026-09-11 (moonlit_deception final at
+    -29.44 LUFS against a -14 target): the master's peak rail was a whole-file
+    scale, so one clipped music burst at 9.6 s pulled the entire 113 s episode
+    down 15.42 dB, dialogue included, and the receipt did not record that it had
+    happened. Fixed by a deterministic look-ahead limiter plus a bounded
+    re-measure pass; the same master re-mastered offline lands at -14.44 LUFS.
+    Covered by the existing "a guard that silently rewrites the whole artifact
+    must receipt what it took" contract.
+  bible_id: '12.162'
+  verdict: covered
+  source: live-artifact
+- record: >-
+    OTR PBUG-20260912-01, live artifact 2026-09-12: a cue-ceiling log line with
+    five %-placeholders and four arguments raised TypeError inside
+    OTR_StableAudioTheme and lost an episode that had already rendered its
+    script, cast, voices and music. Invisible to the suite because lazy
+    %-formatting only raises when the level is enabled and the suite runs at
+    WARNING. Promoted as the portable rule; covered by an AST placeholder sweep
+    plus a getMessage() test, both verified red against the original line.
+  bible_id: '12.165'
+  verdict: covered
+  source: live-artifact
+- record: >-
+    OTR PBUG-20260912-02, live artifacts 2026-09-12 (280 of 1,984 rendered music
+    cue wavs on the dev box carry more than four full-scale samples, worst
+    4,710): no stage on the music path owned the peak -- the decoder pins RMS
+    only, one adapter of five normalised, and the writer hard-clips at the int16
+    cast. Fixed with a per-cue look-ahead ceiling at -1 dBFS (a ceiling, not a
+    normalisation, so quiet cues stay quiet). Same producer/consumer-contract
+    class as 12.162: the level policy was stated nowhere and enforced nowhere.
+  bible_id: '12.162'
   verdict: covered
   source: live-artifact

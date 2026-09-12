@@ -11535,3 +11535,16 @@ bugs:
     For every function documented as returning a sentinel on an absent tool, grep its callers and show each handles the sentinel explicitly (a "< 0" / "is None" branch that warns), or a test that stubs the helper to the sentinel and asserts the render completes with an UNPROVEN receipt. A live run on a box without the tool reaches the publish step.
   tags: [regression-guard, sentinel, degrade, consumer-contract, cold-install, false-green]
   legacy_id: ""
+- id: "12.165"
+  phase: 12
+  area: regression
+  symptom: |
+    A node raises TypeError ("not enough arguments for format string") on a LOG LINE and loses a finished render, while the whole test suite is green and the same code path passes locally. The failure appears only in the long-running server and only sometimes -- in practice, only where the log level is actually enabled.
+  cause: |
+    Lazy %-formatting defers substitution to the handler: log.info("%s %s", one_arg) builds the record happily and raises inside getMessage(), which runs only when a handler emits it. A suite that runs at WARNING never emits the INFO record, so the placeholder/argument mismatch is unreachable from every test while being certain in production. The same shape hides in log.debug on a debug-enabled box. It is not caught by ast.parse, by linters that do not count %-placeholders, or by any amount of coverage that does not enable the level.
+  fix: |
+    Count placeholders against arguments in CI rather than trusting review: an AST sweep over the package for every logging call whose first argument is a literal string, comparing %-specifier count (ignoring %%) with the number of remaining positional arguments. Pair it with at least one test that enables the level on the real logger and calls record.getMessage(), which is where the exception actually lives. Do not "fix" the class by switching to eager f-strings -- that pays formatting cost on every suppressed line, which is why lazy formatting exists.
+  verify: |
+    The AST sweep reports zero mismatches across the package, and a focused test asserts the specific line renders with the level enabled. Neuter it by removing one argument from a real log call and confirm the sweep turns red -- if the suite still passes, the sweep is not reading that call shape.
+  tags: [regression-guard, logging, lazy-format, false-green, log-level, render-killer]
+  legacy_id: ""
