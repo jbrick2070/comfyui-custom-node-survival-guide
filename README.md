@@ -2,7 +2,7 @@
 
 **By Jeffrey A. Brick** · April–May 2026
 
-An AI-agent QA harness for ComfyUI custom-node authoring. v2.1 — 346 bible entries + LLM round-robin consult addon.
+An AI-agent QA harness for ComfyUI custom-node authoring. v2.1 — 347 bible entries + LLM round-robin consult addon.
 
 BUG-11.39 also covers actionable source-repair feedback: identify the selected
 row, quote and offsets so the existing bounded retry can correct an edit,
@@ -14,7 +14,7 @@ Live OTR canonical09 now records one saved-dialogue source-fidelity pass;
 visual continuity, audio listening and repeatability remain open. The coverage
 index also records OPEN PBUG-20260911-03 under path rule01.02: a retained scopes
 video is written outside its owning episode. Incident annotations do not change
-the 344 parsed rules or executable checks. Producer repair and the matching
+the 347 parsed rules or executable checks. Producer repair and the matching
 portable verification/test expansion are the next coding chunk, not a claimed
 fix in this documentation handoff.
 
@@ -40,7 +40,7 @@ The "AI agent confidently shipped a broken fix" failure mode. Static analysis ca
 
 ## What's in the kit
 
-1. **`BUG_BIBLE.yaml` + `tests/bug_bible_regression.py`** — a 346-entry, machine-readable bug bible plus an automated pytest suite that turns the bible's `verify` fields into executable assertions. Point the suite at any custom-node pack and get a pass/fail report in under 2 seconds. No ComfyUI runtime, no model downloads, no manual grepping.
+1. **`BUG_BIBLE.yaml` + `tests/bug_bible_regression.py`** — a 347-entry, machine-readable bug bible plus an automated pytest suite that turns the bible's `verify` fields into executable assertions. Point the suite at any custom-node pack and get a pass/fail report in under 2 seconds. No ComfyUI runtime, no model downloads, no manual grepping.
 
 2. **`llm_round_robin/`** — a drop-in addon that lets your AI agent call ChatGPT, Gemini, and NVIDIA NIM for second opinions, with probe-first ladder pruning, endpoint-aware dispatch, and capability-tag routing so the agent never silently lands on a stale fallback model. See [`docs/llm_round_robin_explainer.md`](./docs/llm_round_robin_explainer.md).
 
@@ -205,7 +205,7 @@ entries. Exits non-zero on issues so it's easy to wire into a pre-commit hook.
 
 ## What the regression suite checks
 
-346 bible entries across 12 phases; the pytest suite encodes the static-
+347 bible entries across 12 phases; the pytest suite encodes the static-
 analysis-checkable subset as executable assertions.
 
 Entries may carry additive `xref-XX.YY` tags (cross-reference to an

@@ -11494,3 +11494,17 @@ bugs:
     the manifest-persistence and non-mutation regression owners.
   tags: [diagnostics, telemetry, frozen-route, provenance, false-warning, applicability]
   legacy_id: PBUG-20260906-03
+
+- id: "12.162"
+  phase: 12
+  area: regression
+  symptom: |
+    A crash that was fixed comes back months later on the same message, with the fix's own test still green. Or: a guard is corrected in one module, its test passes, and the episode still dies one call up with a different exception name.
+  cause: |
+    The fix was verified only at the site it was made, and the value it fixes was never followed to its consumer. Two shapes, seen the same day. (1) The fix lived at ONE CALLER -- a resampler applied where the mismatched clip was produced -- and when that caller was retired the fix went with it, returning the crash to the choke point that every other caller still passes through. (2) The fix lived in the PRODUCER -- a cast size clamped to the voice stock's seats, loudly -- and the CONSUMER compared the clamped result against the raw, never-reassigned request and raised anyway. The test named for the principle tested the producer in isolation, by reading its source, and never saw the caller undo it.
+  fix: |
+    Put the fix at the choke point every caller passes through, not at the one caller in front of you. When the fix changes a value, make the producer REPORT what it actually used (a stamped effective count, a converted rate) and make the consumer read that, never re-derive the ceiling. And write the test at the consumer: drive the real caller with the input that used to crash, and assert on the outcome, not on the producer's source text.
+  verify: |
+    Neuter the fix at the producer and confirm the CONSUMER-level test fails. Then delete the caller you fixed and confirm the crash cannot come back through another caller. A test that only calls the fixed function directly proves the function, not the wiring -- and the wiring is what shipped the regression.
+  tags: [regression-guard, wiring, choke-point, false-green, caller-consumer]
+  legacy_id: ""

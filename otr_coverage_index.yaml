@@ -2999,3 +2999,25 @@ records:
   bible_id: '11.39'
   verdict: covered
   source: live-artifact
+
+- record: >-
+    OTR mixed sample-rate crash, live 2026-06-05 (eda8590c): an indextts2 line at
+    22,050 Hz beside a bark fallback at 24,000 Hz made pack_audio_batch abort.
+    Fixed then by a resample_audio helper at the ONE caller; that caller was
+    retired with the ref-less bark branch and the crash returned to the choke
+    point. Re-fixed 2026-09-11 (c2e48132) AT pack_audio_batch, converting or
+    raising, with the consumer-level test the first fix never had.
+  bible_id: '12.162'
+  verdict: covered
+  source: live-artifact
+- record: >-
+    OTR cast-count clamp defeated one level up, found by review 2026-09-11
+    (4f3fdae9): lock_cast clamped an over-six request and logged it (the
+    2026-08-24 fix); OTR_LedgerScriptWriter compared the clamped cast against
+    the raw, never-reassigned request and raised. tests/test_cast_size_is_a_request.py
+    tested lock_cast in isolation by inspect.getsource and never followed the
+    value to its caller. Second instance of 12.162, recorded as review-found
+    under the rule the live incident admitted.
+  bible_id: '12.162'
+  verdict: covered
+  source: review
