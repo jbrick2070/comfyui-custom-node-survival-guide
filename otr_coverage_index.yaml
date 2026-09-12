@@ -3089,3 +3089,51 @@ records:
   bible_id: '12.162'
   verdict: covered
   source: live-artifact
+- record: >-
+    OTR PBUG-20260912-03, live artifacts 2026-09-12 (65 bench renders on four
+    fixed organ pieces, plus a canonical A/B published to obs -- the_borrowed_voice
+    post-trained/cfg 7 carries 2 bursts, the_jars_secret base/cfg 4 carries zero):
+    the music engine loaded the POST-TRAINED member of a checkpoint family whose
+    publisher documents cfg and negative prompt as having no effect there, while
+    running the BASE member's recipe. The framework drops the unconditional branch
+    only at exactly 1.0, so cfg 7 extrapolated off a branch the post-training had
+    collapsed and the decoder rendered the off-manifold frames as broadband noise
+    -- 74 bursts in 17 renders against 0 in 16 of the same file at cfg 1.0.
+    Lengthening the negative made it worse (11 to 47), which is the signature.
+    Promoted as the portable rule: resolve WHICH family member is loaded and
+    derive the knobs from it, and make every provisioning path fetch the member
+    the resolver prefers.
+  bible_id: '12.166'
+  verdict: covered
+  source: live-artifact
+- record: >-
+    OTR PBUG-20260912-04, live artifacts 2026-09-12 (every SA3 music cue this
+    pack has rendered): the per-cue placement value was computed from the cue's
+    role, passed to the conditioning node that accepts it, printed in the log and
+    written into the render receipt -- and never reached the model. The loaded
+    model class embeds only the other half of the timing pair and the checkpoint
+    carries no such tensor; an older sibling class does implement it, which is
+    why the parameter reads as real. Two nights of reasoning about
+    opening-versus-closing behaviour leaned on a value that had never had an
+    effect. Promoted as the portable rule: verify a parameter at the CONSUMER,
+    and never let a receipt record a sent input as an applied effect.
+  bible_id: '12.167'
+  verdict: covered
+  source: live-artifact
+- record: >-
+    OTR PBUG-20260912-05, live artifacts 2026-09-12 (four canonical 1-act legs,
+    one per source bank, each dying at the workflow validator in about twelve
+    seconds): a module constant stopped being the checkpoint FILENAME and became
+    the operator's OVERRIDE, empty by default, when the engine began resolving
+    between two checkpoints at load time. The visual preflight still read it as a
+    filename, so it asked the framework to locate a weight named "" and killed
+    every render that did not pin the override. The unit suite never exercises
+    that path, and the A/B that qualified the preceding fix pinned the override on
+    BOTH arms, which hid it perfectly; the first leg that did not pin it found it
+    immediately. Fixed by having the preflight ASK the engine which checkpoint it
+    will load. Second instance of 12.162 (follow the value to every consumer),
+    with the twist that the value's MEANING changed rather than its content --
+    the stale reader got an empty string, not a wrong one.
+  bible_id: '12.162'
+  verdict: covered
+  source: live-artifact
