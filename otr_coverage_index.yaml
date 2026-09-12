@@ -3133,7 +3133,10 @@ records:
     immediately. Fixed by having the preflight ASK the engine which checkpoint it
     will load. Second instance of 12.162 (follow the value to every consumer),
     with the twist that the value's MEANING changed rather than its content --
-    the stale reader got an empty string, not a wrong one.
+    the stale reader got an empty string, not a wrong one. Cross-reference
+    12.156, which is arguably the closer mechanism (a convention changed at the
+    writer while a separate reader kept the old one); it was folded here rather
+    than minting a third near-duplicate rule in one week.
   bible_id: '12.162'
   verdict: covered
   source: live-artifact
