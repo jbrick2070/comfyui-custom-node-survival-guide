@@ -3044,3 +3044,14 @@ records:
   bible_id: '12.162'
   verdict: covered
   source: review
+- record: >-
+    OTR PBUG-20260911-06, live artifact 2026-09-11 (the_asss_head, 5080 with
+    ffprobe made unresolvable): the silent composite documented "-1 on an absent
+    tool and carry on" and its own V-1 gate read -1 as a violation; a 514 s
+    render that had cleared every engine was lost at the caption burn as "input
+    video missing". Fixed the same night by routing the composite, mux, scopes
+    and blend probes through the PyAV-capable boundary and making the gates say
+    UNPROVEN on a sentinel; proved by a canonical leg on the same cold shape.
+  bible_id: '12.164'
+  verdict: covered
+  source: live-artifact

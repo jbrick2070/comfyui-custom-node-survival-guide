@@ -11522,3 +11522,16 @@ bugs:
     For every public function added by a change, `grep -rn "<name>(" <package>/` excluding tests and the defining module returns at least one hit, or the plan carries a row naming the helper as intentionally unwired and what unblocks it. A test that calls the helper directly proves the helper; only a call at the production site proves the feature.
   tags: [regression-guard, wiring, dead-code, false-green, built-and-unwired]
   legacy_id: ""
+- id: "12.164"
+  phase: 12
+  area: regression
+  symptom: |
+    A finished render dies at a diagnostic node on a machine that lacks one measuring tool, even though the module that measures documents "an absent tool answers -1 and the render carries on". The log says the output has -1 audio streams and must have 0; the empty path then fails every downstream node with "input missing", and the last node's refusal gets the blame. On every machine that has the tool nothing is wrong.
+  cause: |
+    A degrade sentinel (-1 / 0.0 / an empty dict) is a contract with every consumer, and one consumer compared it with "!= 0". The policy was true of the helper and false of the module: a gate written against the happy-path answer read the sentinel as a violation. The class is "policy stated at the producer, unenforced at the consumer", and it is invisible to every test that runs where the tool exists.
+  fix: |
+    When a helper answers a sentinel for "could not measure", audit every consumer and make each one tell UNMEASURABLE from WRONG: warn and carry on for the sentinel, raise for a real violation. Better, remove the reason for the sentinel by routing the measurement through a boundary that can still measure on that machine (here PyAV when ffprobe is absent), and keep the sentinel only for the case where nothing on the box can. Prove it on the machine shape that lacks the tool, not the one that has it.
+  verify: |
+    For every function documented as returning a sentinel on an absent tool, grep its callers and show each handles the sentinel explicitly (a "< 0" / "is None" branch that warns), or a test that stubs the helper to the sentinel and asserts the render completes with an UNPROVEN receipt. A live run on a box without the tool reaches the publish step.
+  tags: [regression-guard, sentinel, degrade, consumer-contract, cold-install, false-green]
+  legacy_id: ""
