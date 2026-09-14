@@ -34,11 +34,11 @@
 # two records for that reason.
 # 2026-09-02 delta (registry scanner): 1 record appended, promoted as
 # 12.147 -- a scanner rule change flagging the session-bearer hidden input.
-audited: 2026-09-12
+audited: 2026-09-13
 # Last code/test base; the September 11 incident-only delta follows this commit.
 # The audited date above describes the historical audit, not a new full scrape.
 bible_head: 032923303d82425006658716831cb5ac02e47ac3
-bible_entries: 350
+bible_entries: 354
 records:
 - ref: BUG_LOG.md L1022 (BUG-LOCAL-231 soak data point)
   title: A long per-clip render loop had no routine VRAM reclamation — cleanup fired only on an OOM exception, so a gradual
@@ -3139,4 +3139,37 @@ records:
     than minting a third near-duplicate rule in one week.
   bible_id: '12.162'
   verdict: covered
+  source: live-artifact
+
+- otr_ref: "2026-09-13 music cue collapse"
+  summary: |
+    compose_brief_engine_prompt took the shared meta and no cue id, so a derived
+    row composed a byte-identical string for opening, interstitial and closing:
+    the ledger recorded 3 of 3 distinct asks and the engine heard 1 of 3. Only
+    the seed, the duration and the placement still differed. It shipped because
+    the change that made the short form universal was verified along the ENGINE
+    axis (SA3 against MusicGen, identical on all four rhythmic banks) and never
+    along the CUE axis. Verified against a real episode ledger on disk. Fixed by
+    a three-word per-cue clause, groove-aware so a 128 BPM palette is never told
+    to resolve, plus an additive story flavour read from the scene the cue opens
+    on, closes on, or is anchored beside -- additive only, because just 32% of
+    921 ledgers on disk carry scene descriptions at all.
+  bible_id: '12.168'
+  verdict: promoted
+  source: live-artifact
+
+- otr_ref: "2026-09-13 SA3 idiom false premise"
+  summary: |
+    A change was justified by "the long form never read palette.idiom, so the
+    engines taking it never heard the genre or the tempo". The first half was
+    true of that function body; the second did not follow, because the long form
+    appended the ROW TEXT and compose_music_prompt puts the idiom on every
+    branch. The verification had passed the stub string "opening theme" as the
+    row instead of the real composed row, so it manufactured the very gap it
+    reported. Re-measured against real composition: the idiom was present in 18
+    of 18 bank/cue combinations. The claim had already been written into two
+    commit messages and a shipped class comment before a contrarian pass caught
+    it. Corrected in place rather than left as history.
+  bible_id: '12.169'
+  verdict: promoted
   source: live-artifact
