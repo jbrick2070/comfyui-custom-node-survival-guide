@@ -11602,3 +11602,45 @@ bugs:
     Require any absence claim in a commit message or a source comment to cite a POPULATION and a count, and make the sweep itself a test so the claim is re-checked rather than remembered. Where a comment records "this never happens", add the assertion that would go red if it started happening. Neuter the check: feed the verification the real upstream value and confirm the original finding reverses -- if it does not reverse, the synthetic input was not the flaw and the finding stands.
   tags: [regression-guard, false-premise, stub-input, absence-claim, verification-manufactures-finding, comment-as-evidence, population-sweep]
   legacy_id: ""
+
+- id: "12.170"
+  phase: 12
+  area: regression
+  symptom: |
+    A call to a reasoning-capable model returns a short, truncated or empty answer while reporting success. There is no exception, no error field, and the per-candidate finish reason reads normal. Retrying produces the same shape. The work that was supposed to be generated is simply missing, and the most natural diagnosis -- a bad prompt -- is wrong, because the same prompt succeeds the moment the cap is raised. The only witness is a usage or accounting block showing a thought/reasoning token count that accounts for the entire allowance.
+  cause: |
+    The provider's output cap bounds HIDDEN reasoning tokens plus visible output, not visible output alone. Code that sizes the cap from the length of the answer it wants -- which is the obvious way to size it, and was correct before reasoning models -- gives the model an allowance it can spend entirely on thinking, leaving nothing for the response. The parameter name does not say this; it reads as a limit on what comes back. The failure is silent rather than loud for a second reason: truncation of this kind is frequently reported at a DIFFERENT level of the response than ordinary finish reasons -- a top-level status field rather than a per-candidate one -- so a reader that checks finish reasons sees a clean completion. Reasoning effort settings interact with it, since a higher effort spends more of the same pool.
+  fix: |
+    Size the cap as wanted-output PLUS a per-model reasoning headroom, and derive the headroom per model rather than using one constant, because effort tiers and model families differ by a large factor. Read the truncation signal at the level the provider actually reports it, and verify which level that is against a real truncated response rather than assuming it mirrors the finish reason. Beware the over-correction: treating a NESTED status of the same name as truncation will refuse complete answers, so establish which field is authoritative before branching on it. Where the provider exposes a reasoning-effort knob, set it explicitly instead of inheriting a default that can change.
+  verify: |
+    Assert the request's cap EXCEEDS the wanted output by the model's headroom, per model, not that it equals the wanted output. Build a fixture from a real truncated response and assert the code reports it as truncated; build a second from a real COMPLETE response that carries the same status name at a nested level and assert it is NOT reported as truncated -- that second fixture is the one nobody writes and it is what catches the over-correction. Where usage is returned, assert the reasoning token count is read and logged, so a future budget regression is visible in the record rather than only in a short answer.
+  tags: [regression-guard, llm-api, reasoning-tokens, output-cap, silent-truncation, status-level-mismatch, usage-accounting]
+  legacy_id: ""
+
+- id: "12.171"
+  phase: 12
+  area: regression
+  symptom: |
+    A retry or backoff budget that is documented, tested and correct-looking permits far more waiting than its number says. A call configured for four attempts can sleep twelve times; a run that should give up in a minute blocks for several. Nothing errors, the log lines all look right individually, and the unit test passes because it exercises one pass of the loop. The tell is wall-clock: an operation takes a multiple of its stated worst case, and the multiple equals the number of attempts in some OUTER loop nobody was thinking about.
+  cause: |
+    The budget object is constructed INSIDE the loop it is meant to bound. Each outer attempt gets a fresh full budget, so the bound applies per-attempt rather than per-call, and the effective limit is the product of the two loop counts instead of the inner one. This survives review because the construction site reads naturally -- a budget created next to the work it governs looks like good scoping -- and because the inner loop genuinely does honour its number. A closely related sibling ships in the same change: a sleep inside a retry loop that does not check the cancellation signal, so a user's cancel is not honoured until the whole ladder drains. Both are invisible to a test that calls the retrying function once.
+  fix: |
+    Construct the budget at the boundary of the thing it bounds and PASS it down, so every attempt draws from one pool. State in the signature what scope it covers -- per call, per prompt, per session -- because the name alone will not say. Make every sleep in a retry path interruptible and check the cancellation signal on each wake, never only between attempts. When a wrapper is added to one caller, grep for the sibling callers that make the same class of request; a partial rollout leaves the unwrapped path as the one that fails in production.
+  verify: |
+    Test the OUTER caller, not the retrying helper: drive a call that fails at every level and assert the TOTAL number of waits equals the budget, not budget times attempts. Assert a cancel raised mid-sleep returns promptly rather than after the ladder completes. Enumerate the call sites that issue the retried request and assert each one is wrapped -- a test that calls the helper directly proves the helper and never the wiring.
+  tags: [regression-guard, retry-budget, loop-scope, budget-multiplication, cancellation, partial-rollout, wiring-not-helper]
+  legacy_id: ""
+
+- id: "12.172"
+  phase: 12
+  area: regression
+  symptom: |
+    A work item sits frozen for weeks behind a recorded note explaining why it cannot be done -- the format is unmarked, the source is unparseable, no pattern fits. The note is specific, technical and measured-sounding, so every later reader treats the question as settled and moves on. When someone finally opens the source, it is marked cleanly and always was, in a vocabulary the code simply had no rule for. The blocked item was never blocked.
+  cause: |
+    A parser falls back to heuristics when no rule matches a source, and heuristic output fails in ways that LOOK like the source is malformed: fields merge, boundaries land wrong, content lands in the wrong record. The diagnosis is written from the parser's behaviour rather than from the source, so it describes the tool's gap as the input's defect. The note then does the real damage: it converts an unexamined assumption into a recorded finding, and a recorded finding is not re-derived. The failure is systematic rather than unlucky, because every guard in the parser was written against the sources it already handled -- a length check, a case check, a delimiter check -- and a new source can satisfy none of them while being perfectly well formed.
+  fix: |
+    Read the source before believing any note about the source, including one written in your own repo. Fetch it through the pipeline's own cache, dump the structural inventory, and look. Then count what the SOURCE marks and compare with what the parser produced -- never count only what survived parsing, because a record swallowed whole never appears as a record to look for, and plausible totals hide it. When the count gap is confirmed, write a per-source rule rather than loosening a shared heuristic. Audit the guards that were written for other sources against the new one, because the rule can be correct and a downstream guard can still discard every result it produces.
+  verify: |
+    Require any note that blocks work on a claim about an input to cite what was read and the two counts -- what the source marks and what the pipeline produced -- so the claim is checkable rather than remembered. Pin each per-source rule with a fixture built from real fetched markup asserting both halves: the records are claimed AND they survive to the output. Neuter it by reverting the rule and confirming the fixture goes red. Where a shared guard could discard a valid result, assert the specific shape that would trip it.
+  tags: [regression-guard, false-blocker, diagnosis-as-evidence, parser-fallback, per-source-rule, count-what-the-source-marks, stale-note]
+  legacy_id: ""

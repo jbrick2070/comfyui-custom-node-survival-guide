@@ -3173,3 +3173,55 @@ records:
   bible_id: '12.169'
   verdict: promoted
   source: live-artifact
+
+- otr_ref: "PBUG-20260919-01 gemini thinking tokens ate the output budget"
+  summary: |
+    The BYO Google lane's first live legs returned short or empty scripts with no
+    error, because generation_config.max_output_tokens bounds THOUGHT tokens plus
+    visible output and the cap was sized from the wanted script length alone. The
+    truncation is reported only as a top-level status "incomplete", never as a
+    per-candidate finish reason, so the code reading finish reasons saw a clean
+    answer and the only witness was total_thought_tokens in the usage block. Fixed
+    by a per-model thinking level plus headroom. A contrarian pass caught the
+    over-correction on the way in: reading a NESTED status of the same name as
+    truncation refused COMPLETE answers, so the nested check was split out and the
+    top-level one decides. Proven on a published episode.
+  bible_id: '12.170'
+  verdict: promoted
+  source: live-artifact
+
+- otr_ref: "PBUG-20260919-03 google 429 retry budget reset per outer attempt"
+  summary: |
+    Google returns HTTP 429 for a per-minute rate limit as well as a spent quota,
+    and every poster treated it as terminal, so two published episodes carried 2 of
+    8 and 0 of 8 Veo beats. The durable finding is not the missing retry but what a
+    file-grounded reviewer found in the FIX: the quota budget was constructed inside
+    each outer attempt, so a call configured for four waits could wait twelve, and
+    the unit test passed because it drove one pass of the inner loop. The same pass
+    found Cancel was not honoured during a sleep; a second reviewer found one poster
+    (download_media) never wrapped at all -- a test that calls the helper directly
+    proves the helper and never the wiring.
+  bible_id: '12.171'
+  verdict: promoted
+  source: live-artifact
+
+- otr_ref: "2026-09-19 three shakespeare hold notes were wrong about their own editions"
+  summary: |
+    Three vendoring rows sat frozen behind recorded notes saying the edition was
+    unmarked or unparseable. All three notes were wrong and each froze its row for
+    weeks. Tsubouchi "sets stage business inline with no markup of its own" marks it
+    in div.jisage_N; pt.wikisource "no speaker pattern fits" marks every speaker as a
+    bare all-caps div.tiInherit; Zhu Shenghao "breaks no paragraph before a speaker"
+    opens a <p> before every one. In each case the parser had no rule for that
+    edition and fell back to heuristics, whose output looks exactly like a malformed
+    source. The measurable half: count what the EDITION marks, never what survived
+    parsing -- the Italian set read a healthy 142 speeches / 13 speakers while
+    listing a stage direction, Feste's Latin joke and Malvolio's letter among its
+    cast, and in the Japanese set a one-line part had swallowed the Prince's entire
+    speech, which no check for a known speaker inside another speaker's line can see
+    because a character swallowed whole never appears as a speaker to look for. The
+    second trap is the shared guard: _marked_name rejects len(name) < 2, so a correct
+    Chinese rule would still drop every single-character speaker downstream.
+  bible_id: '12.172'
+  verdict: promoted
+  source: live-artifact
