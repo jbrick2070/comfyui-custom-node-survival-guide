@@ -11644,3 +11644,41 @@ bugs:
     Require any note that blocks work on a claim about an input to cite what was read and the two counts -- what the source marks and what the pipeline produced -- so the claim is checkable rather than remembered. Pin each per-source rule with a fixture built from real fetched markup asserting both halves: the records are claimed AND they survive to the output. Neuter it by reverting the rule and confirming the fixture goes red. Where a shared guard could discard a valid result, assert the specific shape that would trip it.
   tags: [regression-guard, false-blocker, diagnosis-as-evidence, parser-fallback, per-source-rule, count-what-the-source-marks, stale-note]
   legacy_id: ""
+
+- id: "12.173"
+  phase: 12
+  area: text-metrics
+  symptom: |
+    A pipeline that measures text in words -- to budget beats, size a passage, cap a chunk, stamp
+    a ledger -- silently handles a whole script wrong. A 3,606-character Japanese scene counted as
+    TWO words, so the planner refused the vendored translation as "a 2-word passage cannot fill 12
+    beats" and fell back, without error, to a machine translation that then shipped under the real
+    translator's credit line. Accented Latin words counted as two ("nao" split at the accent), so
+    every Portuguese, Spanish, Italian and French row was over-counted. Nothing failed; a count
+    was simply wrong, and every consumer of the count believed it.
+  cause: |
+    The canonical word regex was ASCII-only -- [A-Za-z][A-Za-z0-9'-]* -- and every cut in the
+    chunker fell at a space (line.split()), which Chinese and Japanese never have. Two owners of
+    "what is a word" agreed with each other and were both blind to any script but English. The
+    fallback that hid it was correct policy (never refuse an episode for want of a translator's
+    words) applied to a wrong measurement, which is the shape that never raises.
+  fix: |
+    One word measure for every script, in the one canonical counter: a word starts with a letter
+    of ANY script ([^\W\d_]), and CJK characters (Han, kana, hangul) carry the count at a fixed
+    ratio (two per word) because they have no spaces; CJK punctuation is not in the class. Keep
+    the ASCII behaviour byte-identical -- widen only the letter classes, never the continuation --
+    because frozen English records are re-derived from the same counter. A spaceless CJK line is
+    cut after sentence marks, then clause marks, then characters, re-joined with NOTHING between so
+    the source bytes survive; a line without CJK never takes that path. The greedy cut closes a
+    chunk BEFORE the token that would overshoot the cap, which is the same cut for one-word tokens
+    and the promised cut for sentence-sized ones.
+  verify: |
+    Before changing the counter, measure it: run old and new over every source text and every
+    stored row on disk and require 0 differing pure-ASCII rows (27,600 measured here; a first,
+    stricter continuation moved 15 rows -- every one a double dash -- and was withdrawn). After:
+    the real CJK source must PLAN through the real planner on many seeds (50 of 50), every chunk
+    within the cap, chunks re-joining to the original bytes, English chunking asserted unchanged.
+    And read the leg log for the fallback line -- a published file proves the language path, never
+    the vendored path; only the log line that names the translator does.
+  tags: [i18n, cjk, word-count, ascii-only-regex, silent-fallback, chunking, verbatim-lane, measure-before-change, byte-identity]
+  legacy_id: ""

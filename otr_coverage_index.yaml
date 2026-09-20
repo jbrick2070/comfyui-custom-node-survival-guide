@@ -3225,3 +3225,15 @@ records:
   bible_id: '12.172'
   verdict: promoted
   source: live-artifact
+
+- otr_ref: "PBUG-20260919-04 a Japanese Shakespeare scene counted as two words; the translator's text was never performed"
+  summary: |
+    Found on the first native Japanese leg: the vendored Tsubouchi row was selected and
+    hash-verified, then the planner logged "a 2-word passage cannot fill 12 beats" and the
+    episode published as a machine translation under the translator's credit. The canonical
+    word regex was ASCII-only and the chunker cut only at spaces. Fixed 96346118: Unicode
+    letters, CJK at two characters per word, punctuation-boundary cuts for spaceless lines,
+    ASCII byte-identical over 27,600 rows. All seven CJK cells plan; 50 of 50 seeds.
+  bible_id: '12.173'
+  verdict: promoted
+  source: live-artifact
