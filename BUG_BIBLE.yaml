@@ -11682,3 +11682,46 @@ bugs:
     the vendored path; only the log line that names the translator does.
   tags: [i18n, cjk, word-count, ascii-only-regex, silent-fallback, chunking, verbatim-lane, measure-before-change, byte-identity]
   legacy_id: ""
+- id: "12.174"
+  phase: 12
+  area: queue-time-gate-checks-weights-not-node-classes
+  symptom: |
+    A fresh install queues a graph whose selected engine needs a third-party node pack
+    that is not installed. The queue-time gate plans and fetches every weight file
+    (3.9 GB), the writer runs, casting and audio complete, the base video encodes
+    (4,664 frames), and the run fails 18 minutes in at the first render shot with
+    "missing required ComfyUI node class(es): ADE_AnimateDiffLoaderGen1 ...". The
+    engine's own usability check knew the whole time. Nothing reaches the output
+    folder, and the error is written for the pack's authors (an enum, class names, a
+    commit pin) rather than for the person who has to act on it.
+  cause: |
+    The two halves of "can this engine run here" live in two places and are asked at
+    two times. The gate that runs when the graph is queued checks WEIGHT availability
+    and fetches what is missing. The engine's assert_usable checks weights AND node
+    classes, but its only caller is the render driver, per shot. A node pack is a
+    documented MANUAL dependency (it cannot be a pip requirement), so it is the one
+    thing a fresh box is most likely to lack -- and the only check that would say so
+    is asked last. Nothing in the suite noticed because every test that exercised the
+    engine had the pack installed.
+  fix: |
+    Ask the cheap half at the gate. At queue time, BEFORE any download, read each
+    planned engine's declared node-class table (the same table its assert_usable
+    reads) and resolve every name against the host's node registry; refuse with the
+    fix as the FIRST sentence ("Install <pack> from ComfyUI Manager, then restart
+    ComfyUI"), then the engine id and only the missing classes. Node classes only:
+    calling the engine's whole assert_usable at the gate refuses a fresh box for the
+    weights the gate is about to download. An empty or unimportable registry is
+    "nothing to check", never "everything is missing". Keep the render-time check;
+    the gate inherits from it rather than replacing it.
+  verify: |
+    With a stand-in registry lacking the pack's classes: the gate raises before the
+    download planner is called, the message starts with the install instruction, and
+    it names only the missing classes. With every class present it passes. An engine
+    with no table, an unknown engine id, an empty registry and an unimportable
+    registry all pass through. Pin the ORDER by source inspection: the gate call
+    precedes the download call. Live: queue the graph on a box without the pack --
+    refusal at t=0 and nothing fetched. Test trap: if the bridge's resolver re-reads
+    the registry through a function that takes the map as an argument, a stand-in
+    that takes no argument throws inside the loop and every class reads as missing.
+  tags: [queue-time-gate, node-pack, third-party-dependency, assert_usable, render-time-only, fail-early, fix-first-message, fresh-install, xref-12.88]
+  legacy_id: ""
