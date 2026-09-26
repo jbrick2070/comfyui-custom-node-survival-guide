@@ -11800,3 +11800,40 @@ bugs:
     beat), not the number of segments, and the episode publishes.
   tags: [text-encoder, conditioning-cache, t5, multi-segment, system-ram, unified-memory, free-after-use, graph-externals, xref-12.117]
   legacy_id: ""
+- id: "12.177"
+  phase: 12
+  area: publishing-a-hugging-face-cache-path-copies-the-caches-symlink
+  symptom: |
+    A node pack downloads a model with huggingface_hub, verifies it, and publishes it
+    into ComfyUI's model folder -- then its own "can the loader see it?" check fails, or
+    the loader reports the model missing, after a complete and hash-verified download.
+    The model folder holds a symbolic link whose target reads like
+    ../../../blobs/<sha256>, which resolves nowhere from that folder. Only Windows
+    machines that are allowed to create symlinks (developer mode or admin) show it; the
+    same code works on a Windows box without symlink rights, on Linux and on macOS.
+  cause: |
+    hf_hub_download (and snapshot_download without local_dir) returns a path inside the
+    Hugging Face cache's snapshot tree. Where the OS allows symlinks, that path is a
+    RELATIVE symlink into the cache's blob store -- and in recent huggingface_hub it can
+    be a chain (snapshot -> blobs/<sha256> -> a shared blobs/<xx>/<hash>). Windows
+    os.link does not follow symlinks: it hard-links the symlink itself, so the published
+    name carries a relative target that only made sense inside the cache. On POSIX,
+    os.link follows the link by default, and a Windows box without symlink rights gets a
+    real file in the cache, which is why the defect hides on most machines.
+  fix: |
+    Resolve the library-returned path to the real file (os.path.realpath) BEFORE hashing,
+    hard-linking or copying it anywhere. Hard-link the resolved blob (same volume, no
+    extra disk) and fall back to a byte copy across volumes. Alternatively download with
+    local_dir=<model folder>, which writes a real file directly. Never publish the cache
+    path as returned.
+  verify: |
+    Build the Hugging Face cache layout in a temporary folder -- a blob file plus a
+    RELATIVE snapshot symlink to it -- make the fetch return the snapshot path, and
+    publish into a separate "models" folder. The published name must NOT be a symlink,
+    must be a regular file, and must read the payload. Skip where the machine cannot
+    create symlinks. Statically: a module that hard-links (os.link) the result of a
+    huggingface_hub download must resolve it (os.path.realpath / Path.resolve) first.
+    Live: on a Windows box with symlink rights, move one model off the box, let the pack
+    fetch it, and confirm ComfyUI's loader resolves the published file.
+  tags: [huggingface-hub, hf-cache, symlink, hardlink, windows, os-link, auto-download, model-folder, publish]
+  legacy_id: ""

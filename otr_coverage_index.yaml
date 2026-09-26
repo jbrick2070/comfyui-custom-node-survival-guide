@@ -3259,3 +3259,11 @@ records:
   bible_id: '12.176'
   verdict: promoted
   source: live-artifact
+- ref: apple/PROD_BUG_LOG.md L15508 (PBUG-20260926-02)
+  title: An auto-downloaded model was published as a broken symlink (the Hugging Face cache's
+    relative ../../../blobs/<sha256> link, hard-linked by Windows os.link without following it);
+    fixed 173c9073 by resolving the fetched path before hashing and publishing -- the 21 GB H3
+    ref2va then published as a real file and resolved through ComfyUI's loader
+  bible_id: '12.177'
+  verdict: promoted
+  source: live-artifact

@@ -3507,6 +3507,57 @@ class TestSilentFontFallback:
             % ", ".join(offenders))
 
 
+class TestHardLinkPublishResolvesTheSource:
+    """BUG-12.177: a module that hard-links a downloaded file into a model folder
+    must resolve the path first.
+
+    huggingface_hub returns a path in its snapshot tree, and where the OS allows
+    symlinks that path is a RELATIVE symlink into the blob store. Windows
+    ``os.link`` does not follow symlinks -- it hard-links the link itself -- so
+    the model folder receives a name whose relative target resolves nowhere, and
+    the loader reports the model missing after a complete, hash-verified
+    download. The static form of the rule: a module that CALLS ``os.link`` also
+    calls ``os.path.realpath`` or ``.resolve()`` on a path.
+    """
+
+    _EXEMPT_PARTS = ("site-packages", "__pycache__", "tests", "test_")
+
+    def test_a_hard_link_publish_resolves_its_source(self, py_files):
+        import ast
+
+        offenders = []
+        for path in py_files:
+            if any(part in str(path) for part in self._EXEMPT_PARTS):
+                continue
+            try:
+                src = open(path, encoding="utf-8").read()
+            except (OSError, UnicodeDecodeError):
+                continue
+            if not _code_calls(src, "os.link"):
+                continue
+            try:
+                tree = ast.parse(src)
+            except SyntaxError:
+                offenders.append("%s (unparsable)" % path)
+                continue
+            resolves = _code_calls(src, "os.path.realpath") or any(
+                isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+                and n.func.attr == "resolve"
+                for n in ast.walk(tree))
+            if not resolves:
+                offenders.append(str(path))
+
+        assert not offenders, (
+            "BUG-12.177: these modules hard-link with os.link but never resolve "
+            "a path (os.path.realpath / Path.resolve): %s.\n\n"
+            "A path returned by huggingface_hub is, where symlinks are allowed, "
+            "a RELATIVE symlink into its cache. Windows os.link hard-links the "
+            "symlink itself, so the model folder gets a link that resolves "
+            "nowhere and the loader reports the model missing after a complete "
+            "download. Resolve the source to the real file before linking or "
+            "copying it." % ", ".join(offenders))
+
+
 class TestBibleIsActuallyParseable:
     def _repo_root(self):
         """Survival-guide repo root (parent of tests/).
