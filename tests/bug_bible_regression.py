@@ -65,30 +65,50 @@ def pack_dir(request):
 
 
 def _code_calls(content, dotted):
-    """True when the source CALLS ``dotted`` (e.g. ``subprocess.Popen``) --
-    tokens only, so a comment, a docstring, an alias or a type annotation that
-    merely mentions the name does not count."""
-    import io
-    import tokenize
-    parts = dotted.split(".")
-    try:
-        toks = [t for t in tokenize.generate_tokens(io.StringIO(content).readline)
-                if t.type not in (tokenize.COMMENT, tokenize.NL, tokenize.NEWLINE,
-                                  tokenize.INDENT, tokenize.DEDENT, tokenize.STRING)]
-    except (tokenize.TokenError, IndentationError, SyntaxError):
-        return dotted + "(" in content
-    want = []
-    for i, name in enumerate(parts):
-        if i:
-            want.append((tokenize.OP, "."))
-        want.append((tokenize.NAME, name))
-    want.append((tokenize.OP, "("))
-    n = len(want)
-    for i in range(len(toks) - n + 1):
-        if all((toks[i + j].type, toks[i + j].string) == want[j] for j in range(n)):
-            return True
-    return False
+    """True when the source CALLS ``dotted`` (e.g. ``subprocess.Popen``).
 
+    Read from the syntax tree, so a comment, a docstring or a type annotation
+    that merely names it does not count -- and IMPORT ALIASES ARE RESOLVED,
+    so ``import subprocess as sp; sp.Popen(...)``, ``from subprocess import
+    Popen; Popen(...)`` and ``from comfy.model_management import
+    unload_all_models as _unload; _unload()`` all count. A call matches when
+    its resolved name IS ``dotted`` or ends with ``"." + dotted``, so
+    ``mm.unload_all_models()`` matches ``unload_all_models``. A name bound by
+    plain assignment (``P = subprocess.Popen``) is not followed. An
+    unparsable file answers by the bare name, which errs toward a finding."""
+    import ast as _ast
+    try:
+        tree = _ast.parse(content)
+    except (SyntaxError, ValueError):
+        return dotted.rsplit(".", 1)[-1] + "(" in content
+    aliases = {}
+    for node in _ast.walk(tree):
+        if isinstance(node, _ast.Import):
+            for alias in node.names:
+                if alias.asname:
+                    aliases[alias.asname] = alias.name
+        elif isinstance(node, _ast.ImportFrom):
+            base = node.module or ""
+            for alias in node.names:
+                aliases[alias.asname or alias.name] = (
+                    base + "." + alias.name if base else alias.name)
+
+    def resolved(func):
+        parts = []
+        while isinstance(func, _ast.Attribute):
+            parts.append(func.attr)
+            func = func.value
+        if not isinstance(func, _ast.Name):
+            return None
+        parts.append(aliases.get(func.id, func.id))
+        return ".".join(reversed(parts))
+
+    for node in _ast.walk(tree):
+        if isinstance(node, _ast.Call):
+            name = resolved(node.func)
+            if name and (name == dotted or name.endswith("." + dotted)):
+                return True
+    return False
 
 @pytest.fixture(scope="session")
 def py_files(pack_dir):
@@ -197,6 +217,29 @@ class TestPhase01Paths:
                 node = node.args[0]
             return d
 
+        def asks_folder_paths(expr):
+            return any(isinstance(n, ast.Name) and n.id == "folder_paths"
+                       for n in ast.walk(expr))
+
+        def returns_folder_paths_value(try_node):
+            """The try returns a folder_paths call, or a name it assigned from
+            one -- the lookup-first half of the rule's remedy."""
+            from_lookup = set()
+            for b in try_node.body:
+                for n in ast.walk(b):
+                    if isinstance(n, ast.Assign) and asks_folder_paths(n.value):
+                        from_lookup |= {t.id for t in n.targets
+                                        if isinstance(t, ast.Name)}
+            for b in try_node.body:
+                for n in ast.walk(b):
+                    if not isinstance(n, ast.Return) or n.value is None:
+                        continue
+                    if asks_folder_paths(n.value) or (
+                            isinstance(n.value, ast.Name)
+                            and n.value.id in from_lookup):
+                        return True
+            return False
+
         def unsanctioned_chains(tree):
             """Line numbers of 4+ deep chains that could silently land in the
             wrong place. Chains that cannot are not violations: (a) the
@@ -205,9 +248,11 @@ class TestPhase01Paths:
             headless fallback; (b) a probe the very next statement checks
             with ``os.path.isdir/exists/isfile`` before using it; (c) the
             same fallback written as a fall-through: the chain follows, in
-            the same block, a ``try`` whose body asks ``folder_paths`` and
-            returns what it found, so the chain is reached only when that
-            lookup failed."""
+            the same block, a ``try`` that RETURNS what ``folder_paths``
+            gave it (the call itself, or a name assigned from one inside that
+            try), so the chain is reached only when that lookup came up
+            empty or raised. A try that merely mentions folder_paths, or
+            returns something else, sanctions nothing."""
             bad = []
             parents = {}
             for parent in ast.walk(tree):
@@ -253,10 +298,7 @@ class TestPhase01Paths:
                         for prev in seq[:seq.index(stmt)]:
                             if not isinstance(prev, ast.Try):
                                 continue
-                            body = "\n".join(ast.unparse(b) for b in prev.body)
-                            if "folder_paths" in body and any(
-                                    isinstance(n, ast.Return)
-                                    for b in prev.body for n in ast.walk(b)):
+                            if returns_folder_paths_value(prev):
                                 ok = True
                                 break
                 if not ok:
@@ -356,16 +398,18 @@ class TestPhase01Paths:
 
         def owns_output_root(path, hops):
             """This module -- or a local module it imports, up to ``hops`` deep
-            -- asks folder_paths for the output directory. A pack with ONE
+            -- CALLS folder_paths.get_output_directory(). A pack with ONE
             path-owner module (and a rule that nothing else may call
             folder_paths for it) writes through that owner, which is the
-            sanctioned helper this check is for."""
+            sanctioned helper this check is for. A CALL, read from the syntax
+            tree: a helper whose docstring merely names the function owns
+            nothing."""
             try:
                 with open(path, "r", encoding="utf-8", errors="replace") as fh:
                     text = fh.read()
             except OSError:
                 return False
-            if "get_output_directory" in text:
+            if _code_calls(text, "folder_paths.get_output_directory"):
                 return True
             if hops <= 0:
                 return False
