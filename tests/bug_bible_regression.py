@@ -64,6 +64,32 @@ def pack_dir(request):
     return path
 
 
+def _code_calls(content, dotted):
+    """True when the source CALLS ``dotted`` (e.g. ``subprocess.Popen``) --
+    tokens only, so a comment, a docstring, an alias or a type annotation that
+    merely mentions the name does not count."""
+    import io
+    import tokenize
+    parts = dotted.split(".")
+    try:
+        toks = [t for t in tokenize.generate_tokens(io.StringIO(content).readline)
+                if t.type not in (tokenize.COMMENT, tokenize.NL, tokenize.NEWLINE,
+                                  tokenize.INDENT, tokenize.DEDENT, tokenize.STRING)]
+    except (tokenize.TokenError, IndentationError, SyntaxError):
+        return dotted + "(" in content
+    want = []
+    for i, name in enumerate(parts):
+        if i:
+            want.append((tokenize.OP, "."))
+        want.append((tokenize.NAME, name))
+    want.append((tokenize.OP, "("))
+    n = len(want)
+    for i in range(len(toks) - n + 1):
+        if all((toks[i + j].type, toks[i + j].string) == want[j] for j in range(n)):
+            return True
+    return False
+
+
 @pytest.fixture(scope="session")
 def py_files(pack_dir):
     """Collect all .py files in the pack (excluding __pycache__).
@@ -83,7 +109,11 @@ def py_files(pack_dir):
     """
     found = []
     excluded_dirs = (
-        "__pycache__", ".git", ".venv", "venv", "tests", "llm_round_robin"
+        "__pycache__", ".git", ".venv", "venv", "tests", "llm_round_robin",
+        # Agent tooling keeps whole git worktrees under .claude/worktrees/ --
+        # a full stale copy of the pack. Walking it doubled every file-list
+        # verdict and graded old code as if it shipped (OTR, 2026-09-26).
+        ".claude",
     )
     for root, dirs, files in os.walk(pack_dir):
         dirs[:] = [d for d in dirs if d not in excluded_dirs]
@@ -158,10 +188,92 @@ class TestPhase01Paths:
             r"os\.path\.dirname\s*\(\s*"
             r"os\.path\.dirname"
         )
+
+        def depth(node):
+            d = 0
+            while (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                   and node.func.attr == "dirname" and node.args):
+                d += 1
+                node = node.args[0]
+            return d
+
+        def unsanctioned_chains(tree):
+            """Line numbers of 4+ deep chains that could silently land in the
+            wrong place. Chains that cannot are not violations: (a) the
+            fallback inside an ``except`` after a
+            ``folder_paths`` call failed -- the rule's own remedy, with a
+            headless fallback; (b) a probe the very next statement checks
+            with ``os.path.isdir/exists/isfile`` before using it; (c) the
+            same fallback written as a fall-through: the chain follows, in
+            the same block, a ``try`` whose body asks ``folder_paths`` and
+            returns what it found, so the chain is reached only when that
+            lookup failed."""
+            bad = []
+            parents = {}
+            for parent in ast.walk(tree):
+                for child in ast.iter_child_nodes(parent):
+                    parents[child] = parent
+            for node in ast.walk(tree):
+                if not (depth(node) >= 4 and not (node in parents
+                        and depth(parents[node]) > depth(node))):
+                    continue
+                up, ok = node, False
+                while up in parents:
+                    up = parents[up]
+                    if isinstance(up, ast.Try):
+                        body = "\n".join(ast.unparse(b) for b in up.body)
+                        if "folder_paths" in body and any(
+                                node in set(ast.walk(h)) for h in up.handlers):
+                            ok = True
+                        break
+                if not ok:
+                    stmt = node
+                    while stmt in parents and not isinstance(stmt, ast.stmt):
+                        stmt = parents[stmt]
+                    holder = parents.get(stmt)
+                    if (isinstance(stmt, ast.Assign) and len(stmt.targets) == 1
+                            and isinstance(stmt.targets[0], ast.Name) and holder is not None):
+                        for field in ("body", "orelse", "finalbody"):
+                            seq = getattr(holder, field, None)
+                            if isinstance(seq, list) and stmt in seq:
+                                i = seq.index(stmt)
+                                nxt = seq[i + 1] if i + 1 < len(seq) else None
+                                name = stmt.targets[0].id
+                                text = ast.unparse(nxt) if nxt is not None else ""
+                                if any(f"os.path.{fn}({name})" in text
+                                       for fn in ("isdir", "exists", "isfile")):
+                                    ok = True
+                if not ok:
+                    stmt = node
+                    while stmt in parents and not isinstance(stmt, ast.stmt):
+                        stmt = parents[stmt]
+                    holder = parents.get(stmt)
+                    seq = getattr(holder, "body", None) if holder is not None else None
+                    if isinstance(seq, list) and stmt in seq:
+                        for prev in seq[:seq.index(stmt)]:
+                            if not isinstance(prev, ast.Try):
+                                continue
+                            body = "\n".join(ast.unparse(b) for b in prev.body)
+                            if "folder_paths" in body and any(
+                                    isinstance(n, ast.Return)
+                                    for b in prev.body for n in ast.walk(b)):
+                                ok = True
+                                break
+                if not ok:
+                    bad.append(node.lineno)
+            return bad
+
         for fpath in py_files:
             with open(fpath, "r", encoding="utf-8", errors="replace") as f:
                 content = f.read()
-            if pattern.search(content):
+            if not pattern.search(content):
+                continue
+            try:
+                tree = ast.parse(content)
+            except SyntaxError:
+                violations.append(os.path.basename(fpath))
+                continue
+            if unsanctioned_chains(tree):
                 violations.append(os.path.basename(fpath))
 
         assert not violations, (
@@ -238,6 +350,31 @@ class TestPhase01Paths:
         via a sanctioned path helper).
         """
         warnings = []
+        by_stem = {}
+        for other in py_files:
+            by_stem.setdefault(os.path.splitext(os.path.basename(other))[0], other)
+
+        def owns_output_root(path, hops):
+            """This module -- or a local module it imports, up to ``hops`` deep
+            -- asks folder_paths for the output directory. A pack with ONE
+            path-owner module (and a rule that nothing else may call
+            folder_paths for it) writes through that owner, which is the
+            sanctioned helper this check is for."""
+            try:
+                with open(path, "r", encoding="utf-8", errors="replace") as fh:
+                    text = fh.read()
+            except OSError:
+                return False
+            if "get_output_directory" in text:
+                return True
+            if hops <= 0:
+                return False
+            for mod in set(re.findall(r"(?:from\s+\.*|import\s+)(\w+)", text)):
+                target = by_stem.get(mod)
+                if target and target != path and owns_output_root(target, hops - 1):
+                    return True
+            return False
+
         for fpath in py_files:
             with open(fpath, "r", encoding="utf-8", errors="replace") as f:
                 content = f.read()
@@ -253,7 +390,7 @@ class TestPhase01Paths:
                     "output_dir" in content or   # user-configurable path
                     "output_path" in content      # caller-supplied path
                 )
-                if not has_safe_path:
+                if not has_safe_path and not owns_output_root(fpath, 2):
                     warnings.append(os.path.basename(fpath))
 
         assert not warnings, (
@@ -608,7 +745,8 @@ class TestPhase07VRAM:
             with open(fpath, "r", encoding="utf-8", errors="replace") as f:
                 content = f.read()
 
-            if "unload_all_models" in content:
+            # A CALL, not the word: packs document why they do NOT call it.
+            if _code_calls(content, "unload_all_models"):
                 if "empty_cache" not in content:
                     issues.append(os.path.basename(fpath))
 
@@ -637,7 +775,10 @@ class TestPhase09Subprocess:
             with open(fpath, "r", encoding="utf-8", errors="replace") as f:
                 content = f.read()
 
-            if "subprocess.Popen" not in content:
+            # A CALL, not the name: a pass-through gateway that aliases or
+            # annotates subprocess.Popen (and returns the process to its
+            # caller) is not itself spawning anything.
+            if not _code_calls(content, "subprocess.Popen"):
                 continue
 
             # Check for cleanup patterns
@@ -2005,12 +2146,16 @@ class TestPhase07To12ProductionRegressionCatalog:
         }
         exec(compile(ast.Module(body=constants + definitions, type_ignores=[]), path, "exec"), namespace)
         check = namespace["check_ltx_open_health"]
+        # A LIVE member of the open set: the fixture used the literal
+        # "ltx_video", an engine id OTR retired, which the classifier then
+        # correctly reported as "unknown" instead of the "degraded" asserted.
+        ltx = sorted(namespace["_LTX_OPEN_ENGINES"])[0]
         for intended, actual, exists, expected in (
             ("still_pan", "still_pan", True, "not_requested"),
-            (None, "ltx_video", True, "unknown"),
-            ("unmapped", "ltx_video", True, "unknown"),
-            ("ltx_video", "still_pan", True, "degraded"),
-            ("ltx_video", "ltx_video", False, "degraded"),
+            (None, ltx, True, "unknown"),
+            ("unmapped", ltx, True, "unknown"),
+            (ltx, "still_pan", True, "degraded"),
+            (ltx, ltx, False, "degraded"),
             *((eid, eid, True, "healthy") for eid in namespace["_LTX_OPEN_ENGINES"]),
         ):
             manifest = {"roles_effective": {"announcer_visual": intended},
@@ -2144,6 +2289,10 @@ class TestPhase07To12ProductionRegressionCatalog:
         }
         if not os.path.isfile(paths["shared"]):
             pytest.skip("BUG-12.70 explicit word-delivery guard is OTR-local")
+        if not os.path.isfile(paths["codex"]):
+            pytest.skip("BUG-12.70: OTR retired the word-fit apparatus this pins "
+                        "(314dd481 word-fit rip, dae1fb3c codex/fable2 teardown; "
+                        "operator: no word-count chasing) -- nothing left to verify")
         sources = {
             name: open(path, encoding="utf-8").read()
             for name, path in paths.items()
@@ -2209,6 +2358,10 @@ class TestPhase07To12ProductionRegressionCatalog:
             pytest.skip("BUG-12.71 word-fit ceiling guard is OTR-local")
 
         shared_source = open(shared_path, encoding="utf-8").read()
+        if "WordFitCeilingExceeded" not in shared_source:
+            pytest.skip("BUG-12.71: OTR retired the outer word-fit campaign this "
+                        "pins (314dd481; _otr_word_delivery.py now has no retry, "
+                        "candidate or ceiling API) -- nothing left to verify")
         for marker in (
             "DEFAULT_MAX_OUTER_WORD_FIT_CANDIDATES = 12",
             "def _resolve_outer_candidate_ceiling(",
@@ -2271,6 +2424,9 @@ class TestPhase07To12ProductionRegressionCatalog:
             pytest.skip("BUG-12.61 cast-role identity guard is OTR-local")
         with open(anchor, "r", encoding="utf-8") as f:
             story_brief_source = f.read()
+        if "def _is_generic_role_label(" not in story_brief_source:
+            pytest.skip("BUG-12.61: OTR retired the cast-role prose gate this pins, "
+                        "with its tests (314dd481) -- nothing left to verify")
         for symbol in (
             "_is_generic_role_label",
             "_cast_input_substitution_forms",
@@ -2359,7 +2515,13 @@ class TestPhase07To12ProductionRegressionCatalog:
         with open(workflow_path, "r", encoding="utf-8") as f:
             workflow = json.load(f)
         links = {int(row[0]): row for row in workflow.get("links", [])}
-        assert links.get(284) == [284, 12, 0, 90, 4, "STRING"], (
+        # The gate is ShotLock's `gate_in` INPUT fed by node 12 slot 0; its
+        # index moves whenever an earlier input is removed (it was 4, it is 3
+        # since a widget left the node), so resolve it by name, not number.
+        shot_lock = next(n for n in workflow["nodes"] if int(n["id"]) == 90)
+        gate_slot = next(i for i, slot in enumerate(shot_lock.get("inputs") or [])
+                         if slot.get("name") == "gate_in")
+        assert links.get(284) == [284, 12, 0, 90, gate_slot, "STRING"], (
             "BUG-12.66: canonical workflow must gate ShotLock on rename owner"
         )
 
@@ -2382,12 +2544,15 @@ class TestPhase07To12ProductionRegressionCatalog:
             "nodes/production_ledger.py": "refresh_ledger_text_metrics",
             "nodes/_otr_ledger_freeze.py": "canonical_word_count",
             "nodes/_otr_freeze_cascade.py": "refresh_ledger_text_metrics(led)",
-            "nodes/_otr_readiness.py": "set_line_text_metrics",
             "nodes/_otr_ledger_scrub.py": "set_line_text_metrics",
-            "nodes/_otr_ledger_reviewer.py": "set_line_text_metrics",
-            "nodes/_otr_story_spine.py": "set_line_text_metrics",
-            "nodes/_otr_scifi_codex.py": "set_line_text_metrics",
         }
+        # Dropped 2026-09-26: _otr_ledger_reviewer.py and _otr_scifi_codex.py
+        # were deleted (314dd481, dae1fb3c), and _otr_readiness.py was
+        # redesigned never to mutate canonical text (it stamps text_for_tts),
+        # so it has no metric to refresh. _otr_story_spine.py lost its own
+        # rewrite loop in 314dd481 and now hands every text change to
+        # scrub_ledger in _otr_ledger_scrub.py, which is pinned above. Every
+        # remaining writer is pinned.
         for relative_path, marker in required_uses.items():
             path = os.path.join(pack_dir, *relative_path.split("/"))
             assert os.path.isfile(path), (
@@ -2405,13 +2570,13 @@ class TestPhase07To12ProductionRegressionCatalog:
             "tests/test_lfc_phase_0_10_gap_audit.py": (
                 "test_punctuation_glue_count_is_clean_for_every_bank",
             ),
-            "tests/test_lfc_phase_7_8_readiness.py": (
-                "test_final_metric_refresh_preserves_pre_diagnosis_and_cleans_post",
-            ),
             "tests/test_text_metric_ownership.py": (
                 "test_production_nodes_do_not_bypass_canonical_text_metric_owner",
             ),
         }
+        # The readiness metric-refresh test left with the redesign above
+        # (314dd481): readiness no longer rewrites canonical text, so there
+        # is no refresh left for it to prove.
         for relative_path, test_names in tests.items():
             path = os.path.join(pack_dir, *relative_path.split("/"))
             assert os.path.isfile(path), (
@@ -3028,8 +3193,10 @@ class TestModelSpecificReferenceAdmission:
 
         engine_tests = os.path.join(pack_dir, "tests", "test_image_engine_c2.py")
         seed_tests = os.path.join(pack_dir, "tests", "test_still_spine_helpers.py")
-        harness = os.path.join(pack_dir, "scripts", "otr_zimage_reference_ab.py")
-        for required in (engine_tests, seed_tests, harness):
+        # scripts/otr_zimage_reference_ab.py was deleted with its paired test
+        # in OTR's harness purge (96a6bae8); the rejection is still pinned by
+        # the two live test modules below.
+        for required in (engine_tests, seed_tests):
             assert os.path.isfile(required), (
                 f"BUG-12.120: required rejection evidence missing: {required}"
             )
