@@ -11725,3 +11725,78 @@ bugs:
     that takes no argument throws inside the loop and every class reads as missing.
   tags: [queue-time-gate, node-pack, third-party-dependency, assert_usable, render-time-only, fail-early, fix-first-message, fresh-install, xref-12.88]
   legacy_id: ""
+- id: "12.175"
+  phase: 12
+  area: a-directory-existing-outranks-the-hosts-configured-model-paths
+  symptom: |
+    A node pack downloads a model into a folder the user never configured. The user's
+    extra_model_paths.yaml (or the Desktop app's own config) points every model type at
+    a relocated tree, but an EMPTY leftover folder from an earlier install still exists
+    at the pack's hardcoded default, and the pack resolves to it. Nothing errors: the
+    download lands outside the user's model tree, the next ComfyUI install cannot see
+    it, and a second download follows.
+  cause: |
+    The resolver asked "does my hardcoded default exist?" BEFORE asking the host where
+    its models live, so a directory merely existing outranked the user's
+    configuration. A second, quieter half: callers joined a type name onto ONE root
+    ("root + checkpoints"), but extra_model_paths.yaml sets every type separately and
+    `is_default` applies per block, so one box can read checkpoints first from one
+    tree and upscale_models first from another.
+  fix: |
+    Inside a running host, ask the host first: resolve each model TYPE through
+    `folder_paths.get_folder_paths(type)` and take the first entry (an explicit env pin
+    selects among the registered folders, never overrides them). Only outside the host
+    fall back to the hardcoded default, and even then require it to HOLD something --
+    an empty folder is a leftover, not a configuration. One owner module answers the
+    question; every downloader, fallback and resolver routes through it.
+  verify: |
+    With an empty legacy folder on disk and a different folder configured for the
+    type, the resolver returns the configured one. Outside the host, an empty legacy
+    folder is skipped and a populated one is used. Per type: a registry that puts
+    checkpoints and upscale_models under different roots gets each answered from its
+    own first entry. Live: the first download after the fix lands in the configured
+    tree, and the resolver's answer printed at boot matches the host's own
+    /internal/folder_paths for that type.
+  tags: [paths, folder_paths, extra-model-paths, model-roots, per-type-resolution, empty-directory, config-precedence, one-owner, xref-12.88]
+  legacy_id: ""
+- id: "12.176"
+  phase: 12
+  area: per-segment-graph-reloads-a-heavy-text-encoder-for-text-it-already-encoded
+  symptom: |
+    A video lane that renders a long beat as several chained clip segments reloads its
+    text encoder (a ~9.8 GB T5, placed on the CPU) for EVERY segment. Free system RAM
+    saw-tooths between ~20 GB and under 0.5 GB on a 32 GB box, one tooth per segment;
+    a 16 GB-RAM machine pages on every segment. The render still succeeds, so nothing
+    fails -- the defect is only visible in a RAM trace.
+  cause: |
+    The encoder loader node lives in the per-segment graph and the executor frees it
+    once the encodes have run (free-after-use), so each segment pays a full load --
+    about twice the file's size while it loads -- for text the previous segment just
+    encoded: every segment of a beat carries the same positive and negative prompt,
+    and only the seed, the frame count, the still and the audio window change per
+    segment. Hoisting the encoder to live for the beat or the episode is the obvious
+    fix and the wrong one on small machines: on unified memory (a Mac) "CPU" IS the
+    GPU's memory, so a resident encoder sits beside the diffusion model through every
+    sampler step; on a discrete card it competes with the sampler's memory-mapped
+    weights.
+  fix: |
+    Cache the CONDITIONING, not the encoder. Key each encode on the encoder file's
+    identity (real path, device and inode, size, mtime, loader token, clip type,
+    encoder device) plus the exact text read off the graph the encode node would
+    receive. On a hit, hand the cached conditioning to the executor as an external
+    result (a private copy of the outer list and metadata dicts; the tensor is shared)
+    and remove the encode node; when nothing still reads the loader, remove the loader
+    node too. Publish only after the graph ran, bound the cache (a few entries -- one
+    conditioning is a few MB), drop entries made by a different encoder on publish,
+    and give it an opt-out switch that also drops what it holds. The encoder still
+    loads once per NEW text and still leaves before sampling.
+  verify: |
+    Three renders of one beat's text with a fixed encoder identity: the loader and each
+    encode run once, the renders run three times. A new positive with the same
+    negative loads the encoder and reuses the negative. A different encoder identity
+    is a miss and evicts the old entries. A graph that raises publishes nothing. A hit
+    hands a new outer list and new metadata dicts around the same tensor. Live: in one
+    episode the "encoder loads" count equals the number of distinct texts (one per
+    beat), not the number of segments, and the episode publishes.
+  tags: [text-encoder, conditioning-cache, t5, multi-segment, system-ram, unified-memory, free-after-use, graph-externals, xref-12.117]
+  legacy_id: ""

@@ -3245,3 +3245,17 @@ records:
   bible_id: '12.174'
   verdict: promoted
   source: live-artifact
+- ref: apple/PROD_BUG_LOG.md L15434 (PBUG-20260925-03)
+  title: The writer LLM folder followed an empty leftover C:\ComfyUI-Models instead of the tree
+    ComfyUI is configured with; fixed 2026-09-25 -- the models root asks folder_paths first and a
+    per-type lookup (model_type_dir) answers each model type from ComfyUI's own first folder
+  bible_id: '12.175'
+  verdict: promoted
+  source: live-artifact
+- ref: apple/PROD_BUG_LOG.md L15471 (PBUG-20260926-01)
+  title: The 8 GB LTX lane reloaded its 9.8 GB T5 into system RAM for every clip segment (free RAM
+    0.42 GB low on the 4060); fixed f011bb79 with a conditioning cache keyed on the T5 file's
+    identity plus the exact text -- 6 T5 loads for 13 segments on the 5080 proof leg
+  bible_id: '12.176'
+  verdict: promoted
+  source: live-artifact
