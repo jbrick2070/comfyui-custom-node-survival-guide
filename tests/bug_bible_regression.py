@@ -73,9 +73,14 @@ def _code_calls(content, dotted):
     Popen; Popen(...)`` and ``from comfy.model_management import
     unload_all_models as _unload; _unload()`` all count. A call matches when
     its resolved name IS ``dotted`` or ends with ``"." + dotted``, so
-    ``mm.unload_all_models()`` matches ``unload_all_models``. A name bound by
-    plain assignment (``P = subprocess.Popen``) is not followed. An
-    unparsable file answers by the bare name, which errs toward a finding."""
+    ``mm.unload_all_models()`` matches ``unload_all_models``. A chain that
+    starts on something other than a name -- ``mods[0].unload_all_models()``,
+    ``get_mm().unload_all_models()`` -- keeps its attribute tail, so it still
+    matches a bare target. A name bound by plain assignment
+    (``P = subprocess.Popen``) and a ``getattr(mm, "name")()`` call are not
+    followed. An unparsable file answers by the bare name, which errs toward
+    a finding in the checks that look for a call to police; a check that
+    reads a call as a SANCTION must refuse an unparsable file itself."""
     import ast as _ast
     try:
         tree = _ast.parse(content)
@@ -98,9 +103,14 @@ def _code_calls(content, dotted):
         while isinstance(func, _ast.Attribute):
             parts.append(func.attr)
             func = func.value
-        if not isinstance(func, _ast.Name):
+        if isinstance(func, _ast.Name):
+            parts.append(aliases.get(func.id, func.id))
+        elif parts:
+            # A subscript, a call result, ...: no importable root, but the
+            # attribute tail is still the method being called.
+            parts.append("<expr>")
+        else:
             return None
-        parts.append(aliases.get(func.id, func.id))
         return ".".join(reversed(parts))
 
     for node in _ast.walk(tree):
@@ -407,7 +417,12 @@ class TestPhase01Paths:
             try:
                 with open(path, "r", encoding="utf-8", errors="replace") as fh:
                     text = fh.read()
-            except OSError:
+                # A module that does not parse cannot be shown to call
+                # anything, so it sanctions nothing -- _code_calls' fallback
+                # for an unparsable file errs toward "present", which is the
+                # safe side for a finding and the unsafe side for a sanction.
+                ast.parse(text)
+            except (OSError, SyntaxError, ValueError):
                 return False
             if _code_calls(text, "folder_paths.get_output_directory"):
                 return True
