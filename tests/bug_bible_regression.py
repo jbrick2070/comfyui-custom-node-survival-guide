@@ -3696,3 +3696,105 @@ class TestBibleIsActuallyParseable:
             if gaps:
                 missing.append((entry.get("id", "<no id>"), gaps))
         assert not missing, f"entries missing documented fields: {missing[:10]}"
+
+
+class TestPathModuleIsNotChosenByNtpathIsabs:
+    """BUG-12.179: never pick ntpath versus posixpath on ntpath.isabs.
+
+    Before Python 3.13, ntpath.isabs("/workspace/x") is True, so a POSIX root
+    took Windows semantics and ntpath.normpath rewrote every "/" as "\\". The
+    static form: an ``if`` or conditional expression whose test calls
+    ``ntpath.isabs`` and whose branches name ``ntpath`` or ``posixpath`` as the
+    module to use. Decide by the path's form instead (a drive or UNC share via
+    ntpath.splitdrive, or a backslash spelling not rooted at "/").
+    """
+
+    _EXEMPT_PARTS = ("site-packages", "__pycache__", "tests", "test_")
+
+    def test_no_path_module_is_chosen_by_ntpath_isabs(self, py_files):
+        import ast
+
+        def _calls_ntpath_isabs(node):
+            return any(
+                isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+                and n.func.attr == "isabs" and isinstance(n.func.value, ast.Name)
+                and n.func.value.id == "ntpath"
+                for n in ast.walk(node))
+
+        def _names_a_path_module(nodes):
+            for node in nodes:
+                for n in ast.walk(node):
+                    if isinstance(n, ast.Name) and n.id in ("ntpath", "posixpath"):
+                        return True
+            return False
+
+        offenders = []
+        for path in py_files:
+            if any(part in str(path) for part in self._EXEMPT_PARTS):
+                continue
+            try:
+                src = open(path, encoding="utf-8").read()
+            except (OSError, UnicodeDecodeError):
+                continue
+            if "ntpath.isabs" not in src:
+                continue
+            try:
+                tree = ast.parse(src)
+            except SyntaxError:
+                continue
+            for node in ast.walk(tree):
+                if isinstance(node, ast.IfExp) and _calls_ntpath_isabs(node.test):
+                    branches = [node.body, node.orelse]
+                elif isinstance(node, ast.If) and _calls_ntpath_isabs(node.test):
+                    branches = list(node.body) + list(node.orelse)
+                else:
+                    continue
+                if _names_a_path_module(branches):
+                    offenders.append("%s:%d" % (path, node.lineno))
+
+        assert not offenders, (
+            "BUG-12.179: these sites choose ntpath or posixpath on "
+            "ntpath.isabs(): %s.\n\n"
+            "Before Python 3.13, ntpath.isabs calls a '/'-rooted path absolute, "
+            "so a Linux or Mac root takes Windows semantics and normpath turns "
+            "every '/' into a backslash. Decide by the path's form: a drive or "
+            "UNC share (ntpath.splitdrive(p)[0]) or a backslash spelling not "
+            "rooted at '/' is Windows; a '/'-rooted path is POSIX."
+            % ", ".join(offenders))
+
+
+class TestFasterWhisperHasACpuPath:
+    """BUG-12.180: a faster-whisper CUDA model needs a proven CPU fallback.
+
+    ctranslate2 reports a CUDA device on a stack whose CUDA major it was not
+    built for, and fails only at the first encode (cublas64_12 /
+    libcublas.so.12 missing on a CUDA 13 stack). The static form: a module that
+    builds ``WhisperModel`` with a "cuda" device also has a "cpu" build path.
+    """
+
+    _EXEMPT_PARTS = ("site-packages", "__pycache__", "tests", "test_")
+
+    def test_a_cuda_whisper_model_has_a_cpu_fallback(self, py_files):
+        offenders = []
+        for path in py_files:
+            if any(part in str(path) for part in self._EXEMPT_PARTS):
+                continue
+            try:
+                src = open(path, encoding="utf-8").read()
+            except (OSError, UnicodeDecodeError):
+                continue
+            if "WhisperModel" not in src:
+                continue
+            uses_cuda = '"cuda"' in src or "'cuda'" in src
+            has_cpu = '"cpu"' in src or "'cpu'" in src
+            if uses_cuda and not has_cpu:
+                offenders.append(str(path))
+
+        assert not offenders, (
+            "BUG-12.180: these modules build a faster-whisper model on CUDA with "
+            "no CPU path: %s.\n\n"
+            "ctranslate2 reports CUDA even where its cuBLAS build cannot load, and "
+            "fails only at the first encode. Prove CUDA with one real encode "
+            "(transcribe one second of silence), and build the CPU int8 model "
+            "when that raises."
+            % ", ".join(offenders))

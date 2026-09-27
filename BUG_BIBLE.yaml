@@ -11879,3 +11879,68 @@ bugs:
     cleanup_prefetch_queues after it.
   tags: [comfyui-core, text-generate, clip-generate, cuda-graph, model-prefetch, dynamic-vram, device-side-assert, gemma4, version-compat]
   legacy_id: ""
+- id: "12.179"
+  phase: 12
+  area: "ntpath-isabs-picks-windows-semantics-for-a-posix-root"
+  symptom: |
+    A pack that rebases saved absolute paths (a ledger, a manifest, a replay) from
+    an old root to a new one works on Windows and on Python 3.13, but on a Linux or
+    Mac install running Python 3.12 or older every rebased path comes out with
+    backslashes -- "/workspace/ep/stills/c01.png" becomes
+    "\workspace\ep\stills\c01.png" -- and no file can be opened. The files are on
+    disk; the loader reports them missing.
+  cause: |
+    The code picked its path module with ntpath.isabs(old_root): Windows semantics
+    when it returned True, POSIX otherwise. Before Python 3.13, ntpath.isabs calls a
+    "/"-rooted path absolute (a rooted Windows path with no drive), so a POSIX root
+    took Windows semantics and ntpath.normpath rewrote every "/" as "\". Python 3.13
+    changed ntpath.isabs to require a drive or UNC share, which hides the bug on
+    3.13 boxes.
+  fix: |
+    Decide Windows versus POSIX by the path's FORM, not by ntpath.isabs: a drive
+    (C:\x or C:/x) or a UNC share -- ntpath.splitdrive(p)[0] non-empty -- or a
+    backslash spelling not rooted at "/" is Windows; a "/"-rooted path is POSIX.
+    Only then call the chosen module's normpath / commonpath. When a
+    backslash-rooted path is met under POSIX semantics, leave it and name it in a
+    warning rather than guessing which host wrote it.
+  verify: |
+    Static: no module chooses between ntpath and posixpath on the result of
+    ntpath.isabs (an if / conditional expression whose test calls ntpath.isabs and
+    whose branches name ntpath or posixpath). Unit: rebasing "/old/ep/x.png" from
+    root "/old/ep" to "/new/ep" yields "/new/ep/x.png" with forward slashes on
+    Python 3.12 and 3.13; a Windows mixed-separator root still rebases with
+    Windows semantics.
+  tags: ["paths", "ntpath", "posixpath", "python-version", "linux", "replay", "cross-platform"]
+  legacy_id: ""
+- id: "12.180"
+  phase: 12
+  area: "faster-whisper-reports-cuda-it-cannot-run"
+  symptom: |
+    A node that transcribes audio with faster-whisper works on some GPUs and, on
+    others, raises on every transcription with "Library cublas64_12.dll is not found
+    or cannot be loaded" (Windows) or "libcublas.so.12: cannot open shared object
+    file" (Linux). Model construction succeeds; only the first transcribe fails. If
+    the node catches the error to stay fail-open, the feature silently does nothing
+    on every run.
+  cause: |
+    ctranslate2 (faster-whisper's engine) is built against one CUDA major version --
+    4.x against CUDA 12 -- and loads cuBLAS only at the first encode. It still
+    reports a CUDA device, and float16 support, on a CUDA 13 torch stack, so
+    "a CUDA device exists" is not "Whisper can run on it". A loader that picks
+    device="cuda" from the device count builds a model that cannot encode.
+  fix: |
+    Prove CUDA with one real encode before trusting it: build the CUDA model, run
+    transcribe() on one second of silence (it encodes eagerly for language
+    detection -- the exact call that needs cuBLAS), and on any exception release
+    that model explicitly and build the CPU model (int8) instead. Remember the
+    verdict for the process so a box whose CUDA cannot run Whisper does not re-pay
+    the failed load on every call.
+  verify: |
+    Static: a module that constructs faster_whisper.WhisperModel with a "cuda"
+    device also has a "cpu" construction path. Unit: with a fake WhisperModel whose
+    CUDA transcribe raises, the loader returns the CPU model; with one that
+    succeeds it returns the CUDA model; a second load after a CUDA failure does not
+    try CUDA again. Live: on a CUDA 13 stack the log shows the probe failing and
+    the stems transcribed on the CPU.
+  tags: ["faster-whisper", "ctranslate2", "cuda-version", "cublas", "fallback", "fail-open", "audio"]
+  legacy_id: ""

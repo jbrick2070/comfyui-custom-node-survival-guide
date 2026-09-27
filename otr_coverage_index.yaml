@@ -3282,3 +3282,17 @@ records:
   bible_id: '12.178'
   verdict: promoted
   source: live-artifact
+- ref: apple/PROD_BUG_LOG.md L15612 (PBUG-20260927-01)
+  title: A replay on a Python 3.12 Linux pod rebased every episode path with backslashes (ntpath.isabs
+    calls '/x' absolute before 3.13) and could open none of its 23 stills; fixed 495a134c by deciding
+    Windows vs POSIX by the path's form; live-verified on the pod, 23 stills found and the replay rendered
+  bible_id: '12.179'
+  verdict: promoted
+  source: live-artifact
+- ref: apple/PROD_BUG_LOG.md L15635 (PBUG-20260927-02)
+  title: The foley speech duck's faster-whisper raised cublas64_12 missing on every CUDA 13 stack, so
+    the duck ducked nothing; fixed af73b048 + 1adde69a by proving CUDA with one real encode and falling
+    back to CPU int8; live on the 5080 and the pod
+  bible_id: '12.180'
+  verdict: promoted
+  source: live-artifact
