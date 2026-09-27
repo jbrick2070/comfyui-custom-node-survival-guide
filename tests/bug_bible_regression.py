@@ -3703,13 +3703,15 @@ class TestPathModuleIsNotChosenByNtpathIsabs:
 
     Before Python 3.13, ntpath.isabs("/workspace/x") is True, so a POSIX root
     took Windows semantics and ntpath.normpath rewrote every "/" as "\\". The
-    static form: an ``if`` or conditional expression whose test calls
-    ``ntpath.isabs`` and whose branches name ``ntpath`` or ``posixpath`` as the
-    module to use. Decide by the path's form instead (a drive or UNC share via
-    ntpath.splitdrive, or a backslash spelling not rooted at "/").
+    static form: a conditional expression whose test calls ``ntpath.isabs`` and
+    whose arm IS ``ntpath`` or ``posixpath`` (``m = ntpath if ntpath.isabs(r)
+    else posixpath``), or an ``if`` on ``ntpath.isabs`` whose branch assigns
+    one of those modules. Decide by the path's form instead (a drive or UNC
+    share via ntpath.splitdrive, or a backslash spelling not rooted at "/").
     """
 
     _EXEMPT_PARTS = ("site-packages", "__pycache__", "tests", "test_")
+    _PATH_MODULES = ("ntpath", "posixpath")
 
     def test_no_path_module_is_chosen_by_ntpath_isabs(self, py_files):
         import ast
@@ -3721,12 +3723,15 @@ class TestPathModuleIsNotChosenByNtpathIsabs:
                 and n.func.value.id == "ntpath"
                 for n in ast.walk(node))
 
-        def _names_a_path_module(nodes):
-            for node in nodes:
-                for n in ast.walk(node):
-                    if isinstance(n, ast.Name) and n.id in ("ntpath", "posixpath"):
-                        return True
-            return False
+        def _is_path_module(node):
+            return isinstance(node, ast.Name) and node.id in self._PATH_MODULES
+
+        def _assigns_a_path_module(statements):
+            # Only the branch's own statements: an assignment whose value IS a
+            # path module. A path module merely used in the branch is not a choice.
+            return any(
+                isinstance(s, (ast.Assign, ast.AnnAssign)) and _is_path_module(s.value)
+                for s in statements)
 
         offenders = []
         for path in py_files:
@@ -3744,12 +3749,13 @@ class TestPathModuleIsNotChosenByNtpathIsabs:
                 continue
             for node in ast.walk(tree):
                 if isinstance(node, ast.IfExp) and _calls_ntpath_isabs(node.test):
-                    branches = [node.body, node.orelse]
+                    chooses = _is_path_module(node.body) or _is_path_module(node.orelse)
                 elif isinstance(node, ast.If) and _calls_ntpath_isabs(node.test):
-                    branches = list(node.body) + list(node.orelse)
+                    chooses = (_assigns_a_path_module(node.body)
+                               or _assigns_a_path_module(node.orelse))
                 else:
                     continue
-                if _names_a_path_module(branches):
+                if chooses:
                     offenders.append("%s:%d" % (path, node.lineno))
 
         assert not offenders, (
@@ -3763,18 +3769,54 @@ class TestPathModuleIsNotChosenByNtpathIsabs:
             % ", ".join(offenders))
 
 
-class TestFasterWhisperHasACpuPath:
-    """BUG-12.180: a faster-whisper CUDA model needs a proven CPU fallback.
+class TestFasterWhisperProvesCudaBeforeTrustingIt:
+    """BUG-12.180: a faster-whisper CUDA model must be proven by a real encode.
 
-    ctranslate2 reports a CUDA device on a stack whose CUDA major it was not
-    built for, and fails only at the first encode (cublas64_12 /
-    libcublas.so.12 missing on a CUDA 13 stack). The static form: a module that
-    builds ``WhisperModel`` with a "cuda" device also has a "cpu" build path.
+    ctranslate2 reports a CUDA device, and float16 support, on a stack whose
+    CUDA major it was not built for, and fails only at the first encode
+    (cublas64_12 / libcublas.so.12 missing on a CUDA 13 stack). Picking the
+    device from the device count is the shape that shipped the bug. The static
+    form, per function that builds ``WhisperModel`` and names "cuda": a
+    ``transcribe()`` call inside a ``try`` (the proof encode), and a call that
+    passes "cpu" as an argument (the fallback build).
     """
 
     _EXEMPT_PARTS = ("site-packages", "__pycache__", "tests", "test_")
 
-    def test_a_cuda_whisper_model_has_a_cpu_fallback(self, py_files):
+    def test_a_cuda_whisper_model_is_proven_with_a_real_encode(self, py_files):
+        import ast
+
+        def _builds_whisper(fn):
+            return any(
+                isinstance(n, ast.Call) and (
+                    (isinstance(n.func, ast.Name) and n.func.id == "WhisperModel")
+                    or (isinstance(n.func, ast.Attribute) and n.func.attr == "WhisperModel"))
+                for n in ast.walk(fn))
+
+        def _names(fn, text):
+            return any(isinstance(n, ast.Constant) and n.value == text
+                       for n in ast.walk(fn))
+
+        def _proves_by_encode(fn):
+            for t in ast.walk(fn):
+                if not isinstance(t, ast.Try):
+                    continue
+                for stmt in t.body:
+                    for n in ast.walk(stmt):
+                        if (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+                                and n.func.attr == "transcribe"):
+                            return True
+            return False
+
+        def _builds_on_cpu(fn):
+            for n in ast.walk(fn):
+                if not isinstance(n, ast.Call):
+                    continue
+                values = list(n.args) + [k.value for k in n.keywords]
+                if any(isinstance(v, ast.Constant) and v.value == "cpu" for v in values):
+                    return True
+            return False
+
         offenders = []
         for path in py_files:
             if any(part in str(path) for part in self._EXEMPT_PARTS):
@@ -3785,16 +3827,23 @@ class TestFasterWhisperHasACpuPath:
                 continue
             if "WhisperModel" not in src:
                 continue
-            uses_cuda = '"cuda"' in src or "'cuda'" in src
-            has_cpu = '"cpu"' in src or "'cpu'" in src
-            if uses_cuda and not has_cpu:
-                offenders.append(str(path))
+            try:
+                tree = ast.parse(src)
+            except SyntaxError:
+                continue
+            outer = [n for n in ast.walk(tree)
+                     if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
+            for fn in outer:
+                if not (_builds_whisper(fn) and _names(fn, "cuda")):
+                    continue
+                if not (_proves_by_encode(fn) and _builds_on_cpu(fn)):
+                    offenders.append("%s:%d (%s)" % (path, fn.lineno, fn.name))
 
         assert not offenders, (
-            "BUG-12.180: these modules build a faster-whisper model on CUDA with "
-            "no CPU path: %s.\n\n"
+            "BUG-12.180: these functions build a faster-whisper model on CUDA "
+            "without proving it: %s.\n\n"
             "ctranslate2 reports CUDA even where its cuBLAS build cannot load, and "
-            "fails only at the first encode. Prove CUDA with one real encode "
-            "(transcribe one second of silence), and build the CPU int8 model "
-            "when that raises."
+            "fails only at the first encode. Build the CUDA model, run "
+            "transcribe() on one second of silence inside a try, and build the "
+            "CPU int8 model (a call passing \"cpu\") when that raises."
             % ", ".join(offenders))

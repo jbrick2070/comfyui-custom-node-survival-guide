@@ -11905,8 +11905,8 @@ bugs:
     warning rather than guessing which host wrote it.
   verify: |
     Static: no module chooses between ntpath and posixpath on the result of
-    ntpath.isabs (an if / conditional expression whose test calls ntpath.isabs and
-    whose branches name ntpath or posixpath). Unit: rebasing "/old/ep/x.png" from
+    ntpath.isabs (a conditional expression on ntpath.isabs whose arm IS ntpath or
+    posixpath, or an if on it whose branch assigns one). Unit: rebasing "/old/ep/x.png" from
     root "/old/ep" to "/new/ep" yields "/new/ep/x.png" with forward slashes on
     Python 3.12 and 3.13; a Windows mixed-separator root still rebases with
     Windows semantics.
@@ -11936,8 +11936,10 @@ bugs:
     verdict for the process so a box whose CUDA cannot run Whisper does not re-pay
     the failed load on every call.
   verify: |
-    Static: a module that constructs faster_whisper.WhisperModel with a "cuda"
-    device also has a "cpu" construction path. Unit: with a fake WhisperModel whose
+    Static: a function that builds faster_whisper.WhisperModel and names "cuda"
+    also calls transcribe() inside a try (the proof encode) and makes a call
+    passing "cpu" (the fallback build); the device-count choice alone fails it.
+    Unit: with a fake WhisperModel whose
     CUDA transcribe raises, the loader returns the CPU model; with one that
     succeeds it returns the CUDA model; a second load after a CUDA failure does not
     try CUDA again. Live: on a CUDA 13 stack the log shows the probe failing and
