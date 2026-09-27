@@ -3558,6 +3558,76 @@ class TestHardLinkPublishResolvesTheSource:
             "copying it." % ", ".join(offenders))
 
 
+class TestRepeatedClipGenerateClosesTheGraphScope:
+    """BUG-12.178: a module that drives a ComfyUI text model's generate() itself
+    must close ComfyUI's graph scope after each call.
+
+    With dynamic VRAM, ComfyUI captures decode graphs and drops them only in the
+    prompt executor's per-node close-out (cleanup_prefetch_queues,
+    reset_cast_buffers). The stock TextGenerate node makes one call per node; a
+    pack that makes several inside one node replays the first call's graph
+    against a new KV cache and dies on a device-side assert. The static form of
+    the rule: a module that loads a CLIP itself (``load_clip``) and calls
+    ``generate()`` on it (``clip.generate`` / ``self.clip.generate``) runs the
+    executor's close-out, so it references both
+    ``cleanup_prefetch_queues`` and ``reset_cast_buffers``. (Calling only the
+    first, and only on an exception, is the shape that shipped the bug.)
+    """
+
+    _EXEMPT_PARTS = ("site-packages", "__pycache__", "tests", "test_")
+
+    def test_a_clip_generate_driver_closes_the_graph_scope(self, py_files):
+        import ast
+
+        offenders = []
+        for path in py_files:
+            if any(part in str(path) for part in self._EXEMPT_PARTS):
+                continue
+            try:
+                src = open(path, encoding="utf-8").read()
+            except (OSError, UnicodeDecodeError):
+                continue
+            if "load_clip" not in src or ".generate(" not in src:
+                continue
+            try:
+                tree = ast.parse(src)
+            except SyntaxError:
+                offenders.append("%s (unparsable)" % path)
+                continue
+            calls_load_clip = any(
+                isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+                and n.func.attr == "load_clip" for n in ast.walk(tree))
+            def _clip_receiver(node):
+                # clip.generate(...) / self.clip.generate(...): the receiver is
+                # named for the CLIP. An engine's own generate() method is not.
+                if isinstance(node, ast.Name):
+                    return "clip" in node.id.lower()
+                if isinstance(node, ast.Attribute):
+                    return "clip" in node.attr.lower()
+                return False
+
+            calls_generate = any(
+                isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+                and n.func.attr == "generate" and _clip_receiver(n.func.value)
+                for n in ast.walk(tree))
+            closes = ("cleanup_prefetch_queues" in src and "reset_cast_buffers" in src)
+            if calls_load_clip and calls_generate and not closes:
+                offenders.append(str(path))
+
+        assert not offenders, (
+            "BUG-12.178: these modules load a CLIP and call generate() but do not "
+            "run ComfyUI's per-node close-out (cleanup_prefetch_queues + "
+            "reset_cast_buffers): %s.\n\n"
+            "ComfyUI drops its captured decode graphs only when a NODE finishes. "
+            "A second generate() inside the same node replays the first call's "
+            "graph against a new KV cache and aborts on a device-side assert. "
+            "After every call, run the executor's close-out: "
+            "comfy.model_prefetch.cleanup_prefetch_queues() and "
+            "comfy.model_management.reset_cast_buffers() (plus the vbar "
+            "watermark reset), under the executor's own aimdo_enabled condition."
+            % ", ".join(offenders))
+
+
 class TestBibleIsActuallyParseable:
     def _repo_root(self):
         """Survival-guide repo root (parent of tests/).

@@ -11837,3 +11837,45 @@ bugs:
     fetch it, and confirm ComfyUI's loader resolves the published file.
   tags: [huggingface-hub, hf-cache, symlink, hardlink, windows, os-link, auto-download, model-folder, publish]
   legacy_id: ""
+- id: "12.178"
+  phase: 12
+  area: many-generate-calls-inside-one-node-replay-a-stale-comfy-graph
+  symptom: |
+    A custom node drives one of ComfyUI's own text models (a CLIP loaded with
+    comfy.sd.load_clip, for example Gemma 4) and calls clip.generate() more than once
+    inside a single node execution. The first call writes correctly. A later call dies
+    on its first decode step with a CUDA device-side assert such as
+    "ScatterGatherKernel.cu: scatter gather kernel index out of bounds", and the server
+    process aborts ("Fatal Python error: Aborted"). The stock TextGenerate node never
+    shows it, because it makes one call per node.
+  cause: |
+    With dynamic VRAM, ComfyUI captures CUDA graphs for the decode steps
+    (comfy.model_prefetch: the per-module _comfy_graph, and on newer versions the malloc
+    graphs) and keeps them until the prompt executor's per-node close-out
+    (execution.py: cleanup_prefetch_queues() and reset_cast_buffers(), present in 0.34
+    and 0.37). A second generate() in the same node sizes a new KV cache
+    (prompt + max_length) but replays the graph captured against the first call's
+    buffers, and the replayed kernels index memory that no longer matches.
+  fix: |
+    After EVERY generate() call made from inside one node -- on success and on failure --
+    run the same close-out the executor runs when a node finishes:
+    comfy.model_prefetch.cleanup_prefetch_queues() and
+    comfy.model_management.reset_cast_buffers() (look both up with getattr; older and
+    newer ComfyUI differ). Each call then starts the way a fresh TextGenerate node does.
+    Log a failure BEFORE the close-out: after a device-side assert the close-out itself
+    touches CUDA and aborts the process, so a log line written first is the only record
+    of the real error. Keep version-tolerant call sites too: CLIP.generate() gained an
+    mtp keyword in 0.37 that 0.34 rejects, and BaseGenerate.sample_token gained
+    penalty_mask -- a wrapper around sample_token must forward the loop's keyword
+    arguments untouched rather than name them.
+  verify: |
+    With fake comfy.model_prefetch / comfy.model_management modules that record calls,
+    run the adapter's generate twice and once more with a failing loop: the close-out
+    (cleanup_prefetch_queues, reset_cast_buffers) must follow every call, and the failure
+    warning must be emitted before it starts. Live: in one node, make two generate()
+    calls with different prompt lengths on a dynamic-VRAM ComfyUI; both must complete,
+    and CUDA_LAUNCH_BLOCKING=1 must show no graph replay error. Statically: a module that
+    calls clip.generate() in a loop or from a reusable adapter must call
+    cleanup_prefetch_queues after it.
+  tags: [comfyui-core, text-generate, clip-generate, cuda-graph, model-prefetch, dynamic-vram, device-side-assert, gemma4, version-compat]
+  legacy_id: ""

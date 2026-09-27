@@ -3267,3 +3267,18 @@ records:
   bible_id: '12.177'
   verdict: promoted
   source: live-artifact
+- ref: apple/PROD_BUG_LOG.md L15552 (PBUG-20260926-03)
+  title: The Comfy-native Gemma writer passed ComfyUI 0.37's CLIP.generate keyword (mtp) and forwarded
+    penalty_mask to sample_token on a stock 0.34 install -- TypeError on the first writer call; fixed
+    3b1aced6 by dropping mtp and forwarding the loop's keywords untouched
+  bible_id: '12.178'
+  verdict: covered
+  source: live-artifact
+- ref: apple/PROD_BUG_LOG.md L15570 (PBUG-20260926-04)
+  title: A second clip.generate() inside one node replayed the first call's captured decode graph
+    against a new KV cache (ComfyUI drops those graphs only at the node boundary) -- device-side
+    assert and a server abort on the 4060; fixed f488f4d7 + 67da20b9 by running the executor's
+    per-node close-out after every call; 45 clean calls and an episode in obs on the 4060
+  bible_id: '12.178'
+  verdict: promoted
+  source: live-artifact
