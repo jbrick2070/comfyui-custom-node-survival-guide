@@ -2309,22 +2309,33 @@ class TestPhase07To12ProductionRegressionCatalog:
             parsed = ast.parse(handle.read(), filename=path)
         names = {"_RepairSpan", "_exact_interval", "_merge_repair_spans",
                  "_covers_spoken_row", "_splice_replacements"}
-        # The splice refuses a replacement that repeats the kept text
-        # (BUG-12.181), through these helpers and constants; lift them with it.
-        helpers = {"_repeats_kept_speech", "_spoken_words", "_longest_shared_run"}
-        constants = {"_WORD", "_REPEAT_RUN"}
+        # Lift the owners with every module-level helper and constant they
+        # reach: the splice's repeat check (BUG-12.181) grows its own helpers,
+        # and a hand-kept list of them broke this check twice.
+        top = {}
+        for node in parsed.body:
+            if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
+                top[node.name] = node
+            elif (isinstance(node, ast.Assign) and len(node.targets) == 1
+                  and isinstance(node.targets[0], ast.Name)):
+                top[node.targets[0].id] = node
+        wanted, queue = set(), list(names)
+        while queue:
+            name = queue.pop()
+            if name in wanted or name not in top:
+                continue
+            wanted.add(name)
+            queue.extend(n.id for n in ast.walk(top[name]) if isinstance(n, ast.Name))
         definitions = [node for node in parsed.body
-                       if (isinstance(node, (ast.FunctionDef, ast.ClassDef))
-                           and node.name in names | helpers)
-                       or (isinstance(node, ast.Assign) and len(node.targets) == 1
-                           and isinstance(node.targets[0], ast.Name)
-                           and node.targets[0].id in constants)]
+                       if any(top.get(name) is node for name in wanted)]
         defined = {node.name for node in definitions if not isinstance(node, ast.Assign)}
         assert names <= defined, "BUG-11.64: missing scoped cleanup owner"
         import re
         import typing
+        import unicodedata
         namespace = {key: getattr(typing, key) for key in ("Any", "NamedTuple", "Mapping", "Sequence")}
         namespace["re"] = re
+        namespace["unicodedata"] = unicodedata
         module = ast.Module(body=definitions, type_ignores=[])
         exec(compile(module, path, "exec"), namespace)
         ground = namespace["_exact_interval"]
