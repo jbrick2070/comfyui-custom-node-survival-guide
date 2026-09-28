@@ -11981,3 +11981,37 @@ bugs:
     published episode has no line spoken twice.
   tags: ["llm", "repair", "splice", "duplication", "validation", "tts", "script"]
   legacy_id: ""
+- id: "12.182"
+  phase: 12
+  area: "cloud-llm-run-token-ceiling-kills-paid-runs"
+  symptom: |
+    A pipeline that drives a paid cloud LLM aborts a long run partway through --
+    after the expensive calls have already been billed -- with "this call would
+    push the run total over the per-run token ceiling", although the provider's
+    own bill for the run is a fraction of that ceiling. Everything the run paid
+    for is thrown away, and raising the number only moves the cliff.
+  cause: |
+    The ceiling was checked and accumulated from a pre-call ESTIMATE -- prompt
+    characters / 4 PLUS the call's whole max_tokens output allowance -- instead
+    of the usage the provider reported. With a generous output allowance on
+    every call, each call "cost" several times what it did, so a normal long run
+    crossed the ceiling. And a mid-run ceiling can only fail a run that has
+    already spent money; it cannot un-spend it.
+  fix: |
+    Gate money once, before the first paid call (a balance check against a
+    deliberately high estimate), and never abort mid-run on an accumulated token
+    count. Tally the provider's reported usage (tokens and cost) for the log,
+    counted where the reply is read, never an estimate. Send no output cap:
+    providers bill only what the model writes, so a cap can only cut a reply
+    short. Keep the model's own context window as the one pre-send check, and
+    give a transport whose reply arrives only when finished a read timeout long
+    enough for an uncapped reply.
+  verify: |
+    Static: in a module that posts chat completions, no `if` compares a
+    module-level running total (a name carrying "run" and "token", "total" or
+    "spend") plus another amount against a limit and raises. Unit: 400 calls of
+    3,000 billed tokens each (1.2 million) all complete, and the run tally equals
+    the reported usage, not the requested output. Live: a 3-act episode with a
+    paid creative writer gets through ledger_clean to publish.
+  tags: ["llm", "cloud", "openrouter", "cost", "ceiling", "estimate", "usage", "abort"]
+  legacy_id: ""

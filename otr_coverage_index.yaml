@@ -3304,3 +3304,11 @@ records:
   bible_id: '12.181'
   verdict: promoted
   source: live-artifact
+- ref: apple/PROD_BUG_LOG.md L15689 (PBUG-20260928-02)
+  title: The cloud writer's per-run token ceiling killed paid 3-act episodes inside ledger_clean on
+    an estimate (prompt plus the whole 16384 output allowance per call) the provider never billed
+    (2026-09-17 and 2026-09-28; the Comfy lane 2026-09-15); fixed 505d7d51 by removing every cloud
+    writer token cap and tallying reported usage; live-verified uncapped replies on OpenRouter and Gemini
+  bible_id: '12.182'
+  verdict: promoted
+  source: live-artifact

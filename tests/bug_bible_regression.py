@@ -3934,3 +3934,85 @@ class TestLlmSpanRepairRefusesRepeatedKeptText:
             "that contains the kept speech or shares a run of consecutive words "
             "with it, and raise it as a validation error the retry can see."
             % ", ".join(offenders))
+
+
+class TestCloudLlmNeverAbortsOnARunTokenTotal:
+    """BUG-12.182: a cloud LLM client must not abort a run on an accumulated
+    token count.
+
+    A per-run ceiling fed from a pre-call estimate (prompt / 4 plus the whole
+    max_tokens allowance) crosses its limit on a normal long run while the
+    provider bills a fraction of it, and the abort throws away every credit the
+    run already spent. The static form: in a module that posts chat
+    completions, no ``if`` compares a module-level running total (a name
+    carrying "run" and "token"/"total"/"spend") plus another amount against a
+    limit and raises.
+    """
+
+    _EXEMPT_PARTS = ("site-packages", "__pycache__", "tests", "test_")
+
+    def test_no_mid_run_token_ceiling(self, py_files):
+        import ast
+        import re
+
+        running = re.compile(r"run", re.IGNORECASE)
+        amount = re.compile(r"token|total|spend", re.IGNORECASE)
+
+        def _module_names(tree):
+            names = set()
+            for node in tree.body:
+                targets = []
+                if isinstance(node, ast.Assign):
+                    targets = node.targets
+                elif isinstance(node, ast.AnnAssign):
+                    targets = [node.target]
+                for t in targets:
+                    if isinstance(t, ast.Name):
+                        names.add(t.id)
+            return names
+
+        def _adds_running_total(test, totals):
+            for sub in ast.walk(test):
+                if isinstance(sub, ast.BinOp) and isinstance(sub.op, ast.Add):
+                    for leaf in ast.walk(sub):
+                        if isinstance(leaf, ast.Name) and leaf.id in totals:
+                            return True
+            return False
+
+        def _raises(stmts):
+            return any(isinstance(n, ast.Raise)
+                       for s in stmts for n in ast.walk(s))
+
+        offenders = []
+        for path in py_files:
+            if any(part in str(path) for part in self._EXEMPT_PARTS):
+                continue
+            try:
+                src = open(path, encoding="utf-8").read()
+            except (OSError, UnicodeDecodeError):
+                continue
+            if "chat/completions" not in src:
+                continue
+            try:
+                tree = ast.parse(src)
+            except SyntaxError:
+                continue
+            totals = {n for n in _module_names(tree)
+                      if running.search(n) and amount.search(n)}
+            if not totals:
+                continue
+            for node in ast.walk(tree):
+                if (isinstance(node, ast.If) and isinstance(node.test, ast.Compare)
+                        and _adds_running_total(node.test, totals)
+                        and _raises(node.body)):
+                    offenders.append("%s:%d" % (path, node.lineno))
+
+        assert not offenders, (
+            "BUG-12.182: these cloud LLM clients abort on an accumulated run "
+            "token total: %s.\n\n"
+            "A mid-run ceiling can only fail a run that has already been billed, "
+            "and one fed from an estimate (prompt plus the whole output "
+            "allowance) crosses its limit while the provider bills a fraction of "
+            "it. Gate money once, before the first paid call, and tally the "
+            "provider's reported usage for the log instead."
+            % ", ".join(offenders))
