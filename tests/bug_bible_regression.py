@@ -2309,11 +2309,22 @@ class TestPhase07To12ProductionRegressionCatalog:
             parsed = ast.parse(handle.read(), filename=path)
         names = {"_RepairSpan", "_exact_interval", "_merge_repair_spans",
                  "_covers_spoken_row", "_splice_replacements"}
+        # The splice refuses a replacement that repeats the kept text
+        # (BUG-12.181), through these helpers and constants; lift them with it.
+        helpers = {"_repeats_kept_speech", "_spoken_words", "_longest_shared_run"}
+        constants = {"_WORD", "_REPEAT_RUN"}
         definitions = [node for node in parsed.body
-                       if isinstance(node, (ast.FunctionDef, ast.ClassDef)) and node.name in names]
-        assert {node.name for node in definitions} == names, "BUG-11.64: missing scoped cleanup owner"
+                       if (isinstance(node, (ast.FunctionDef, ast.ClassDef))
+                           and node.name in names | helpers)
+                       or (isinstance(node, ast.Assign) and len(node.targets) == 1
+                           and isinstance(node.targets[0], ast.Name)
+                           and node.targets[0].id in constants)]
+        defined = {node.name for node in definitions if not isinstance(node, ast.Assign)}
+        assert names <= defined, "BUG-11.64: missing scoped cleanup owner"
+        import re
         import typing
         namespace = {key: getattr(typing, key) for key in ("Any", "NamedTuple", "Mapping", "Sequence")}
+        namespace["re"] = re
         module = ast.Module(body=definitions, type_ignores=[])
         exec(compile(module, path, "exec"), namespace)
         ground = namespace["_exact_interval"]
@@ -3846,4 +3857,80 @@ class TestFasterWhisperProvesCudaBeforeTrustingIt:
             "fails only at the first encode. Build the CUDA model, run "
             "transcribe() on one second of silence inside a try, and build the "
             "CPU int8 model (a call passing \"cpu\") when that raises."
+            % ", ".join(offenders))
+
+
+class TestLlmSpanRepairRefusesRepeatedKeptText:
+    """BUG-12.181: splicing model replacements must refuse one that repeats the
+    kept text.
+
+    A model asked for "what replaces this span" can return the REST of the line,
+    and a splice that keeps the unchanged text as well publishes the line twice;
+    a re-read that checks only for the defect being repaired passes it. The
+    static form: a function that takes a ``replacements`` parameter, reads each
+    item's "replacement" string and joins the pieces must also call a repeat or
+    duplicate check (a callee whose name contains "repeat" or "duplicat").
+    """
+
+    _EXEMPT_PARTS = ("site-packages", "__pycache__", "tests", "test_")
+
+    def test_a_replacement_splice_checks_for_repeated_kept_text(self, py_files):
+        import ast
+
+        def _params(fn):
+            a = fn.args
+            return {p.arg for p in list(a.posonlyargs) + list(a.args) + list(a.kwonlyargs)}
+
+        def _reads_replacement(fn):
+            return any(isinstance(n, ast.Constant) and n.value == "replacement"
+                       for n in ast.walk(fn))
+
+        def _joins(fn):
+            return any(isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+                       and n.func.attr == "join" for n in ast.walk(fn))
+
+        def _checks_repeat(fn):
+            for n in ast.walk(fn):
+                if not isinstance(n, ast.Call):
+                    continue
+                if isinstance(n.func, ast.Name):
+                    name = n.func.id
+                elif isinstance(n.func, ast.Attribute):
+                    name = n.func.attr
+                else:
+                    continue
+                low = name.lower()
+                if "repeat" in low or "duplicat" in low:
+                    return True
+            return False
+
+        offenders = []
+        for path in py_files:
+            if any(part in str(path) for part in self._EXEMPT_PARTS):
+                continue
+            try:
+                src = open(path, encoding="utf-8").read()
+            except (OSError, UnicodeDecodeError):
+                continue
+            if "replacement" not in src:
+                continue
+            try:
+                tree = ast.parse(src)
+            except SyntaxError:
+                continue
+            for fn in ast.walk(tree):
+                if not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    continue
+                if ("replacements" in _params(fn) and _reads_replacement(fn)
+                        and _joins(fn) and not _checks_repeat(fn)):
+                    offenders.append("%s:%d (%s)" % (path, fn.lineno, fn.name))
+
+        assert not offenders, (
+            "BUG-12.181: these functions splice model replacements into a line "
+            "without checking for repeated kept text: %s.\n\n"
+            "A model asked for a span's replacement can hand back the rest of "
+            "the line, and the splice then says it twice while a re-read that "
+            "checks only the original defect passes it. Refuse a replacement "
+            "that contains the kept speech or shares a run of consecutive words "
+            "with it, and raise it as a validation error the retry can see."
             % ", ".join(offenders))

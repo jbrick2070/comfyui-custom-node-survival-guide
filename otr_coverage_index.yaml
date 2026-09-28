@@ -38,7 +38,7 @@ audited: 2026-09-13
 # Last code/test base; the September 11 incident-only delta follows this commit.
 # The audited date above describes the historical audit, not a new full scrape.
 bible_head: 032923303d82425006658716831cb5ac02e47ac3
-bible_entries: 354
+bible_entries: 355
 records:
 - ref: BUG_LOG.md L1022 (BUG-LOCAL-231 soak data point)
   title: A long per-clip render loop had no routine VRAM reclamation — cleanup fired only on an OOM exception, so a gradual
@@ -3294,5 +3294,13 @@ records:
     the duck ducked nothing; fixed af73b048 + 1adde69a by proving CUDA with one real encode and falling
     back to CPU int8; live on the 5080 and the pod
   bible_id: '12.180'
+  verdict: promoted
+  source: live-artifact
+- ref: apple/PROD_BUG_LOG.md L15655 (PBUG-20260928-01)
+  title: A stage-direction repair spliced the rest of the line back in, so published lines were spoken
+    twice (four of six rows in signal_time_20260928_105643, five more episodes since 09-26); fixed
+    90902989 by refusing a replacement that repeats the kept speech and saying so in the scoped
+    prompt; live-verified on the 5080
+  bible_id: '12.181'
   verdict: promoted
   source: live-artifact

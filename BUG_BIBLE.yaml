@@ -11946,3 +11946,38 @@ bugs:
     the stems transcribed on the CPU.
   tags: ["faster-whisper", "ctranslate2", "cuda-version", "cublas", "fallback", "fail-open", "audio"]
   legacy_id: ""
+- id: "12.181"
+  phase: 12
+  area: "llm-span-repair-repeats-the-kept-text"
+  symptom: |
+    A pipeline that asks an LLM to repair one marked piece of a line (a stage
+    direction such as "(low, steady tone)") and splices the answer back in
+    publishes lines that say their own words twice: "I see the grid. I see the
+    ledger. I see the grid. I see the ledger." The repair is logged as clean, the
+    voice actor reads it faithfully, and the listener hears every affected line
+    repeated.
+  cause: |
+    The model was asked for "what replaces this span" but, told elsewhere in the
+    prompt to keep the speech and the line's length, it returned the REST of the
+    line as the replacement. The splice kept the unchanged text as well, so the
+    line doubled. The re-read that grades the repair checks for the defect it was
+    asked to remove (stage directions), not for repetition, so it passed the
+    doubled line as clean.
+  fix: |
+    Make the splice -- the one place model text meets the kept text -- refuse a
+    replacement that contains all of the kept speech or shares a run of several
+    consecutive words with it, and raise that as a validation error so the model's
+    retry ladder sees it. Tell the model in the scoped prompt that the kept words
+    are already kept and must not be written again, and drop any whole-line
+    "keep the length" instruction from the scoped variant. A row whose repairs
+    keep repeating ships its original text, flagged -- never doubled.
+  verify: |
+    Static: a function that takes a `replacements` parameter and splices each
+    item's "replacement" string into joined pieces of the original also calls a
+    repeat or duplicate check. Unit: splicing "I see the grid. I see the ledger."
+    into "(low, steady tone) I see the grid. I see the ledger." for the direction
+    span raises; "(sighs) Fine." with the replacement "Fine." raises; a real edit
+    that shares a word or two with the kept text splices. Live: a transcript of the
+    published episode has no line spoken twice.
+  tags: ["llm", "repair", "splice", "duplication", "validation", "tts", "script"]
+  legacy_id: ""
