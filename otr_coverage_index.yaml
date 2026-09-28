@@ -3312,3 +3312,26 @@ records:
   bible_id: '12.182'
   verdict: promoted
   source: live-artifact
+- ref: apple/PROD_BUG_LOG.md L15727 (PBUG-20260928-03)
+  title: Chained LTX joins opened darker because the terminal frame came out of ffmpeg's default
+    yuv420p-to-RGB conversion 1.3 luma dark (and the compositor upscaler decode, credits backdrop and
+    canvas poster the same); fixed ae7b4515 + 1f457e75 + 625f40de with accurate_rnd+full_chroma_int as
+    an output option; live join step median -2.08 -> -0.28 on the costume replay
+  bible_id: '12.183'
+  verdict: promoted
+  source: live-artifact
+- ref: apple/PROD_BUG_LOG.md L15757 (PBUG-20260928-04)
+  title: The 8 GB LTX lane decoded with a 16-frame temporal VAE tile (two latent frames, one
+    overlapping), so every 8th frame was a blend with 0.54x the detail, a 3 Hz softness pulse; fixed
+    d12f5b61 (vae_temporal 64, kept by v5); live pulse 0.72 -> 1.05, 8 GB peak 7,579 of 8,188 MiB
+  bible_id: '12.184'
+  verdict: promoted
+  source: live-artifact
+- ref: apple/PROD_BUG_LOG.md L15776 (PBUG-20260928-05)
+  title: Recipe v4 (Lightricks' canonical distilled schedule plus LTXVPreprocess 38) made LTX 0.9.8
+    leave its still within half a second (62 of 68 beats further than v3; the schedule is the cause)
+    and softened the frames; fixed 39bb1f18 (v5, v3's sampling with the 64-frame tile) + 6c18ba84;
+    live on the 4060, frame-24 distance 17.6 against v3 17.0
+  bible_id: '12.185'
+  verdict: promoted
+  source: live-artifact

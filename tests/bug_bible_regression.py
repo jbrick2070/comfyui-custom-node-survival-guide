@@ -4027,3 +4027,184 @@ class TestCloudLlmNeverAbortsOnARunTokenTotal:
             "it. Gate money once, before the first paid call, and tally the "
             "provider's reported usage for the log instead."
             % ", ".join(offenders))
+
+
+class TestRgbExtractionFromVideoUsesAccurateFlags:
+    """BUG-12.183: pulling RGB out of a yuv420p video with ffmpeg must carry
+    accurate_rnd + full_chroma_int.
+
+    swscale's default flags convert yuv420p to RGB about 1.3 luma dark with the
+    saturation pushed up. A frame extracted that way and fed back as the next
+    chained segment's still makes every join step darker; a poster or backdrop
+    reads darker than its episode. `-sws_flags` before `-i` is an input option
+    and changes nothing. The static form: a function that builds an ffmpeg
+    argv with `-i` and an RGB output -- a single image (`-update`, `image2`, or
+    `-frames:v` with an image file name in the function) or a raw rgb24 pipe
+    named after `-i` in one list -- has `accurate_rnd` in some string it builds.
+
+    BUG-12.185 (a vendor's canonical image-to-video recipe -- its distilled
+    schedule, its conditioning-image compression -- makes a lane whose prompt
+    narrates the scene cut away from its still) has no executable assertion,
+    deliberately: its verify clause is a PAIRED live replay scored against each
+    beat's still, and no static reading of a recipe can say whether a knob
+    helps a given prompt style. It is recorded so the next alignment with a
+    canonical graph is measured before it ships, not after.
+    """
+
+    _EXEMPT_PARTS = ("site-packages", "__pycache__", "tests", "test_")
+    _IMAGE_NAME = re.compile(r"\.(png|jpe?g|bmp|webp)\b", re.IGNORECASE)
+
+    @staticmethod
+    def _rgb_pipe_after_input(func):
+        import ast
+        for lst in ast.walk(func):
+            if not isinstance(lst, ast.List):
+                continue
+            vals = [e.value if isinstance(e, ast.Constant) and isinstance(e.value, str)
+                    else None for e in lst.elts]
+            if ("-i" in vals and "rgb24" in vals
+                    and vals.index("rgb24") > vals.index("-i")):
+                return True
+        return False
+
+    def test_rgb_extraction_carries_the_accurate_flags(self, py_files):
+        import ast
+
+        offenders = []
+        for path in py_files:
+            if any(part in str(path) for part in self._EXEMPT_PARTS):
+                continue
+            try:
+                src = open(path, encoding="utf-8").read()
+            except (OSError, UnicodeDecodeError):
+                continue
+            if '"-i"' not in src and "'-i'" not in src:
+                continue
+            try:
+                tree = ast.parse(src)
+            except SyntaxError:
+                continue
+            for func in ast.walk(tree):
+                if not isinstance(func, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    continue
+                consts = [n.value for n in ast.walk(func)
+                          if isinstance(n, ast.Constant) and isinstance(n.value, str)]
+                if "-i" not in consts:
+                    continue
+                single_image = ("-update" in consts or "image2" in consts
+                                or ("-frames:v" in consts
+                                    and any(self._IMAGE_NAME.search(c) for c in consts)))
+                if not (single_image or self._rgb_pipe_after_input(func)):
+                    continue
+                if any("accurate_rnd" in c for c in consts):
+                    continue
+                offenders.append("%s:%d %s" % (path, func.lineno, func.name))
+
+        assert not offenders, (
+            "BUG-12.183: these functions take RGB out of a video with ffmpeg's "
+            "default conversion: %s.\n\n"
+            "The default yuv420p -> RGB path lands about 1.3 luma dark with the "
+            "saturation up. Pass `-sws_flags accurate_rnd+full_chroma_int` AFTER "
+            "`-i` (before it, it is an input option and changes nothing), or put "
+            "flags=bicubic+accurate_rnd+full_chroma_int on the scale filter that "
+            "does the conversion." % ", ".join(offenders))
+
+
+class TestVideoVaeTemporalTileIsWideEnough:
+    """BUG-12.184: a tiled video VAE decode must not use a temporal tile of a
+    couple of latent frames.
+
+    VAEDecodeTiled's temporal_size 16 on a VAE that compresses time 8x is two
+    latent frames with one overlapping, so every 8th frame is a blend of two
+    chunk decodes: a ~3 Hz pulse of softness (0.54x the detail of an untiled
+    decode). The static form: the LIVE recipe a lane reads -- a module-level
+    `<NAME>_RECIPE = <versioned dict>` binding, resolved through its
+    `dict(base, key=value)` chain -- decodes with `vae_temporal` of at least
+    64 when `tiled_vae` is on, and no graph dict hands a literal
+    `temporal_size` under 64. Archived versions keep their old values on
+    purpose (their receipts describe renders that happened) and are not read.
+    """
+
+    _EXEMPT_PARTS = ("site-packages", "__pycache__", "tests", "test_")
+    _FLOOR = 64
+
+    @classmethod
+    def _resolve(cls, node, env):
+        import ast
+        if isinstance(node, ast.Name):
+            found = env.get(node.id)
+            return dict(found) if isinstance(found, dict) else None
+        if isinstance(node, ast.Dict):
+            out = {}
+            for key, value in zip(node.keys, node.values):
+                if isinstance(key, ast.Constant):
+                    out[key.value] = value.value if isinstance(value, ast.Constant) else None
+            return out
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                and node.func.id == "dict"):
+            out = {}
+            for arg in node.args:
+                base = cls._resolve(arg, env)
+                if base is None:
+                    return None
+                out.update(base)
+            for kw in node.keywords:
+                if kw.arg is None:
+                    return None
+                out[kw.arg] = kw.value.value if isinstance(kw.value, ast.Constant) else None
+            return out
+        return None
+
+    def test_the_live_decode_tile_spans_eight_latent_frames(self, py_files):
+        import ast
+
+        offenders = []
+        for path in py_files:
+            if any(part in str(path) for part in self._EXEMPT_PARTS):
+                continue
+            try:
+                src = open(path, encoding="utf-8").read()
+            except (OSError, UnicodeDecodeError):
+                continue
+            if "temporal" not in src:
+                continue
+            try:
+                tree = ast.parse(src)
+            except SyntaxError:
+                continue
+            env = {}
+            live = []
+            for node in tree.body:
+                if not (isinstance(node, ast.Assign) and len(node.targets) == 1
+                        and isinstance(node.targets[0], ast.Name)):
+                    continue
+                name = node.targets[0].id
+                value = self._resolve(node.value, env)
+                if value is not None:
+                    env[name] = value
+                if name.endswith("_RECIPE") and isinstance(node.value, ast.Name):
+                    live.append((name, node.lineno))
+            for name, lineno in live:
+                recipe = env.get(name) or {}
+                tile = recipe.get("vae_temporal")
+                if (recipe.get("tiled_vae") and isinstance(tile, int)
+                        and not isinstance(tile, bool) and tile < self._FLOOR):
+                    offenders.append("%s:%d %s vae_temporal=%d" % (path, lineno, name, tile))
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Dict):
+                    continue
+                for key, value in zip(node.keys, node.values):
+                    if (isinstance(key, ast.Constant) and key.value == "temporal_size"
+                            and isinstance(value, ast.Constant)
+                            and isinstance(value.value, int)
+                            and value.value < self._FLOOR):
+                        offenders.append("%s:%d temporal_size=%d"
+                                         % (path, node.lineno, value.value))
+
+        assert not offenders, (
+            "BUG-12.184: these decodes tile time too finely: %s.\n\n"
+            "A temporal tile of 16 on an 8x-compressed video VAE is two latent "
+            "frames with one overlapping, so every 8th frame is a blend of two "
+            "chunk decodes -- a visible pulse of softness. Decode with at least "
+            "64 frames (eight latent frames) a tile, ComfyUI's own default."
+            % ", ".join(offenders))

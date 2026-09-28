@@ -12015,3 +12015,101 @@ bugs:
     paid creative writer gets through ledger_clean to publish.
   tags: ["llm", "cloud", "openrouter", "cost", "ceiling", "estimate", "usage", "abort"]
   legacy_id: ""
+- id: "12.183"
+  phase: 12
+  area: "ffmpeg-yuv-to-rgb-extraction-darkens"
+  symptom: |
+    A frame pulled out of an H.264 / yuv420p clip with ffmpeg -- a still that
+    seeds the next generation step, a thumbnail, a backdrop, a raw RGB pipe for
+    a model pass -- comes back slightly darker and more saturated than the frame
+    the clip was made from. Where the extracted frame feeds the next segment of
+    a chained render, every join steps darker and the drift compounds down a
+    long shot; a poster or backdrop reads darker than the episode it stands for.
+  cause: |
+    swscale's default flags convert yuv420p to RGB on its fast path, whose
+    rounding lands about 1.3 luma dark on 8-bit content (measured -1.31 per hop,
+    -4.8 after four hops, -1.83 on a scaled poster) with the chroma interpolation
+    pushing the saturation up. `-sws_flags` written BEFORE `-i` is an input
+    option: it reaches the decoder, not the conversion, and the output is
+    byte-identical to passing no flags. The reverse direction (RGB to yuv420p
+    on encode) measured unbiased with the defaults.
+  fix: |
+    Pass `-sws_flags accurate_rnd+full_chroma_int` as an OUTPUT option (after
+    `-i`), or put `flags=accurate_rnd+full_chroma_int` on the scale filter that
+    performs the conversion (name the resize algorithm too, e.g.
+    `flags=bicubic+accurate_rnd+full_chroma_int`, because a flags= value
+    replaces the default one). A `format=rgb24` after that scale is only the
+    output constraint; the scale does the conversion and carries the flags.
+  verify: |
+    Static: every function that builds an ffmpeg argv with `-i` and an RGB
+    output -- a single image (`-update`, `image2`, or `-frames:v` with an image
+    file name) or a raw rgb24 pipe named after `-i` -- carries `accurate_rnd`
+    in its argv or filter. Unit: a synthetic RGB frame encoded to yuv420p with
+    the pack's own encoder and extracted again keeps its mean luma within 0.5.
+    Live: the signed luma step at chained-segment joins, net of the local
+    drift, is centred on zero.
+  tags: ["ffmpeg", "swscale", "yuv420p", "rgb", "color", "brightness", "chain", "extract"]
+  legacy_id: ""
+- id: "12.184"
+  phase: 12
+  area: "video-vae-temporal-tile-softness-pulse"
+  symptom: |
+    A video decoded through a tiled VAE shows a regular pulse of softness: every
+    Nth frame is blurrier than its neighbours (every 8th with LTX's VAE), which
+    reads on screen as stepping or strobing rather than as a blur you can point
+    at. Stills look fine; only playback shows it.
+  cause: |
+    The temporal tile was a small number of latent frames. VAEDecodeTiled's
+    temporal_size 16 on a VAE that compresses time 8x is two latent frames with
+    one overlapping, so every tile boundary -- every 8th frame -- is a blend of
+    two chunk decodes, and a decoder that looks both ways in time (LTX 0.9.8,
+    causal_decoder false) loses context at each chunk edge. Measured: those
+    frames kept 0.54x the Laplacian variance of an untiled decode (0.72x of
+    their neighbours in published clips), a ~3 Hz pulse at 25 fps.
+  fix: |
+    Decode with a temporal tile of at least eight latent frames (64 pixel
+    frames at 8x; ComfyUI's own VAEDecodeTiled default), keeping the spatial
+    tile for the VRAM ceiling. At 64 the decode measured 0.995-1.003x of
+    untiled, and an 8 GB card decoded 161-frame segments at a 7.5 GB peak.
+    Keep the old value only in versioned history, never in the live recipe.
+  verify: |
+    Static: the live recipe a video lane reads (not its archived versions)
+    decodes with a temporal tile of at least 64 frames when tiled decode is on,
+    and no graph builder hands VAEDecodeTiled a literal temporal_size under 64.
+    Live: per-frame Laplacian variance of a decoded clip shows no periodic dip;
+    every 8th frame against the mean of its two neighbours is 0.9 or higher.
+  tags: ["vae", "tiled", "decode", "temporal", "video", "ltx", "pulse", "sharpness"]
+  legacy_id: ""
+- id: "12.185"
+  phase: 12
+  area: "canonical-i2v-recipe-leaves-the-still-under-a-narrating-prompt"
+  symptom: |
+    After aligning an image-to-video lane with the model vendor's canonical
+    graph (its distilled sigma schedule, its conditioning-image preprocessing),
+    clips stop showing the still they were conditioned on: within half a second
+    the picture cuts to a different scene or composition -- often the one the
+    text prompt describes -- and the frames come out softer. Frame 0 still
+    matches the still, so a check on the first frame passes.
+  cause: |
+    The vendor recipe is tuned for a prompt that CAPTIONS the conditioning image.
+    A pipeline whose prompt narrates the scene instead (who speaks, what
+    happens) gives the text a different picture than the still. The distilled
+    schedule spends several steps at near-pure noise, where the text decides the
+    composition, and the preprocessing (an H.264-style compression of the still,
+    LTXVPreprocess 38) loosens the still's grip further and softens every frame.
+    Measured on LTX 0.9.8 with paired replays: distance from the still at frame
+    24 rose from 17.0 to 31.2 with the schedule alone; 58 of 68 beats of one
+    episode left the still's composition entirely.
+  fix: |
+    Adopt a vendor recipe knob only after a PAIRED measurement on the
+    pipeline's own prompts: the same stills, prompts and seeds, one knob moved,
+    each beat's opening frames scored against its still (distance at frames
+    12-48) and for detail. Keep what wins on those numbers; here that was the
+    schedule the lane already had, the clean still, and only the decode fix.
+  verify: |
+    Live: a paired replay of a finished episode, the candidate recipe against
+    the current one, scored per beat at frames 12, 24 and 48 against the beat's
+    still; the candidate is not adopted if it sits further from the still in
+    most beats or loses detail.
+  tags: ["i2v", "ltx", "recipe", "canonical", "schedule", "preprocess", "adherence", "measurement"]
+  legacy_id: ""
