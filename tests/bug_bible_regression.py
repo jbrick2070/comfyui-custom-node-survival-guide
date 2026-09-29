@@ -1056,24 +1056,54 @@ class TestPhase11LLM:
         required string that opens outside ASCII (a Japanese name,
         "Ángel", "¿Dónde?") dies after its first character.
 
-        Static tripwire: a file that builds a JsonSchemaParser and hands
-        it to an integration (anything under lmformatenforcer.integrations,
-        a TokenEnforcer, build_token_enforcer_tokenizer_data) must ASSIGN
-        alphabet_without_quotes -- a comment naming it does not count. If
-        a later release of the library fixes the copy, the assignment is
-        a harmless no-op.
+        Static tripwire, read from the syntax tree so comments and
+        docstrings count for nothing: a file that CALLS JsonSchemaParser
+        and uses an integration (imports from lmformatenforcer.integrations,
+        or calls TokenEnforcer, build_token_enforcer_tokenizer_data or a
+        build_*_logits_processor / build_*_prefix_allowed_tokens_fn) must
+        assign alphabet_without_quotes (or setattr it). Per file: a parser
+        built in one module and handed to the integration in another is
+        not seen. If a later release of the library fixes the copy, the
+        assignment is a harmless no-op.
         """
-        integration = re.compile(
-            r"lmformatenforcer\.integrations|TokenEnforcer|"
-            r"build_token_enforcer_tokenizer_data")
-        refresh = re.compile(r"\.alphabet_without_quotes\s*=(?!=)")
+        builders = ("TokenEnforcer", "build_token_enforcer_tokenizer_data")
         issues = []
         for fpath in py_files:
             with open(fpath, "r", encoding="utf-8", errors="replace") as f:
                 content = f.read()
-            if "JsonSchemaParser(" not in content:
+            if "JsonSchemaParser" not in content:
                 continue
-            if integration.search(content) and not refresh.search(content):
+            try:
+                tree = ast.parse(content)
+            except SyntaxError:
+                continue  # test_all_py_files_parse reports the file
+            builds = integrates = refreshes = False
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Call):
+                    func = node.func
+                    name = getattr(func, "id", None) or getattr(func, "attr", None) or ""
+                    if name == "JsonSchemaParser":
+                        builds = True
+                    elif name in builders or (name.startswith("build_") and name.endswith(
+                            ("_logits_processor", "_prefix_allowed_tokens_fn"))):
+                        integrates = True
+                    elif (name == "setattr" and len(node.args) >= 2
+                          and isinstance(node.args[1], ast.Constant)
+                          and node.args[1].value == "alphabet_without_quotes"):
+                        refreshes = True
+                elif isinstance(node, ast.ImportFrom):
+                    if (node.module or "").startswith("lmformatenforcer.integrations"):
+                        integrates = True
+                elif isinstance(node, ast.Import):
+                    if any(a.name.startswith("lmformatenforcer.integrations")
+                           for a in node.names):
+                        integrates = True
+                elif isinstance(node, (ast.Assign, ast.AnnAssign)):
+                    targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+                    if any(isinstance(t, ast.Attribute) and t.attr == "alphabet_without_quotes"
+                           for t in targets):
+                        refreshes = True
+            if builds and integrates and not refreshes:
                 issues.append(os.path.basename(fpath))
         assert not issues, (
             "BUG-12.190: a JsonSchemaParser handed to an lm-format-enforcer "
@@ -1202,10 +1232,13 @@ class TestThreeFileContract:
     # tests/test_cast_lock.py (360 casts, the count against the draws with
     # the count patched out) and tests/test_lane_rolls.py (a roll over a cast
     # bigger than Bark's voices leaves Bark out, the count in its receipt).
-    # 12.191's verify is a measurement on the real model; the static half
-    # that every writing pass receives the row's instruction is pinned in
-    # OTR's tests/test_episode_language_writer.py (writer and title) and
-    # tests/test_episode_language_painted_show.py (the announcer seam).
+    # 12.191's verify is a measurement on the real model (OTR's numbers are
+    # in its apple/PROD_BUG_LOG.md, PBUG-20260929-07). Of the static half --
+    # every writing pass receives the row's instruction -- OTR pins the
+    # writer's native instruction, the outline and the title prompts in
+    # tests/test_episode_language_writer.py and the announcer seam in
+    # tests/test_episode_language_painted_show.py; its compose, exchange and
+    # clean-up passes are not pinned one by one.
     # BUG-12.190 IS asserted, in TestPhase11LLM.
 
     def _repo_root(self):
