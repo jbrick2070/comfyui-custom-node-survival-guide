@@ -3335,3 +3335,12 @@ records:
   bible_id: '12.185'
   verdict: promoted
   source: live-artifact
+- ref: apple/PROD_BUG_LOG.md (PBUG-20260928-06)
+  title: The ONNX Kokoro backend refused every language but English, so three randomized
+    Desktop runs (Python 3.13) wrote their scripts and died at the first Spanish line; fixed
+    4f973e98 (misaki's EspeakG2P repeated on the ONNX side, phonemes identical to misaki on
+    five languages) + 2326632b (the queue-time gate refuses or skips a language the run's
+    voices cannot speak)
+  bible_id: '12.186'
+  verdict: promoted
+  source: live-artifact

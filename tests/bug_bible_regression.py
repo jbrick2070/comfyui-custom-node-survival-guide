@@ -1141,6 +1141,14 @@ class TestThreeFileContract:
     # reconciliation exists, so it lands with the fix rather than with
     # the entry. Add it there -- an entry whose static half stays
     # unwritten is how a rule becomes decoration.
+    #
+    # BUG-12.186 (a portable backend refuses a capability the reference
+    # backend gets from a shared, pure step -- the ONNX Kokoro refusing every
+    # language but English) has no executable assertion here, deliberately.
+    # Its verify clause is a PARITY test between the portable step and the
+    # reference one, and only a pack that ships both can run it; OTR pins it
+    # in tests/test_kokoro_backends.py (the phonemes equal misaki's on every
+    # espeak language) and pins the queue-time half in tests/test_lane_rolls.py.
 
     def _repo_root(self):
         """Resolve the survival guide repo root (parent of tests/)."""

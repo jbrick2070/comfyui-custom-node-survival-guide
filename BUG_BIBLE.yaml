@@ -12113,3 +12113,40 @@ bugs:
     most beats or loses detail.
   tags: ["i2v", "ltx", "recipe", "canonical", "schedule", "preprocess", "adherence", "measurement"]
   legacy_id: ""
+- id: "12.186"
+  phase: 12
+  area: "portable-backend-refuses-what-the-reference-gets-from-a-shared-step"
+  symptom: |
+    A feature works on one install and dies late on another: at its first use,
+    after the expensive work upstream has already run, with an error saying the
+    portable backend cannot do it ("kokoro-onnx is English-only"), while the
+    reference backend on another Python version does it without trouble. On a
+    randomized run it fails at random, whenever the roll lands on the refused
+    value.
+  cause: |
+    The pack refused the capability on the portable backend by rule (a
+    hard-coded locale, a refusal written from the library's README) instead
+    of by measurement. The reference backend got the capability from a pure
+    preprocessing step (grapheme-to-phoneme through espeak-ng, wrapped by a
+    package with no build for the portable Python) whose real dependencies the
+    portable backend already ships. And the refusal fired when the model
+    loaded, not when the run was queued, so every rolled episode that hit it
+    lost the writer's minutes first.
+  fix: |
+    Repeat the reference backend's pure step on the portable side, with the
+    same library, the same settings and the same post-processing, and hand the
+    portable backend the step's output (phonemes rather than text). Prove the
+    two equal on the intermediate form wherever both are installed, and pin
+    that as a test. Refuse by name only what genuinely needs the missing
+    package, and ask the same question at queue time so a pick refuses and a
+    roll skips before anything is spent.
+  verify: |
+    Test: for every value the portable path claims (each language), run the
+    portable step and the reference step on sample inputs that exercise the
+    post-processing (brackets, quotes, borrowed foreign words, folded symbols)
+    and assert identical output; skip only where the reference is not
+    installed. Live: produce one output per claimed value through the portable
+    backend on the portable install. Queue time: a value the run cannot serve
+    refuses when picked and is left out when rolled, before any download.
+  tags: ["tts", "kokoro", "onnx", "g2p", "espeak", "phonemes", "portability", "python-3.13", "parity", "queue-time"]
+  legacy_id: ""
