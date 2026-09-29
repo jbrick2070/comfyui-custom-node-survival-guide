@@ -12209,3 +12209,112 @@ bugs:
     with the live error.
   tags: ["ownership", "handoff", "producer-consumer", "casting", "tts", "gate", "randomized-roll"]
   legacy_id: ""
+- id: "12.189"
+  phase: 12
+  area: "a-hard-capacity-pool-counted-only-where-it-runs-dry"
+  symptom: |
+    A randomized pick of an engine or backend passes every check at queue
+    time, and the run dies late -- after the expensive upstream work -- with
+    "nothing to pick" from a pool that looked big enough. It happens only for
+    large inputs, and only when the roll lands on that option; picked by hand,
+    the option fails the same way, just as late.
+  cause: |
+    The option draws from a pool with a hard capacity (a fixed set of voices,
+    seats or licences), and a rule forbids two consumers sharing one entry.
+    The demand -- how many characters a story brings -- is only known after an
+    earlier stage runs, and nothing compared demand with capacity where the
+    option is chosen: the first place that noticed was the draw, when the
+    pool ran dry. A separate count is easy to get wrong in both directions,
+    because rows that already hold an entry, or legitimately share one,
+    change what the draws actually spend.
+  fix: |
+    Count demand against capacity where the option is chosen. A roll leaves
+    out an option that cannot serve this input and says why in its receipt;
+    an explicit pick refuses before any draw, in words that give both numbers
+    and the ways out (another option, a smaller input). Derive the count from
+    the same rows and rules the draw uses, in one function that the roll and
+    the refusal both call.
+  verify: |
+    Test: enumerate inputs across the boundary (sizes around the capacity,
+    rows that already hold an entry, entries shared between rows), run the
+    real draws with the count patched out, and assert the count's verdict
+    (demand <= capacity) equals whether the draws succeeded, for every input.
+    Test: a roll over an input bigger than the pool never selects that
+    option, and its receipt carries the count. Live: an input one bigger than
+    the pool is refused by count when the option is picked, and publishes on
+    another option when the choice is rolled.
+  tags: ["pool", "capacity", "uniqueness", "randomized-roll", "late-failure", "casting", "tts", "xref-10.04"]
+  legacy_id: ""
+- id: "12.190"
+  phase: 12
+  area: "a-grammar-parser-keeps-a-copy-of-the-alphabet-its-integration-replaced"
+  symptom: |
+    Schema-constrained JSON generation works in English and dies in other
+    languages at the first character of a required string: the model writes
+    `"name": "ノ` and then only whitespace until end-of-text, on every retry,
+    and the parse reports an unterminated string. Latin values that open with
+    an accent or an inverted question mark ("Ángel", "¿Dónde?") fail the same
+    way. The same field without a minimum length is fine.
+  cause: |
+    lm-format-enforcer's JsonSchemaParser (measured on 0.11.3) copies the
+    alphabet it was constructed with -- the ASCII default unless one is
+    passed -- into context.alphabet_without_quotes, which a string with
+    minLength reads until it is long enough. Every integration builds a
+    TokenEnforcer, which installs the tokenizer's alphabet on parser.config
+    only, so the copy stays ASCII. A required string's non-ASCII first
+    character is rejected, the parser state empties, and the enforcer falls
+    back to allowing whitespace and end-of-text.
+  fix: |
+    After the integration installs the tokenizer alphabet, refresh the copy
+    from it -- parser.context.alphabet_without_quotes =
+    parser.config.alphabet.replace('"', "") -- at every site that builds a
+    JsonSchemaParser, next to any other config the integration overwrote.
+    Do not drop minLength or loosen the constraint to get past it.
+  verify: |
+    Test: build the parser through the real integration with the real
+    tokenizer's alphabet, a required minLength string, and values that open
+    outside ASCII ("ノラ", "诺拉", "नोरा", "Ángel", "¿Dónde?"); assert each
+    first character is allowed and the document completes to can_end().
+    Static: a file that builds a JsonSchemaParser and hands it to an
+    integration assigns alphabet_without_quotes. Live: one run per non-Latin
+    language completes the constrained pass.
+  tags: ["llm", "structured-json", "lm-format-enforcer", "json-schema", "grammar", "minLength", "non-ascii", "multilingual", "stale-copy"]
+  legacy_id: ""
+- id: "12.191"
+  phase: 12
+  area: "a-language-instruction-that-names-the-language-but-not-the-written-standard"
+  symptom: |
+    Episodes requested in Mandarin come out in Cantonese-flavoured written
+    Chinese -- 嘅 咗 喺 佢 我哋 in the narration, the dialogue and the
+    announcer's lines -- with traditional characters mixed in, even at a low
+    temperature. A rewrite pass turns a fixed station name, 失落的信号, into
+    失落嘅信号. A Mandarin voice reads the Cantonese characters with Mandarin
+    readings, so what airs is neither language.
+  cause: |
+    The language instruction asked for the spoken language (普通话) but never
+    named the written standard or the script, and a multilingual model filled
+    the gap with a regional written variety it also knows. Measured on the
+    real writer (Gemma 4 12B, native ComfyUI sampling), per 1000 Chinese
+    characters of output: 75.3 Cantonese markers and 19.7 traditional-only
+    characters with the old wording at repetition penalty 1.03, and 71.3 and
+    0.0 at 1.0. The wording owned the Cantonese; in that pair the penalty --
+    which ComfyUI, like transformers, applies to the prompt's tokens too --
+    owned the traditional forms.
+  fix: |
+    Name the standard and the script in the instruction's own language, and
+    say what to avoid: 请用简体字的标准普通话（中国大陆书面语）写完整集，不要写粤语，
+    也不要用繁体字。 (measured: 0.0 and 0.0 at penalty 1.03). Give the
+    instruction to every pass that writes in the language -- outline,
+    compose, dialogue, titles, judge-and-repair, the announcer -- and bump
+    the language row's revision, so a replay of an older episode reports
+    that its wording changed.
+  verify: |
+    Measure before adopting: run the same story on the real model and the
+    shipping sampler with the old and the new wording, count the variant's
+    markers and the other script's characters per 1000 characters of output,
+    and adopt only a wording that measures zero; measure the sampler's
+    penalty separately, because it shifts spelling variants on its own.
+    Test: every pass that writes in the language receives the row's
+    instruction.
+  tags: ["llm", "multilingual", "language-instruction", "chinese", "cantonese", "simplified-chinese", "script", "repetition-penalty", "measurement"]
+  legacy_id: ""

@@ -3361,3 +3361,35 @@ records:
   bible_id: '12.188'
   verdict: promoted
   source: live-artifact
+- ref: apple/PROD_BUG_LOG.md (PBUG-20260929-03)
+  title: A My Story cast bigger than Bark's ten voices died in CastLock ("available_voices is
+    empty") after the writer had run, whenever the voice roll drew Bark (live 10:07,
+    pending_20260929_100014); fixed ee9c2ddf + 8efff924 + b23a3441 + bb5ed977 (the roll counts
+    Bark's seats and leaves it out, a hand pick is refused by the same count); verified live on a
+    thirteen-character test story
+  bible_id: '12.189'
+  verdict: promoted
+  source: live-artifact
+- ref: apple/PROD_BUG_LOG.md (PBUG-20260929-04)
+  title: My Story cast names carried the model's leading spaces into the ledger, the credits and the
+    act prompt (" Meerkats"); the speaker match compared normalized names, the stored name was never
+    normalized; fixed a709287c + bd5d4e59 (names normalized where they enter the schema)
+  bible_id: '12.43'
+  verdict: covered
+  source: live-artifact
+- ref: apple/PROD_BUG_LOG.md (PBUG-20260929-05)
+  title: lm-format-enforcer read a stale ASCII copy of its alphabet for minLength strings, so every
+    required string that opened outside ASCII died after one character (Japanese and Hindi My Story,
+    gauntlet legs 6 and 11); fixed 62af48ae (refresh context.alphabet_without_quotes after the
+    integration installs the tokenizer alphabet); verified live
+  bible_id: '12.190'
+  verdict: promoted
+  source: live-artifact
+- ref: apple/PROD_BUG_LOG.md (PBUG-20260929-07)
+  title: Mandarin episodes were written in Cantonese-flavoured Chinese with traditional characters,
+    spoken lines included (split_account_zh_20260929_112744); the zh instruction never named the
+    written standard or the script; fixed 9d7268db, measured 75.3 -> 0.0 Cantonese markers per 1000
+    Chinese characters
+  bible_id: '12.191'
+  verdict: promoted
+  source: published-episode

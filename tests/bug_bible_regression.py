@@ -1047,6 +1047,40 @@ class TestPhase11LLM:
             "normalization in: " + ", ".join(issues)
         )
 
+    def test_lmfe_alphabet_copy_is_refreshed_after_the_integration(self, py_files):
+        """BUG-12.190: lm-format-enforcer's JsonSchemaParser copies the
+        alphabet it was built with into context.alphabet_without_quotes,
+        and a string with minLength reads that copy until it is long
+        enough. Every integration installs the tokenizer's alphabet on
+        parser.config only, so the copy stays the ASCII default and every
+        required string that opens outside ASCII (a Japanese name,
+        "Ángel", "¿Dónde?") dies after its first character.
+
+        Static tripwire: a file that builds a JsonSchemaParser and hands
+        it to an integration (anything under lmformatenforcer.integrations,
+        a TokenEnforcer, build_token_enforcer_tokenizer_data) must ASSIGN
+        alphabet_without_quotes -- a comment naming it does not count. If
+        a later release of the library fixes the copy, the assignment is
+        a harmless no-op.
+        """
+        integration = re.compile(
+            r"lmformatenforcer\.integrations|TokenEnforcer|"
+            r"build_token_enforcer_tokenizer_data")
+        refresh = re.compile(r"\.alphabet_without_quotes\s*=(?!=)")
+        issues = []
+        for fpath in py_files:
+            with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+            if "JsonSchemaParser(" not in content:
+                continue
+            if integration.search(content) and not refresh.search(content):
+                issues.append(os.path.basename(fpath))
+        assert not issues, (
+            "BUG-12.190: a JsonSchemaParser handed to an lm-format-enforcer "
+            "integration without refreshing context.alphabet_without_quotes "
+            "in: " + ", ".join(issues)
+        )
+
     def test_generate_calls_have_length_guard(self, py_files):
         """BUG-12.33: Files that call model.generate() should have
         prompt length checking/truncation nearby.
@@ -1159,6 +1193,20 @@ class TestThreeFileContract:
     # tests/test_sanctioned_gap_end_to_end.py (ShotLock-shaped fixtures; the
     # old keying fails them) and 12.188 in tests/test_cast_lock.py (the lane's
     # unvoiced rows drawn on Bark; with the draw patched out, leg 10's error).
+    #
+    # BUG-12.189 (a hard-capacity pool counted only where the draw runs dry)
+    # and BUG-12.191 (a language instruction that names the language but not
+    # the written standard or script) have no executable assertion here.
+    # 12.189's verify runs the pack's own draws against its own count, which
+    # only the pack that owns both can do; OTR pins it in
+    # tests/test_cast_lock.py (360 casts, the count against the draws with
+    # the count patched out) and tests/test_lane_rolls.py (a roll over a cast
+    # bigger than Bark's voices leaves Bark out, the count in its receipt).
+    # 12.191's verify is a measurement on the real model; the static half
+    # that every writing pass receives the row's instruction is pinned in
+    # OTR's tests/test_episode_language_writer.py (writer and title) and
+    # tests/test_episode_language_painted_show.py (the announcer seam).
+    # BUG-12.190 IS asserted, in TestPhase11LLM.
 
     def _repo_root(self):
         """Resolve the survival guide repo root (parent of tests/)."""
