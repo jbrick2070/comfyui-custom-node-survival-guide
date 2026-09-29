@@ -1149,6 +1149,16 @@ class TestThreeFileContract:
     # reference one, and only a pack that ships both can run it; OTR pins it
     # in tests/test_kokoro_backends.py (the phonemes equal misaki's on every
     # espeak language) and pins the queue-time half in tests/test_lane_rolls.py.
+    #
+    # BUG-12.187 (two call sites key one record differently, so a declared
+    # skip is honoured by the validator and crashes the executor) and
+    # BUG-12.188 (a field each module defers to the other, owned by nobody on
+    # one engine's branch) have no executable assertion here either: both
+    # verify clauses run the producer's REAL record shape through the
+    # consumer, which only the pack that owns both can do. OTR pins 12.187 in
+    # tests/test_sanctioned_gap_end_to_end.py (ShotLock-shaped fixtures; the
+    # old keying fails them) and 12.188 in tests/test_cast_lock.py (the lane's
+    # unvoiced rows drawn on Bark; with the draw patched out, leg 10's error).
 
     def _repo_root(self):
         """Resolve the survival guide repo root (parent of tests/)."""

@@ -12150,3 +12150,62 @@ bugs:
     refuses when picked and is left out when rolled, before any download.
   tags: ["tts", "kokoro", "onnx", "g2p", "espeak", "phonemes", "portability", "python-3.13", "parity", "queue-time"]
   legacy_id: ""
+- id: "12.187"
+  phase: 12
+  area: "two-call-sites-key-one-record-differently"
+  symptom: |
+    A declared skip crashes one layer later. The validator logs that it is
+    skipping a record whose optional input was legitimately refused (a
+    sanctioned gap), and the executor then processes that same record anyway
+    and dies on the missing input with a worse message -- a whole run lost for
+    one declined asset, although the skip was designed, documented and tested.
+  cause: |
+    Two call sites apply "the same predicate", but each derives the record's
+    key on its own. The validator derives it from the link fields the
+    producer actually writes (a source-line list, else the record id with its
+    prefix stripped); the executor reads a field the producer never writes, so
+    on every real record the lookup is empty and nothing is ever skipped. The
+    end-to-end test passed because its hand-built fixture carried both fields.
+  fix: |
+    Make the predicate one function that takes the RECORD and derives the key
+    itself, and call it at every site that decides skip, render or report, so
+    they cannot disagree. Build test fixtures in the producer's real shape --
+    or run the real producer -- never as a superset of its fields.
+  verify: |
+    Test: build records exactly as the producer writes them, mark one as a
+    sanctioned gap, run the validator and then the executor with the
+    expensive call mocked to raise; assert the gapped record is never
+    executed, every other record is executed in the same order as before, and
+    the report marks the gap as sanctioned. Mutation: re-key one site to the
+    absent field and assert the test fails.
+  tags: ["pipeline", "predicate", "skip", "fixtures", "producer-shape", "render", "sanctioned-gap"]
+  legacy_id: ""
+- id: "12.188"
+  phase: 12
+  area: "deferred-field-owned-by-nobody"
+  symptom: |
+    One configuration of an otherwise working pipeline fails at a late hard
+    gate every time -- "field empty on rows ..." -- for one engine on one
+    family of inputs, while every other engine on the same rows succeeds.
+    Under a randomized roll it looks like an intermittent failure.
+  cause: |
+    Two modules each defer the same field to the other, in their own words:
+    the producer leaves it empty "until the consumer stamps it", and the
+    consumer's branch for that one engine only VERIFIES it, under a contract
+    written back when the producer used to fill it. Every other branch of the
+    consumer stamps the field, so the gap shows for one engine only, and only
+    after the expensive upstream work has run.
+  fix: |
+    Give the field one owner in every branch that consumes it: the consumer
+    stamps what the producer left empty and keeps what it did set, and the
+    verification gate stays after the stamp. When a producer stops filling a
+    field, search every consumer branch for who fills it now before landing
+    the change.
+  verify: |
+    Test: run the producer's real rows (the field left empty) through the
+    consumer once per engine or branch; assert each ends with the field
+    filled and the gate passing, and that a row the producer did fill keeps
+    its value. With the new stamping patched out, the same rows must fail
+    with the live error.
+  tags: ["ownership", "handoff", "producer-consumer", "casting", "tts", "gate", "randomized-roll"]
+  legacy_id: ""

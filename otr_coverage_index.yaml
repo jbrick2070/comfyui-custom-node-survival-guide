@@ -3344,3 +3344,20 @@ records:
   bible_id: '12.186'
   verdict: promoted
   source: live-artifact
+- ref: apple/PROD_BUG_LOG.md (PBUG-20260929-01)
+  title: A refused required still (Ideogram's safety placeholder on the music-opening still)
+    was waved through as a sanctioned gap by the still-spine validator and then rendered anyway by
+    run_episode, which keyed shots on a beat_id field ShotLock never writes; still_pan died on
+    the missing still (overnight leg 07); fixed 232d9f41 + f9ef4f4f + 2c500d3a
+    (shot_is_sanctioned_gap at every site, fixtures in ShotLock's real shape)
+  bible_id: '12.187'
+  verdict: promoted
+  source: live-artifact
+- ref: apple/PROD_BUG_LOG.md (PBUG-20260929-02)
+  title: Bark rolled on scifi_news_pro died at CastLock Gate 1 ("empty voice_preset on 2
+    rows") because the content-owned lanes leave character voices to CastLock and CastLock's
+    Bark branch only verified them (overnight leg 10); fixed 0c1bf1f6 + 35689b12 + 982427eb
+    (CastLock draws the unvoiced rows); verified live on leg 15 (My Story on Bark published)
+  bible_id: '12.188'
+  verdict: promoted
+  source: live-artifact
