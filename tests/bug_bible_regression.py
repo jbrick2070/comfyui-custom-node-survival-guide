@@ -1061,10 +1061,13 @@ class TestPhase11LLM:
         and uses an integration (imports from lmformatenforcer.integrations,
         or calls TokenEnforcer, build_token_enforcer_tokenizer_data or a
         build_*_logits_processor / build_*_prefix_allowed_tokens_fn) must
-        assign alphabet_without_quotes (or setattr it). Per file: a parser
-        built in one module and handed to the integration in another is
-        not seen. If a later release of the library fixes the copy, the
-        assignment is a harmless no-op.
+        assign alphabet_without_quotes (or setattr it). Names imported from
+        lm-format-enforcer under an alias are followed. It is a tripwire, not
+        a proof: it reads one file at a time (a parser built in one module
+        and handed to the integration in another is not seen), and any
+        assignment of that attribute in the file satisfies it. If a later
+        release of the library fixes the copy, the assignment is a harmless
+        no-op.
         """
         builders = ("TokenEnforcer", "build_token_enforcer_tokenizer_data")
         issues = []
@@ -1077,11 +1080,18 @@ class TestPhase11LLM:
                 tree = ast.parse(content)
             except SyntaxError:
                 continue  # test_all_py_files_parse reports the file
+            aliases = {}
+            for node in ast.walk(tree):
+                if (isinstance(node, ast.ImportFrom)
+                        and (node.module or "").startswith("lmformatenforcer")):
+                    for imported in node.names:
+                        aliases[imported.asname or imported.name] = imported.name
             builds = integrates = refreshes = False
             for node in ast.walk(tree):
                 if isinstance(node, ast.Call):
                     func = node.func
                     name = getattr(func, "id", None) or getattr(func, "attr", None) or ""
+                    name = aliases.get(name, name)
                     if name == "JsonSchemaParser":
                         builds = True
                     elif name in builders or (name.startswith("build_") and name.endswith(
