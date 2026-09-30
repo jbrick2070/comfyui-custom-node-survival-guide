@@ -12318,3 +12318,77 @@ bugs:
     instruction.
   tags: ["llm", "multilingual", "language-instruction", "chinese", "cantonese", "simplified-chinese", "script", "repetition-penalty", "measurement"]
   legacy_id: ""
+- id: "12.192"
+  phase: 12
+  area: "an-advertised-capability-that-depends-on-an-undeclared-install"
+  symptom: |
+    A dropdown lists eight languages and a "roll any language" option, and
+    every one of them works on the developer's box. On a fresh install of
+    the published pack two of them are refused the moment the user presses
+    Run ("needs fugashi, jaconv, which are not installed"), and the roll
+    quietly draws from the six that work, so nobody sees a failure at all --
+    the feature is simply narrower than the menu says. The libraries were
+    documented as an "opt-in" pip step; the developer had run it months ago.
+  cause: |
+    A capability the pack advertises was gated on a runtime library the pack
+    never declared, on the argument that users of other languages should not
+    carry it. The argument had lapsed (the biggest piece, a dictionary, was
+    already a declared requirement) while the refusal stayed, and the
+    fallback that hid it -- the roll dropping unavailable rows -- turned a
+    missing dependency into a silent narrowing of the product. Cold installs
+    are the only place this shows, and the developer's box is never one.
+  fix: |
+    Declare the library in both dependency lists (the registry reads
+    pyproject's static list, the extractor reads requirements.txt), under an
+    environment marker that names exactly the interpreters that use it, so
+    it is neither an unbuildable line that blocks the whole install elsewhere
+    nor a tax on interpreters with another backend. Prove the wheels exist
+    for every platform the pack ships to before declaring (a Linux CI job
+    that pip-installs the requirements plus the candidate, and a Windows
+    portable), because pip resolves a requirements file all-or-nothing. Keep
+    the pip line as the error's repair text, not as a documented step.
+  verify: |
+    Cold drill: a fresh install of the published pack, every model moved
+    aside, selects each advertised option and runs; a refusal at Run for a
+    library is this defect. Test: the marker-bearing lines carry the same
+    marker in both dependency lists and install exactly where the backend
+    that needs them installs. CI: pip install -r requirements.txt on a clean
+    Linux interpreter, then import every declared runtime library.
+  tags: ["packaging", "requirements", "pyproject", "environment-marker", "cold-install", "registry", "multilingual", "silent-degrade", "roll"]
+  legacy_id: ""
+- id: "12.193"
+  phase: 12
+  area: "an-output-reported-under-a-ui-key-the-api-does-not-map"
+  symptom: |
+    The pipeline's final node publishes an mp4, the canvas and the app view
+    play it, and the run reports success. An API client (the Comfy SDK
+    through the Comfy API v2, comfy-api-proxy in front of a self-hosted
+    ComfyUI) asks the finished job for that node's outputs and receives only
+    a poster png; the episode is not listed. Iterating all of the job's
+    outputs instead fails on the first one: an earlier node's canvas preview
+    of an intermediate video that the pipeline's own asset cleanup deleted
+    after publishing ("output bytes are no longer retrievable upstream").
+  cause: |
+    ComfyUI's history stores whatever `ui` dict a node returns, and each
+    consumer maps only the keys it knows. The frontend and app view play a
+    custom "video" list; the API bridge turns only "images", "gifs" and
+    "audio" into downloadable outputs, so the deliverable was invisible to
+    it. Separately, history keeps references to every file a node ever
+    reported, including intermediates a later node deletes, and the API has
+    no notion of retention or "final".
+  fix: |
+    Report the deliverable under the keys every consumer maps -- the
+    animated-gif convention ("gifs") for video, "images" for stills, "audio"
+    for audio -- in addition to any key a richer player wants, each entry
+    {filename, subfolder, type} relative to the output root. Tell API users
+    to fetch the deliverable node's outputs by node id, not the whole job's,
+    while intermediates are reported by earlier nodes; and do not report an
+    intermediate the pipeline will delete unless the canvas needs it.
+  verify: |
+    Live: submit the graph through the API bridge, wait for the job, and
+    download the deliverable node's outputs; the published file arrives byte
+    for byte. Test: the final node's `ui` carries the deliverable under a
+    key in {"images", "gifs", "audio"} with the three fields, and any custom
+    key duplicates rather than replaces it.
+  tags: ["output-node", "ui-dict", "history", "api", "comfy-sdk", "api-proxy", "video", "asset-cleanup", "intermediates"]
+  legacy_id: ""

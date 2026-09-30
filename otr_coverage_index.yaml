@@ -3393,3 +3393,19 @@ records:
   bible_id: '12.191'
   verdict: promoted
   source: published-episode
+- ref: apple/PROD_BUG_LOG.md (PBUG-20260929-10)
+  title: A fresh Python 3.13 install of the published pack refused Japanese and Mandarin at Run
+    for want of six undeclared phonemizer libraries, and the language roll quietly drew from six
+    languages instead of eight (4060 cold drill legs ja_shakespeare_video, zh_flux_still); declared
+    under kokoro-onnx's marker in 2.3.17, proven on Windows and Linux 3.13, both legs published
+  bible_id: '12.192'
+  verdict: promoted
+  source: headless-run
+- ref: apple/HANDOFF_LOG.md (2026-09-30 09:55, the Comfy SDK demo; 04329e1e)
+  title: Through the Comfy API v2 bridge the SDK saw only the poster png for the final node because
+    the published mp4 rode a custom "video" ui key the bridge does not map, and iterating all
+    outputs died on a deleted intermediate (job 52a51943); reported under "gifs" too, job f76413b1
+    saved the episode byte for byte
+  bible_id: '12.193'
+  verdict: promoted
+  source: headless-run
