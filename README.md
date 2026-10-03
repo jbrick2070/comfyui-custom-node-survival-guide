@@ -292,6 +292,23 @@ context. Skip it if you're just here to use the bible + addon.
 
 Some of these patterns generalize beyond ComfyUI to any long-form LLM pipeline — multi-pass revision, arc scoring, token budgets matching reality. Hoisted out into a separate repo for the people who'd never search "comfyui" but need the same patterns: **[long-form-llm-survival-guide](https://github.com/jbrick2070/long-form-llm-survival-guide)**. Same voice, same Three-File Contract discipline, same MIT terms.
 
+## Complementary Tools
+
+**[comfyui-development-skills](https://github.com/badgids/comfyui-development-skills)**
+by Alan Guice (Badgids), MIT. A portable Agent Skills pack for Claude Code,
+Codex, Gemini CLI, OpenCode, Cursor, and other Agent Skills clients. It routes
+the agent to the source that owns each ComfyUI answer: the live `/object_info`
+catalog, a version-matched checkout, or current Comfy-Org docs. It ships
+read-only helpers, including a workflow preflight against the live node catalog.
+
+The two fit together. That pack tells the agent *where to look up* current
+ComfyUI facts; this bible tells it *what tends to break* and checks for it.
+Load the skills while you build, then run `tests/bug_bible_regression.py`
+before you ship.
+
+It is an independent community project, separate from this guide and not
+affiliated with Comfy-Org.
+
 ## License
 
 MIT. Use freely. If an entry helped you, the cost of admission is sending a new
