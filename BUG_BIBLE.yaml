@@ -12392,3 +12392,41 @@ bugs:
     key duplicates rather than replaces it.
   tags: ["output-node", "ui-dict", "history", "api", "comfy-sdk", "api-proxy", "video", "asset-cleanup", "intermediates"]
   legacy_id: ""
+- id: "12.194"
+  phase: 12
+  area: "a-user-facing-instruction-that-names-a-file-the-published-package-excludes"
+  symptom: |
+    A node pack installed from the registry refuses a run, warns, or opens a
+    dialog, and the instruction it gives names a file the install does not
+    contain: "see apple/DEPENDENCIES.md", "re-generate it with
+    scripts/build_variants.py", "re-run otr_check bank ...". The gate itself
+    worked -- the refusal fired before any download -- but the user is told to
+    open or run something that does not exist on their disk, and nothing else
+    fails to show it.
+  cause: |
+    The publisher's packaging excludes the development tree (a .comfyignore
+    or package-exclude list strips docs, scripts/, tools/), while message text
+    is written inside that tree, where every cited file exists. Tests run there
+    too, so a dead pointer never fails anything. A check for runtime path joins
+    onto excluded files (a worker script, a Blender stage) does not cover
+    message text, tooltips or frontend dialogs, which is where these live. A
+    sibling trap: an instruction that is right for one cause of a refusal and
+    loops for another -- "reinstall the pack" for a stamp check that compares
+    the queued graph against the file on disk, when the stale party is a graph
+    the user saved before an update.
+  fix: |
+    Every instruction a shipped string gives must be actionable from the
+    published package alone: cite an excluded document by its full repository
+    URL, give the end-user action (update or reinstall the pack, re-open the
+    shipped template), and mark any development-tree command as git-clone-only
+    beside its name. Name what the check actually compares, so the advice fits
+    each way it can fail.
+  verify: |
+    Test: walk the non-docstring string constants of every shipped .py file
+    and the frontend sources, strip full URLs, and fail on any path-like token
+    the packaging exclusion rules match unless the same literal carries a
+    git-clone qualifier. Live: install from the registry, trigger each refusal,
+    and confirm every file or command it names exists in the install or is a
+    working URL.
+  tags: ["packaging", "comfyignore", "registry", "user-facing-text", "dead-end-instruction", "dev-tree", "error-messages", "tooltips", "frontend-dialog"]
+  legacy_id: "OTR-PBUG-20261009-01"

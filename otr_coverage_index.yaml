@@ -3409,3 +3409,12 @@ records:
   bible_id: '12.193'
   verdict: promoted
   source: headless-run
+- ref: apple/PROD_BUG_LOG.md (PBUG-20261009-01)
+  title: A Comfy Desktop install of 2.3.22 refused otr_8gb_animatediff (no AnimateDiff-Evolved)
+    with an instruction ending "(apple/DEPENDENCIES.md names the pinned commit)", a file
+    .comfyignore keeps out of the registry bundle; QA then found eighteen more shipped strings
+    naming excluded scripts/ and apple/ files, and a master-hash refusal whose "reinstall" advice
+    looped for a copy saved before an update; fixed 1f8e84d6, 93ee86b2, b6a4b1f7
+  bible_id: '12.194'
+  verdict: promoted
+  source: live-artifact
