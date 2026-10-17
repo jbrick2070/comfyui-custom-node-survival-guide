@@ -3418,3 +3418,23 @@ records:
   bible_id: '12.194'
   verdict: promoted
   source: live-artifact
+- ref: apple/PROD_BUG_LOG.md (PBUG-20261016-01)
+  title: On the 4060's 8 GB profiles Kokoro voiced the characters and read "(distorted, urgent
+    static)" and four other delivery notes aloud, because its prepare_text was the identity while
+    Bark, Chatterbox and IndexTTS2 drop parentheticals; fixed 12ff8485
+  bible_id: '12.195'
+  verdict: promoted
+  source: live-artifact
+- ref: apple/PROD_BUG_LOG.md (PBUG-20261016-02)
+  title: A scifi_news_pro close on a custom premise said "according to User Seed" -- the provenance
+    label sat in the custom-premise article's outlet field; fixed 12ff8485
+  bible_id: '12.196'
+  verdict: promoted
+  source: live-artifact
+- ref: apple/PROD_BUG_LOG.md (PBUG-20261016-03)
+  title: Across 47 legs the ledger_clean pass refused 41 correct already_spoken verdicts and 29
+    correct whole-line repairs over answer shape, and 17 rows shipped their delivery notes; fixed
+    039bbb55
+  bible_id: '12.197'
+  verdict: promoted
+  source: headless-run

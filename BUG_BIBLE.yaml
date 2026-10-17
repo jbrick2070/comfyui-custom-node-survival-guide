@@ -12430,3 +12430,92 @@ bugs:
     working URL.
   tags: ["packaging", "comfyignore", "registry", "user-facing-text", "dead-end-instruction", "dev-tree", "error-messages", "tooltips", "frontend-dialog"]
   legacy_id: "OTR-PBUG-20261009-01"
+
+- id: "12.195"
+  phase: 12
+  area: "one-voice-engine-skips-the-shared-spoken-text-rule"
+  symptom: |
+    Delivery notes the script writer left inside a spoken line --
+    "(distorted, urgent static)", "(sharp, questioning whisper)" -- are read
+    aloud, but only on some machines or some roles. The same ledger rendered
+    on a bigger card is clean.
+  cause: |
+    Several TTS engines share one contract (the ledger keeps the line as
+    written; each engine drops markup before it speaks), applied through a
+    per-engine prepare-text hook. One engine's hook was the identity, kept for
+    "legacy parity" when it only voiced a narrator. A later machine profile
+    gave that engine the characters too, and the one hook without the rule
+    became the voice of every line. Every per-engine test passed, because each
+    engine was only ever tested against itself.
+  fix: |
+    Every engine's prepare hook applies the shared spoken-text cleaner (or
+    states, in code, the one documented reason it may not). Lines whose
+    parentheses ARE speech (verbatim source text) are protected before any
+    engine hook runs, not by one engine skipping the cleaner.
+  verify: |
+    Test: parametrize over every registered local voice engine and assert
+    `prepare_text("(distorted, urgent static) ...the pressure drops.")` keeps
+    the words and contains no parenthetical. Live: render one episode on the
+    machine profile where the narrator engine voices characters and confirm no
+    delivery note is audible.
+  tags: ["tts", "multi-engine", "prepare-text", "stage-direction", "per-engine-hook", "machine-profile", "legacy-parity"]
+  legacy_id: "OTR-PBUG-20261016-01"
+
+- id: "12.196"
+  phase: 12
+  area: "a-provenance-label-stored-in-a-content-field-is-read-as-content"
+  symptom: |
+    A generated closing line credits its fact to an internal label: "...sank
+    thirty years ago, according to User Seed." Nothing errors; the label is
+    spoken as if it were a publication.
+  cause: |
+    A user-typed premise was wrapped in the same article shape a news feed
+    produces, and the OUTLET field was filled with a provenance label ("User
+    Seed") instead of being left empty. The model writing the close is told to
+    name who reported the find, and it did. A separate flag already recorded
+    the provenance, so the label in the outlet slot was a second meaning for
+    one field.
+  fix: |
+    A field an LLM reads as content holds only that content or nothing;
+    provenance rides its own field. When the content slot is empty, say so in
+    the prompt ("no outlet, credit no one") rather than leave a small model to
+    fill the gap with an invention ("A researcher noted ...").
+  verify: |
+    Test: build the input through the real custom-premise path and assert the
+    outlet field is empty and the prompt sent to the closing pass contains
+    neither the label nor any invented reporter instruction gap. Grep: no
+    literal provenance label is assigned to a field named source/outlet/author.
+  tags: ["llm", "provenance", "one-field-two-meanings", "prompt-input", "attribution", "custom-premise", "hallucination"]
+  legacy_id: "OTR-PBUG-20261016-02"
+
+- id: "12.197"
+  phase: 12
+  area: "a-validator-refuses-the-model-s-right-answer-in-the-wrong-shape"
+  symptom: |
+    A model-driven clean-up pass reports the defect correctly and still ships
+    it. Logs show the structured call failing both attempts on the pass's own
+    validators -- "repeats words the line already keeps", "Only
+    localized_defect may contain spans" -- while the raw answers are correct:
+    the whole cleaned line, or the right verdict with an echo in an unused
+    field.
+  cause: |
+    Two protocol faults, both invisible to unit tests written against
+    well-shaped fixtures. The prompt for the narrow answer shape inherited a
+    worked example and a self-check written for the wide shape (a whole-line
+    before/after), so small models copied the wide shape. And the validator
+    refused a whole answer over a field the chosen verdict never reads.
+  fix: |
+    Each answer shape gets its own example and self-check; tell the model
+    which fields to leave empty for which verdict. Where an answer in the
+    other shape can be read back losslessly (an exact partition of the kept
+    text, each kept slice once, in order), read it back and run it through the
+    same guards; ignore an unused field instead of refusing, unless its
+    content contradicts the verdict.
+  verify: |
+    Count the validator refusal reasons in a night of live logs per writer
+    model; replay the exact refused raw answers through the validators in a
+    test and assert the right ones are kept and the doubled/dropped ones are
+    still refused. Assert the narrow-shape prompt contains no wide-shape
+    example text.
+  tags: ["llm", "structured-output", "post-validator", "small-model", "prompt-example", "answer-shape", "clean-pass"]
+  legacy_id: "OTR-PBUG-20261016-03"
