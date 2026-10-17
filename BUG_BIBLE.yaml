@@ -12505,17 +12505,24 @@ bugs:
     before/after), so small models copied the wide shape. And the validator
     refused a whole answer over a field the chosen verdict never reads.
   fix: |
-    Each answer shape gets its own example and self-check; tell the model
-    which fields to leave empty for which verdict. Where an answer in the
-    other shape can be read back losslessly (an exact partition of the kept
-    text, each kept slice once, in order), read it back and run it through the
-    same guards; ignore an unused field instead of refusing, unless its
-    content contradicts the verdict.
+    Fix the ASK: each answer shape gets its own example and self-check, and
+    the model is told which fields to leave empty for which verdict. Ignore
+    an unused field instead of refusing only when its content is a harmless
+    echo (the whole row on an "already spoken" verdict), never when it
+    contradicts the verdict. Do NOT parse the wrong shape back into the right
+    one: an exact-partition read-back of whole-line answers was built, failed
+    three QA rounds with new split/doubling classes each time, and was
+    removed on a panel's advice. Instead make the narrow-shape guard refuse
+    what the wrong shape produces: a replacement that holds ALL the kept
+    speech in order (splicing it says that speech twice by construction),
+    a short line's frame handed back, and the words across a span's seam
+    repeated; and treat an answer whose marked pieces all still stand
+    literally as a no-op.
   verify: |
     Count the validator refusal reasons in a night of live logs per writer
-    model; replay the exact refused raw answers through the validators in a
-    test and assert the right ones are kept and the doubled/dropped ones are
-    still refused. Assert the narrow-shape prompt contains no wide-shape
-    example text.
+    model, before and after the prompt fix. Replay real recorded attempts
+    through old and new guards and list every accept/refuse difference; fuzz
+    whole-line answers with one word bent and assert none splices in twice.
+    Assert the narrow-shape prompt contains no wide-shape example text.
   tags: ["llm", "structured-output", "post-validator", "small-model", "prompt-example", "answer-shape", "clean-pass"]
   legacy_id: "OTR-PBUG-20261016-03"
